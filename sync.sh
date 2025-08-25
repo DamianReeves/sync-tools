@@ -407,9 +407,11 @@ run_one_way() {
     echo "[sync-debug] SRC=$SRC DST=$DST" >>/tmp/sync_debug.log
     echo "[sync-debug] RSYNC_CMD: rsync ${RSYNC_OPTS[*]} ${FILTER_ARGS_SRC[*]} ${FILTER_ARGS_DST[*]} $SRC $DST" >>/tmp/sync_debug.log
   fi
+  # Pass destination filters first, then source filters, so source-side
+  # include/unignore rules can come last and override destination excludes.
   rsync "${RSYNC_OPTS[@]}" \
-    "${FILTER_ARGS_SRC[@]}" \
     "${FILTER_ARGS_DST[@]}" \
+    "${FILTER_ARGS_SRC[@]}" \
     "$SRC" "$DST"
 }
 
