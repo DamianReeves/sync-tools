@@ -231,6 +231,10 @@ clean_to_filter_file() {
     [[ "$line" =~ ^# ]] && continue
     to_filter_rule "$line" >>"$out"
   done <"$in"
+    if [ "${SYNC_DEBUG:-}" = "1" ]; then
+      # preserve a copy for debugging (name includes pid and timestamp)
+      cp "$out" "/tmp/sync_debug_filter_$$.$(date +%s%3N)" 2>/dev/null || true
+    fi
   echo "$out"
 }
 
@@ -240,6 +244,9 @@ patterns_to_filter_file() {
     [[ -n "$pat" ]] || continue
     to_filter_rule "$pat" >>"$out"
   done
+  if [ "${SYNC_DEBUG:-}" = "1" ]; then
+    cp "$out" "/tmp/sync_debug_filter_$$.$(date +%s%3N)" 2>/dev/null || true
+  fi
   echo "$out"
 }
 
@@ -329,14 +336,10 @@ build_side_filters() {
     fi
   fi
 
-  # Default filters (lowest precedence among user-provided filters):
-  # - Always exclude .git/ at the top-level (both sides)
-  out_arr+=(--filter "- /.git/")
-  # - Optionally exclude all hidden directories (both sides)
-  if [[ $EXCLUDE_HIDDEN_DIRS -eq 1 ]]; then
-    # Exclude any directory whose basename begins with a dot
-    out_arr+=(--filter "- .*/")
-  fi
+  # NOTE: default filters (like excluding .git/ and hidden dirs) are appended
+  # at the end of this function so that user-provided include/unignore rules
+  # (from .syncignore, .gitignore, config, or CLI) can appear before the
+  # final exclusions and therefore override them when necessary.
 
   # .syncignore
   if [[ $use_sync -eq 1 && -f "$root/.syncignore" ]]; then
@@ -390,6 +393,15 @@ build_side_filters() {
       out_arr+=(--filter ". $cfi")
     fi
   fi
+
+  # Append default filters last (lowest precedence), so that explicit include
+  # rules generated from user patterns can override the defaults.
+  # - Always exclude top-level .git/ (both sides)
+  out_arr+=(--filter "- /.git/")
+  # - Optionally exclude all hidden directories (both sides)
+  if [[ $EXCLUDE_HIDDEN_DIRS -eq 1 ]]; then
+    out_arr+=(--filter "- .*/")
+  fi
 }
 
 FILTER_ARGS_SRC=()
@@ -407,11 +419,12 @@ run_one_way() {
     echo "[sync-debug] SRC=$SRC DST=$DST" >>/tmp/sync_debug.log
     echo "[sync-debug] RSYNC_CMD: rsync ${RSYNC_OPTS[*]} ${FILTER_ARGS_SRC[*]} ${FILTER_ARGS_DST[*]} $SRC $DST" >>/tmp/sync_debug.log
   fi
-  # Pass destination filters first, then source filters, so source-side
-  # include/unignore rules can come last and override destination excludes.
+  # Pass source filters first, then destination filters. Putting source-side
+  # include/unignore rules early in the combined filter list ensures they
+  # can override later default destination exclusions (e.g. - /.git/).
   rsync "${RSYNC_OPTS[@]}" \
-    "${FILTER_ARGS_DST[@]}" \
     "${FILTER_ARGS_SRC[@]}" \
+    "${FILTER_ARGS_DST[@]}" \
     "$SRC" "$DST"
 }
 
