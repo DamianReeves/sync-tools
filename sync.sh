@@ -400,6 +400,13 @@ build_side_filters "dest" FILTER_ARGS_DST
 # One-way (SOURCE -> DEST)
 run_one_way() {
   info "One-way sync: $SOURCE -> $DEST"
+  if [[ "${SYNC_DEBUG:-0}" == "1" ]]; then
+    echo "[sync-debug] RSYNC_OPTS=${RSYNC_OPTS[*]}" >>/tmp/sync_debug.log
+    echo "[sync-debug] FILTER_ARGS_SRC=${FILTER_ARGS_SRC[*]}" >>/tmp/sync_debug.log
+    echo "[sync-debug] FILTER_ARGS_DST=${FILTER_ARGS_DST[*]}" >>/tmp/sync_debug.log
+    echo "[sync-debug] SRC=$SRC DST=$DST" >>/tmp/sync_debug.log
+    echo "[sync-debug] RSYNC_CMD: rsync ${RSYNC_OPTS[*]} ${FILTER_ARGS_SRC[*]} ${FILTER_ARGS_DST[*]} $SRC $DST" >>/tmp/sync_debug.log
+  fi
   rsync "${RSYNC_OPTS[@]}" \
     "${FILTER_ARGS_SRC[@]}" \
     "${FILTER_ARGS_DST[@]}" \
