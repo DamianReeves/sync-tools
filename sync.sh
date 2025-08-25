@@ -240,6 +240,13 @@ build_only_filter_file() {
   for path in "${only_list[@]}"; do
     local p="${path#./}"
     [[ -z "$p" ]] && continue
+    # Include parent directories so rsync can create them on DEST
+    IFS='/' read -r -a parts <<<"$p"
+    local accum=""
+    for ((i=0;i<${#parts[@]}-1;i++)); do
+      accum+="${parts[i]}/"
+      printf "+ %s\n" "$accum" >>"$out"
+    done
     # Allow the path itself and any children beneath it
     printf "+ %s\n" "$p" >>"$out"
     printf "+ %s/**\n" "$p" >>"$out"
