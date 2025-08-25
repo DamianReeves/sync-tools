@@ -181,16 +181,40 @@ to_filter_rule() {
   local pat="$1"
   if [[ "$pat" == !* ]]; then
     local p="${pat:1}"
-    # Always include the exact path
-    printf "+ %s\n" "$p"
-    # If not already recursive, also include recursive children
-    if [[ "$p" != */** ]]; then
-      # Ensure directory form ends with a slash when appropriate
-      if [[ "$p" == */ ]]; then
-        printf "+ %s**\n" "$p"
+    # Normalize: if pattern ends with /**, treat base as dir
+    local base="$p"
+    local has_glob=0
+    if [[ "$p" == */** ]]; then
+      has_glob=1
+      base="${p%/**}"
+    fi
+
+    # Ensure base ends with a slash when representing a directory
+    local base_dir="$base"
+    if [[ "$base_dir" != */ ]]; then
+      base_dir="$base_dir/"
+    fi
+
+    # Include parent directories so rsync can traverse/create them
+    IFS='/' read -r -a parts <<<"${base#/}"
+    local accum=""
+    for ((i=0;i<${#parts[@]}-1;i++)); do
+      accum+="${parts[i]}/"
+      # preserve leading slash if present in original pattern
+      if [[ "$p" == /* ]]; then
+        printf "+ /%s\n" "$accum"
       else
-        printf "+ %s/**\n" "$p"
+        printf "+ %s\n" "$accum"
       fi
+    done
+
+    # Include the directory itself and recursive children
+    if [[ "$p" == /* ]]; then
+      printf "+ %s\n" "/${base_dir%/}"
+      printf "+ %s/**\n" "/${base_dir%/}"
+    else
+      printf "+ %s\n" "${base_dir%/}"
+      printf "+ %s/**\n" "${base_dir%/}"
     fi
   else
     printf "- %s\n" "$pat"
