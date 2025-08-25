@@ -30,3 +30,59 @@ jobs:
           # Use project's Makefile to create venv, install test deps, and run behave + pytest
           make install
           make test
+
+  integration:
+    name: Integration tests (unit+integration)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Create virtualenv and install deps
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -e .
+      - name: Run integration tests
+        run: |
+          source .venv/bin/activate
+          # Run only pytest integration tests (they mock rsync)
+          .venv/bin/pytest -q tests/test_integration.py
+
+  # Optional manual end-to-end job that runs a real rsync on the runner.
+  e2e:
+    name: E2E smoke (manual)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y rsync
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Create virtualenv and install deps
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -e .
+      - name: Run e2e smoke
+        run: |
+          source .venv/bin/activate
+          # run a small smoke script that exercises the CLI against real rsync
+          python - <<'PY'
+          import tempfile, os, subprocess
+          from pathlib import Path
+          src = tempfile.mkdtemp()
+          dst = tempfile.mkdtemp()
+          Path(src, 'keep.txt').write_text('keep')
+          cmd = ['.venv/bin/python','-m','sync_tools.cli','sync','--source',src,'--dest',dst]
+          print('Running e2e:', cmd)
+          subprocess.check_call(cmd)
+          PY
