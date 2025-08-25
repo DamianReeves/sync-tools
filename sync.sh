@@ -153,28 +153,6 @@ to_filter_rule() {
       printf -- "+ %s/**\n" "${base%/}"
     fi
   else
-    printf -- "- %s\n" "$pat"
-  fi
-}
-    for ((i=0;i<${#parts[@]}-1;i++)); do
-      accum+="${parts[i]}/"
-      # preserve leading slash if present in original pattern
-      if [[ "$p" == /* ]]; then
-        printf "+ /%s\n" "$accum"
-      else
-        printf "+ %s\n" "$accum"
-      fi
-    done
-
-    # Include the directory itself and recursive children
-    if [[ "$p" == /* ]]; then
-      printf "+ %s\n" "/${base_dir%/}"
-      printf "+ %s/**\n" "/${base_dir%/}"
-    else
-      printf "+ %s\n" "${base_dir%/}"
-      printf "+ %s/**\n" "${base_dir%/}"
-    fi
-  else
     printf "- %s\n" "$pat"
   fi
 }
