@@ -115,86 +115,47 @@ if [[ -n "$CONFIG" ]]; then
   [[ -f "$CONFIG" ]] || die "Config file not found: $CONFIG"
   # shellcheck disable=SC1090
   source "$CONFIG"
-fi
-
-# 2) Pull values from config (if present)
-SOURCE="${SOURCE:-}"
-DEST="${DEST:-}"
-MODE="${MODE:-}"
-
-EXCLUDES_FILE="${EXCLUDES_FILE:-}"
-EXCLUDE="${EXCLUDE:-}"
-ONLY_LIST_FILE="${ONLY_LIST_FILE:-}"
-USE_SOURCE_GITIGNORE="${USE_SOURCE_GITIGNORE:-$USE_SOURCE_GITIGNORE}"
-EXCLUDE_HIDDEN_DIRS="${EXCLUDE_HIDDEN_DIRS:-$EXCLUDE_HIDDEN_DIRS}"
-
-# 3) Override with CLI if provided
-[[ -n "$CLI_SOURCE" ]] && SOURCE="$CLI_SOURCE"
-[[ -n "$CLI_DEST" ]] && DEST="$CLI_DEST"
-if [[ -n "$CLI_MODE" ]]; then MODE="$CLI_MODE"; fi
-
-# 4) Validate presence of SOURCE/DEST
-if [[ -z "${SOURCE:-}" || -z "${DEST:-}" ]]; then
-  print_usage
-  die "You must provide SOURCE and DEST via config or --source/--dest"
-fi
-      local p="${pat:1}"
-      # Determine base (strip trailing /** if present)
-      local base="$p"
-      if [[ "$base" == */** ]]; then
-        base="${base%/**}"
-      fi
-
-      # Determine if pattern had a leading slash
-      local has_lead=0
-      if [[ "$base" == /* ]]; then has_lead=1; fi
-
-      # Prepare relative form for splitting (no leading slash)
-      local rel="${base#/}"
-      IFS='/' read -r -a parts <<<"$rel"
-      local accum=""
-      for ((i=0;i<${#parts[@]}-1;i++)); do
-        accum+="${parts[i]}/"
-        if [[ $has_lead -eq 1 ]]; then
-          printf -- "+ /%s\n" "$accum"
-        else
-          printf -- "+ %s\n" "$accum"
-        fi
-      done
-
-      # Include the base path and recursive children
-      if [[ $has_lead -eq 1 ]]; then
-        printf -- "+ %s\n" "$base"
-        printf -- "+ %s/**\n" "$base"
-      else
-        printf -- "+ %s\n" "${base%/}"
-        printf -- "+ %s/**\n" "${base%/}"
-      fi
-  fi
-      printf -- "- %s\n" "$pat"
 
 # Helpers for filter building
 to_filter_rule() {
   local pat="$1"
   if [[ "$pat" == !* ]]; then
     local p="${pat:1}"
-    # Normalize: if pattern ends with /**, treat base as dir
+    # Strip trailing /** if present to get base path
     local base="$p"
-    local has_glob=0
-    if [[ "$p" == */** ]]; then
-      has_glob=1
-      base="${p%/**}"
+    if [[ "$base" == */** ]]; then
+      base="${base%/**}"
     fi
 
-    # Ensure base ends with a slash when representing a directory
-    local base_dir="$base"
-    if [[ "$base_dir" != */ ]]; then
-      base_dir="$base_dir/"
-    fi
+    # Was the pattern anchored (leading slash)?
+    local has_lead=0
+    if [[ "$base" == /* ]]; then has_lead=1; fi
 
-    # Include parent directories so rsync can traverse/create them
-    IFS='/' read -r -a parts <<<"${base#/}"
+    # Build parent includes (no leading slash for splitting)
+    local rel="${base#/}"
+    IFS='/' read -r -a parts <<<"$rel"
     local accum=""
+    for ((i=0;i<${#parts[@]}-1;i++)); do
+      accum+="${parts[i]}/"
+      if [[ $has_lead -eq 1 ]]; then
+        printf -- "+ /%s\n" "$accum"
+      else
+        printf -- "+ %s\n" "$accum"
+      fi
+    done
+
+    # Include the base and its recursive children
+    if [[ $has_lead -eq 1 ]]; then
+      printf -- "+ %s\n" "$base"
+      printf -- "+ %s/**\n" "$base"
+    else
+      printf -- "+ %s\n" "${base%/}"
+      printf -- "+ %s/**\n" "${base%/}"
+    fi
+  else
+    printf -- "- %s\n" "$pat"
+  fi
+}
     for ((i=0;i<${#parts[@]}-1;i++)); do
       accum+="${parts[i]}/"
       # preserve leading slash if present in original pattern
