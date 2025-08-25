@@ -235,24 +235,17 @@ build_only_filter_file() {
   [[ ${#only_list[@]} -gt 0 ]] || return 1
 
   local out; out="$(mktemp)"
-  echo "- *" >"$out"
+  # Write include rules first, then exclude everything else. Including recursive
+  # patterns (p/**) ensures directories and their contents are allowed.
   for path in "${only_list[@]}"; do
     local p="${path#./}"
-    IFS='/' read -r -a parts <<<"$p"
-    local accum=""
-    for ((i = 0; i < ${#parts[@]} - 1; i++)); do
-      local part="${parts[i]}"
-      [[ -z "$part" ]] && continue
-      accum+="/$part"
-      printf "+ %s/\n" "$accum" >>"$out"
-    done
-    if [[ "$p" == */ ]]; then
-      printf "+ %s\n" "$p" >>"$out"
-    else
-      printf "+ %s\n" "$p" >>"$out"
-      printf "+ %s/\n" "$p" >>"$out"
-    fi
+    [[ -z "$p" ]] && continue
+    # Allow the path itself and any children beneath it
+    printf "+ %s\n" "$p" >>"$out"
+    printf "+ %s/**\n" "$p" >>"$out"
   done
+  # Exclude everything else
+  echo "- *" >>"$out"
   echo "$out"
 }
 
