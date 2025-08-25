@@ -180,7 +180,18 @@ fi
 to_filter_rule() {
   local pat="$1"
   if [[ "$pat" == !* ]]; then
-    printf "+ %s\n" "${pat:1}"
+    local p="${pat:1}"
+    # Always include the exact path
+    printf "+ %s\n" "$p"
+    # If not already recursive, also include recursive children
+    if [[ "$p" != */** ]]; then
+      # Ensure directory form ends with a slash when appropriate
+      if [[ "$p" == */ ]]; then
+        printf "+ %s**\n" "$p"
+      else
+        printf "+ %s/**\n" "$p"
+      fi
+    fi
   else
     printf "- %s\n" "$pat"
   fi
