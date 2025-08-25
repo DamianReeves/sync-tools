@@ -48,6 +48,15 @@ def step_source_syncignore(context):
         f.write(text)
 
 
+@given('a source .gitignore with:')
+def step_source_gitignore(context):
+    """Write a .gitignore file in the source directory from a multiline block."""
+    text = context.text or ""
+    fpath = os.path.join(context.source_dir, '.gitignore')
+    with open(fpath, 'w') as f:
+        f.write(text)
+
+
 @given('a dest .syncignore with:')
 def step_dest_syncignore(context):
     text = context.text or ""
@@ -114,6 +123,15 @@ def step_verify_dest_files(context):
         context.dest_tmpdir.cleanup()
     except Exception:
         pass
+
+
+@then('the destination directory should not contain the files:')
+def step_verify_dest_files_not_present(context):
+    """Verify that the destination directory does NOT contain the listed files."""
+    for row in context.table:
+        filename = row['filename']
+        dest_file = os.path.join(context.dest_dir, filename)
+        assert not os.path.exists(dest_file), f"Unexpected file present: {dest_file}"
 
 
 @then('a conflict file should exist for "{filename}" on the source')
