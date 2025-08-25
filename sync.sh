@@ -206,12 +206,12 @@ to_filter_rule() {
       fi
     done
 
-    # Include the base and its recursive children
+    # Include the base (as a directory) and its recursive children
     if [[ $has_lead -eq 1 ]]; then
-      printf -- "+ %s\n" "$base"
-      printf -- "+ %s/**\n" "$base"
+      printf -- "+ %s/\n" "${base%/}"
+      printf -- "+ %s/**\n" "${base%/}"
     else
-      printf -- "+ %s\n" "${base%/}"
+      printf -- "+ %s/\n" "${base%/}"
       printf -- "+ %s/**\n" "${base%/}"
     fi
   else
