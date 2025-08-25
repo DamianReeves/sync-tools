@@ -81,6 +81,14 @@ def _run_sync_with_mode(context, mode='one-way'):
     if hasattr(context, 'only_items') and context.only_items:
         for item in context.only_items:
             cmd += ['--only', item]
+    # Include any extra CLI args passed via context.extra_args
+    if hasattr(context, 'extra_args') and context.extra_args:
+        for a in context.extra_args:
+            # if a is a tuple (arg, val) expand, else append single token
+            if isinstance(a, (list, tuple)):
+                cmd += [str(a[0]), str(a[1])]
+            else:
+                cmd += [str(a)]
     result = subprocess.run(cmd, capture_output=True, text=True)
     context.returncode = result.returncode
     context.stdout = result.stdout
@@ -127,3 +135,17 @@ def step_conflict_file_exists(context, filename):
 def step_whitelist_paths(context):
     """Set whitelist items for the upcoming sync run from a table of paths."""
     context.only_items = [row['path'] for row in context.table]
+
+
+@given('I add extra args:')
+@when('I add extra args:')
+def step_add_extra_args(context):
+    """Add extra CLI arguments for the next sync run from a table of arg/value."""
+    context.extra_args = []
+    for row in context.table:
+        arg = row.get('arg')
+        val = row.get('value')
+        if val is None or val == '':
+            context.extra_args.append(arg)
+        else:
+            context.extra_args.append((arg, val))
