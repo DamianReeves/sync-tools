@@ -26,3 +26,22 @@ jobs:
         run: |
           source .venv/bin/activate
           make test
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Create virtualenv and install deps
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -e .
+      - name: Run integration tests
+        run: |
+          source .venv/bin/activate
+          .venv/bin/pytest -q tests/test_integration.py tests/test_report.py

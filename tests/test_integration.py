@@ -52,3 +52,42 @@ def test_integration_whitelist_generates_filters(monkeypatch, tmp_path):
         src_lines = p['src_filter']['lines']
         assert any(l.startswith('+') and 'keep.txt' in l for l in src_lines)
         assert '- *' in src_lines
+
+
+def test_cli_list_filtered(monkeypatch, caplog):
+    runner = CliRunner()
+    with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
+        # create files in source
+        open(os.path.join(src, "keep.txt"), "w").write("keep")
+        open(os.path.join(src, "drop.txt"), "w").write("drop")
+
+        # no rsync call expected; invoke CLI with list-filtered
+        result = runner.invoke(cli, ['sync', '--source', src, '--dest', dst, '--list-filtered', 'src'])
+        assert result.exit_code == 0
+        # capture either stdout/stderr or logger output
+        out = result.output
+        if 'Filtered items' not in out:
+            # fall back to logger capture
+            logs = "\n".join([r.getMessage() for r in caplog.records])
+            assert 'Filtered items' in logs
+
+
+def test_cli_report_writes_file(monkeypatch, tmp_path):
+    runner = CliRunner()
+    with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
+        open(os.path.join(src, "keep.txt"), "w").write("keep")
+
+        # mock subprocess.run to simulate rsync output
+        class FakeProc:
+            stdout = "+f+++++++++ keep.txt\n"
+            stderr = ""
+        def fake_run(cmd, stdout, stderr, text):
+            return FakeProc()
+        monkeypatch.setattr('sync_tools.rsync_wrapper.subprocess.run', fake_run)
+
+        report_path = tmp_path / "report.md"
+        result = runner.invoke(cli, ['sync', '--source', src, '--dest', dst, '--report', str(report_path)])
+        assert result.exit_code == 0
+        assert report_path.exists()
+        txt = report_path.read_text()
+        assert 'Added' in txt or 'Updated' in txt or 'Deleted' in txt

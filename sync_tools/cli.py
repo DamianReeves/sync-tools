@@ -65,7 +65,9 @@ def cli():
 @click.option("--log-file", type=click.Path(), default=None, help="Path to write logs")
 @click.option("--dump-commands", type=click.Path(), default=None, help="Write rsync command and filters to JSON file")
 @click.option("--log-format", type=click.Choice(["text", "json"]), default="text", help="Log format")
-def sync(config, source, dest, mode, dry_run, use_source_gitignore, exclude_hidden_dirs, only_syncignore, ignore_src, ignore_dest, only_items, v, log_level, log_file, dump_commands, log_format):
+@click.option("--report", type=click.Path(), default=None, help="Write a markdown sync report to this path")
+@click.option("--list-filtered", type=click.Choice(["src", "dst", "both"]), default=None, help="List items that would be filtered (src, dst or both)")
+def sync(config, source, dest, mode, dry_run, use_source_gitignore, exclude_hidden_dirs, only_syncignore, ignore_src, ignore_dest, only_items, v, log_level, log_file, dump_commands, log_format, report, list_filtered):
     """Perform a sync between SOURCE and DEST using rsync with layered filters.
 
     You can specify defaults in a TOML config and override them on the command line.
@@ -170,7 +172,7 @@ def sync(config, source, dest, mode, dry_run, use_source_gitignore, exclude_hidd
             dst_filter = (dst_tmp, dst_lines)
 
         # wire logger into run_rsync so it can log prepared commands
-        run_rsync(src, dst, rsync_opts, src_filter=src_filter, dst_filter=dst_filter, dump_commands=dump_commands, logger=logger)
+        run_rsync(src, dst, rsync_opts, src_filter=src_filter, dst_filter=dst_filter, dump_commands=dump_commands, logger=logger, report_path=report, list_filtered=list_filtered)
     finally:
         for p in (src_tmp, dst_tmp):
             if p:
