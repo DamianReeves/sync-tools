@@ -160,6 +160,20 @@ ensure_trailing_slash() {
   if [[ "$p" != */ ]]; then printf "%s/\n" "$p"; else printf "%s\n" "$p"; fi
 }
 
+# Collect config-level excludes into arrays
+CONFIG_EXCLUDE_FILES=()
+CONFIG_EXCLUDE_PATS=()
+[[ -n "$EXCLUDES_FILE" ]] && CONFIG_EXCLUDE_FILES+=("$EXCLUDES_FILE")
+if [[ -n "$EXCLUDE" ]]; then
+  if declare -p EXCLUDE 2>/dev/null | grep -q 'declare \-a'; then
+    CONFIG_EXCLUDE_PATS+=("${EXCLUDE[@]}")
+  else
+    # shellcheck disable=SC2206
+    TMP_SPLIT=(${EXCLUDE//,/ })
+    CONFIG_EXCLUDE_PATS+=("${TMP_SPLIT[@]}")
+  fi
+fi
+
 # Helpers for filter building
 to_filter_rule() {
   local pat="$1"
