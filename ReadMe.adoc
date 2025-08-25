@@ -81,35 +81,20 @@ Core:
     --source PATH            Source directory/endpoint (required if no config)
     --dest PATH              Destination directory/endpoint (required if no config)
     --mode MODE              one-way | two-way (defaults to one-way if unset)
-    --dry-run                Show actions without making changes
 ----
-
 Ignore sources:
 ----
     --no-source-syncignore   Disable using SOURCE/.syncignore
-    --no-dest-syncignore     Disable using DEST/.syncignore
     --only-syncignore        Use only .syncignore + CLI excludes (ignore config excludes)
-    --use-source-gitignore   Also import SOURCE/.gitignore patterns (supports ! unignore)
     --ignore-src-file PATH   Extra ignore file for SOURCE side (repeatable)
-    --ignore-dest-file PATH  Extra ignore file for DEST side (repeatable)
-    --ignore-src "pattern"   Extra inline pattern for SOURCE side (repeatable)
     --ignore-dest "pattern"  Extra inline pattern for DEST side (repeatable)
 # Notes: patterns can start with "!" to unignore; directory patterns should end with "/"
 ----
 
 Hidden/implicit rules:
-----
-    --exclude-hidden-dirs    Exclude all hidden directories (dot-dirs) on both sides
-# Default behavior: ".git/" is always excluded on both sides (lowest precedence).
-# You can explicitly unignore it if needed, e.g., --ignore-src "!/.git/**"
-----
-
-Whitelist (“only”) mode:
-----
     --only PATH              Whitelist a path (repeatable; relative to side root)
 
 Config equivalents (if using config):
-    ONLY_LIST_FILE=/path/to/only.list
     USE_SOURCE_GITIGNORE=1
     EXCLUDE_HIDDEN_DIRS=1
 ----
@@ -118,19 +103,31 @@ Config equivalents (if using config):
 
 Per side (SOURCE side and DEST side), filters are layered with this precedence
 from low to high (later overrides earlier):
-
 . Whitelist (if provided via `--only`/`ONLY_LIST_FILE`) — starts with exclude-all then includes listed paths
 . Default filters (always `-.git/`; optional hidden dirs if `--exclude-hidden-dirs`/`EXCLUDE_HIDDEN_DIRS=1`)
 . `.syncignore` at that side (if enabled)
 . `SOURCE/.gitignore` (only if `--use-source-gitignore` or `USE_SOURCE_GITIGNORE=1`)
-. Config `EXCLUDES_FILE` (unless `--only-syncignore`)
-. Config `EXCLUDE` patterns (unless `--only-syncignore`)
 . CLI `--ignore-*-file` files (repeatable)
 . CLI `--ignore-*-pattern` patterns (repeatable)
 
 Notes:
-- Patterns are rsync-style. Use trailing slash for directories (e.g., `build/`).
 - Use a leading `!` to unignore (include) a path that would otherwise be excluded.
+== Parity Harness
+
+We include a small utility `tools/rsync_parity_harness.py` which runs `rsync` in
+dry-run mode with the same filter file that the Python code would pass and
+compares the list of files rsync would transfer with the decisions made by the
+Python matcher. This is useful to find corner-cases where the Python matcher and
+rsync disagree.
+
+Usage example:
+
+----
+PYTHONPATH=. python3 tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt'
+----
+
+The harness can also write diagnostic JSON (path reported on mismatch) for CI
+artifact upload. See `docs/user_guide.adoc` for details.
 - Paths are evaluated relative to the root of the respective side.
 - Because default filters are lowest precedence, explicit unignores can override them.
 

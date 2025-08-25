@@ -12,8 +12,12 @@ authors = [
 dependencies = [
     "pytest",
     "behave",
-    "pytest-bdd"
+    "pytest-bdd",
+    "click"
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools]
+packages = { find = { include = ["sync_tools*"] } }

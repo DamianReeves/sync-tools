@@ -1,0 +1,111 @@
+= Sync Tools User Guide
+Damian Reeves <>
+:icons: font
+:toc: left
+:sectnums:
+
+== Overview
+
+This document explains how to use the Python-based `sync_tools` wrapper and
+associated utilities. It covers CLI usage, configuration, filters, the parity
+harness, and recommended CI integration.
+
+== Installation
+
+A minimal setup uses Python 3.12 and the provided virtualenv pattern. From the
+repository root:
+
+----
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e .
+----
+
+== CLI
+
+The main Python CLI is in `sync_tools/cli.py` and exposes the same options as the
+legacy `sync.sh` script but with enhanced logging and reporting.
+
+=== Common options
+
+- `--config PATH` — Load a TOML configuration (CLI overrides values)
+- `--source`, `--dest` — Source and destination
+- `--mode` — one-way or two-way
+- `--dry-run` — run rsync with `--dry-run`
+- `-v`/`--log-level` — control verbosity
+- `--dump-commands PATH` — write a JSON dump of rsync command + filters
+- `--report PATH` — write a Markdown report of Added/Updated/Deleted/Excluded
+- `--list-filtered {src,dst,both}` — locally list files that would be filtered
+
+== Filters and Patterns
+
+Filters support rsync-like patterns including `*`, `?`, `**`, trailing `/` to
+indicate directories, and `!` for explicit includes (unignore). The Python
+matcher attempts to mirror rsync semantics; however, exact 1:1 parity is
+non-trivial.
+
+Use `--only` (whitelist) to create an include-only filter set. Files can be
+specified absolute (leading `/`) or relative.
+
+== Parity Harness
+
+A diagnostic tool `tools/rsync_parity_harness.py` is provided to compare the
+Python matcher against rsync's own decision logic.
+
+=== What it does
+
+- Builds the same filter file the Python code would use
+- Runs `rsync --dry-run --out-format='%i %n'` from `src/` to an empty temp
+  dir and captures the files rsync would transfer
+- Walks the source tree and compares `decision_for_path` results to rsync's
+  inclusion list
+- Prints mismatches and (optionally) writes a JSON diagnostic file with
+  decisions and mismatches for CI artifact upload
+
+=== Basic usage
+
+----
+PYTHONPATH=. python tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --pattern '!keep.py'
+----
+
+To request JSON diagnostics explicitly:
+
+----
+PYTHONPATH=. python tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --dump-json /tmp/parity.json
+----
+
+When the harness finds mismatches it exits with code 2 and writes the JSON
+payload by default to a temp file; you can give `--dump-json` to control the
+path.
+
+=== Example CI step (GitHub Actions)
+
+[source,yaml]
+----
+- name: Parity check
+  run: |
+    PYTHONPATH=. python tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
+    if [ -f parity.json ]; then
+      echo "Uploading parity.json as artifact"
+      # upload artifact step here
+    fi
+----
+
+== Reports
+
+The CLI can create a Markdown report summarizing Added/Updated/Deleted and
+Excluded-by-filters. Use `--report report.md` to generate this file. You can
+extend the report by stat'ing files for size/mtime.
+
+== Troubleshooting
+
+- If the harness shows mismatches, inspect the JSON file to see per-path
+  decisions from Python and rsync's included set.
+- Some complex rsync filter precedence cases are easier to diagnose by
+  creating a minimal reproduction tree and running the harness against it.
+
+== Development notes
+
+Contributions to the matcher should include unit tests in `tests/test_pattern_matching.py`.
+
+*** End of document
