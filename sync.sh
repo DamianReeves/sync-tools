@@ -284,10 +284,16 @@ build_side_filters() {
 
   # Whitelist (applies to both sides, same list)
   local only_file=""
-  if only_file="$(build_only_filter_file)"; then
-    TMPS_TO_CLEAN+=("$only_file")
-    out_arr+=(--filter ". $only_file")
-    info "Using whitelist-only mode"
+  # Apply whitelist-only mode only to the SOURCE side. Applying it to DEST
+  # can prevent rsync from creating files because the DEST side would be
+  # excluded by the initial "- *" rule. Only use the whitelist for the
+  # source side to limit what is sent.
+  if [[ "$side" == "src" ]]; then
+    if only_file="$(build_only_filter_file)"; then
+      TMPS_TO_CLEAN+=("$only_file")
+      out_arr+=(--filter ". $only_file")
+      info "Using whitelist-only mode"
+    fi
   fi
 
   # Default filters (lowest precedence among user-provided filters):
