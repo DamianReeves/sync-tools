@@ -63,12 +63,16 @@ conda activate sync-tools
 
 ### 3. Install Python Dependencies
 
-```bash
-# Install the project in editable mode with dependencies
-pip install -e .
+Preferred: use the provided Makefile which creates the virtualenv and installs the project
 
-# Or install dependencies directly
-pip install pytest behave pytest-bdd
+```bash
+# Create venv and install dependencies
+make install
+
+# Alternatively, if you prefer manual steps:
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
 ### 4. Verify Installation
@@ -91,61 +95,37 @@ chmod +x sync.sh
 
 ## Running Tests
 
-### BDD Tests (Cucumber/Behave)
-
-Run behavior-driven development tests using Behave:
+This project includes a `Makefile` with convenient targets. Recommended workflow:
 
 ```bash
-# Run all BDD tests
-behave
+# Create venv and install dependencies
+make install
 
-# Run with verbose output
-behave -v
+# Run BDD (behave)
+make bdd
 
-# Run specific feature file
-behave features/hello_world.feature
+# Run pytest
+make pytest
 
-# Run with custom format
-behave -f pretty
+# Run both (BDD then pytest)
+make test
 ```
 
-### Unit/Integration Tests (pytest)
-
-Run Python unit and integration tests:
+You can also call the underlying tools directly if you prefer. When calling them directly, run them from the activated virtualenv:
 
 ```bash
-# Run all pytest tests
-pytest
+# Activate venv
+source .venv/bin/activate
 
-# Run with verbose output
+# Behave
+behave --no-capture
+
+# Pytest
 pytest -v
 
-# Run specific test file
-pytest tests/test_hello_world.py
-
-# Run specific test function
-pytest tests/test_hello_world.py::test_sync_script_exists
-
-# Run with coverage
+# With coverage
 pip install pytest-cov
 pytest --cov=. --cov-report=html
-```
-
-### Running Both Test Suites
-
-```bash
-# Run behave tests first, then pytest
-behave && pytest
-
-# Or create a simple script
-echo '#!/bin/bash
-echo "Running BDD tests..."
-behave
-echo "Running pytest tests..."
-pytest
-' > run_all_tests.sh
-chmod +x run_all_tests.sh
-./run_all_tests.sh
 ```
 
 ## Development Workflow

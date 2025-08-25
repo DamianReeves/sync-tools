@@ -10,18 +10,26 @@ This project uses [pytest](https://docs.pytest.org/), [behave](https://behave.re
 
 ## Setup
 
-1. Install dependencies (already handled by `pyproject.toml`):
-   ```bash
-   pip install -r requirements.txt  # or use a tool like pipx/poetry if preferred
-   ```
-2. Run Behave BDD tests:
-   ```bash
-   behave
-   ```
-3. Run pytest tests:
-   ```bash
-   pytest
-   ```
+This repository provides a `Makefile` to create the virtualenv and run tests.
+
+```bash
+# Create venv and install the project + deps
+make install
+
+# Run behave tests
+make bdd
+
+# Run pytest tests
+make pytest
+```
+
+If you want to run the tools manually, activate the venv first:
+
+```bash
+source .venv/bin/activate
+behave --no-capture
+pytest -v
+```
 
 ## Writing Tests
 - Add `.feature` files to `features/`
