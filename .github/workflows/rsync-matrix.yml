@@ -25,7 +25,8 @@ jobs:
           echo "rsync version:"
           rsync --version
 
-      - name: Run test suite
+      - name: Install dependencies and run test suite
         run: |
-          # Use project's Makefile to create venv and run behave + pytest
+          # Use project's Makefile to create venv, install test deps, and run behave + pytest
+          make install
           make test
