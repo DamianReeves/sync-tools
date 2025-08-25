@@ -21,6 +21,27 @@ python3 -m venv .venv
 pip install -e .
 ----
 
+=== Installable distribution
+
+We publish installable distributions (sdist + wheel) on GitHub Releases. Once
+released you can install with pip directly from the wheel or from PyPI if
+published there:
+
+----
+# From a downloaded wheel
+pip install ./sync_tools-0.1.0-py3-none-any.whl
+
+# From a source checkout
+pip install -e .
+----
+
+When installed, a console launcher `sync-tools` is available on your PATH. It
+exposes the same CLI described below and can be run simply as:
+
+----
+sync-tools sync --source ./project --dest ./backup --dry-run
+----
+
 == CLI
 
 The main Python CLI is in `sync_tools/cli.py` and exposes the same options as the
@@ -90,6 +111,13 @@ path.
       # upload artifact step here
     fi
 ----
+
+=== Release artifacts from CI
+
+The repository includes a GitHub Actions workflow that builds sdist and wheel
+when a tag matching `v*.*.*` is pushed and publishes them to a GitHub Release.
+The uploaded `dist/` artifacts contain both the `.tar.gz` source and the
+`.whl` wheel which you can download and install with pip as shown above.
 
 == Reports
 
