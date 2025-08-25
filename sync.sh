@@ -115,6 +115,7 @@ if [[ -n "$CONFIG" ]]; then
   [[ -f "$CONFIG" ]] || die "Config file not found: $CONFIG"
   # shellcheck disable=SC1090
   source "$CONFIG"
+fi
 
 # Helpers for filter building
 to_filter_rule() {
