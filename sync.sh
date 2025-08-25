@@ -160,6 +160,10 @@ ensure_trailing_slash() {
   if [[ "$p" != */ ]]; then printf "%s/\n" "$p"; else printf "%s\n" "$p"; fi
 }
 
+# Prepare SRC/DST with trailing slashes for rsync
+SRC="$(ensure_trailing_slash "$SOURCE")"
+DST="$(ensure_trailing_slash "$DEST")"
+
 # Collect config-level excludes into arrays
 CONFIG_EXCLUDE_FILES=()
 CONFIG_EXCLUDE_PATS=()
