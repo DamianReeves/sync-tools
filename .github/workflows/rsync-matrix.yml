@@ -1,0 +1,31 @@
+name: CI - rsync matrix
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+
+jobs:
+  test:
+    name: Tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show rsync version
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y rsync
+          echo "rsync version:"
+          rsync --version
+
+      - name: Run test suite
+        run: |
+          # Use project's Makefile to create venv and run behave + pytest
+          make test

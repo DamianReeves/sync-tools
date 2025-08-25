@@ -448,3 +448,58 @@ bash sync.sh \
 == License
 
 MIT
+
+== Testing & Coverage
+
+This repository includes an integration test suite using behave (Gherkin) and a small pytest smoke suite. Tests run using the project's `Makefile` targets (which create and use the Python virtualenv at `.venv`).
+
+Run tests locally:
+
+----
+make test
+----
+
+What was executed in this run:
+
+- behave BDD features (integration scenarios): 8 features, 10 scenarios — all passed locally.
+- pytest unit/smoke tests: 4 tests — all passed locally.
+
+=== Appendix: Integration test coverage
+
+The following list maps feature files to the functionality they exercise (these scenarios are included in the `features/` directory):
+
+- `features/hello_world.feature` — test harness smoke checks (framework sanity).
+- `features/sync.feature` — basic one-way sync (copies files and directories).
+- `features/two_way.feature` — two-way syncing with simple conflict preservation (dest preserved as `.conflict-...`).
+- `features/ignore.feature` — `.syncignore` handling and unignore (`!`) semantics.
+- `features/gitignore_import.feature` — importing `SOURCE/.gitignore` when `--use-source-gitignore` is set.
+- `features/gitdir.feature` — default `.git/` exclusion and explicit re-include via `--ignore-src "!/.git/**"`.
+- `features/hidden.feature` — excluding hidden directories via `--exclude-hidden-dirs`.
+- `features/whitelist.feature` — whitelist/"only" mode and that whitelisted paths are the only items synced.
+
+=== Verified behaviors (integration tests)
+
+- Basic one-way sync (files and nested directories).
+- Two-way sync with conflict preservation when both sides differ (destination preserved as `.conflict-*`).
+- `.syncignore` parsing (comments, blank lines) and unignore (`!`) semantics for source side.
+- Importing `SOURCE/.gitignore` patterns when requested.
+- Default exclusion of `.git/` and successful re-inclusion using `--ignore-src "!/.git/**"`.
+- Exclusion of hidden directories with `--exclude-hidden-dirs`.
+- Whitelist/only mode: including specified paths and excluding others.
+
+=== Remaining / partially verified behaviors (recommended follow-ups)
+
+The test suite covers the core functionality end-to-end, but the following items may need additional coverage or cross-environment verification:
+
+- Remote endpoints over SSH (rsync remote syntax like `user@host:/path`) — current tests operate on local filesystem paths only.
+- Complex `.gitignore` features (e.g., negations and nested rules with multiple levels) beyond a basic import — consider more scenarios to cover subtle gitignore glob behaviors.
+- Large-scale performance or edge cases with huge directory trees and symlink handling — add stress tests if required.
+- Behavior across multiple rsync versions (3.1 vs 3.2 vs 3.3) — some flags and filter semantics differ between versions.
+- Optional `--mkpath` behavior on older rsync versions and the interactions with whitelist directories creation.
+- Behavior when combining whitelist (`--only`) with complicated unignore rules across both sides — add matrix tests for combinations.
+- Behavior when using `--ignore-dest` unignore rules to re-include on the destination side (we have tests for source-side re-include but richer cases for destination side would be useful).
+
+If you want, I can:
+
+- Run the full suite in CI-like Docker image(s) to validate behavior across multiple rsync versions.
+- Add a small matrix of additional behave scenarios to cover remote endpoints and destination-side unignores.
