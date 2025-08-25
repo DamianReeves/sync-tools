@@ -117,6 +117,49 @@ if [[ -n "$CONFIG" ]]; then
   source "$CONFIG"
 fi
 
+# 2) Pull values from config (if present)
+SOURCE="${SOURCE:-}"
+DEST="${DEST:-}"
+MODE="${MODE:-}"
+
+EXCLUDES_FILE="${EXCLUDES_FILE:-}"
+EXCLUDE="${EXCLUDE:-}"
+ONLY_LIST_FILE="${ONLY_LIST_FILE:-}"
+USE_SOURCE_GITIGNORE="${USE_SOURCE_GITIGNORE:-$USE_SOURCE_GITIGNORE}"
+EXCLUDE_HIDDEN_DIRS="${EXCLUDE_HIDDEN_DIRS:-$EXCLUDE_HIDDEN_DIRS}"
+
+# 3) Override with CLI if provided
+[[ -n "$CLI_SOURCE" ]] && SOURCE="$CLI_SOURCE"
+[[ -n "$CLI_DEST" ]] && DEST="$CLI_DEST"
+if [[ -n "$CLI_MODE" ]]; then MODE="$CLI_MODE"; fi
+
+# 4) Validate presence of SOURCE/DEST
+if [[ -z "${SOURCE:-}" || -z "${DEST:-}" ]]; then
+  print_usage
+  die "You must provide SOURCE and DEST via config or --source/--dest"
+fi
+
+# 5) Default MODE if still unset
+MODE="${MODE:-one-way}"
+
+# Normalize/validate MODE
+MODE_LOWER="$(echo "$MODE" | tr '[:upper:]' '[:lower:]')"
+if [[ "$MODE_LOWER" != "one-way" && "$MODE_LOWER" != "two-way" ]]; then
+  die "MODE must be 'one-way' or 'two-way' (got: $MODE)"
+fi
+
+# Rsync opts
+RSYNC_OPTS=(-a -v --delete --human-readable --itemize-changes --partial)
+if rsync --version 2>/dev/null | grep -q 'version 3\.[2-9]'; then
+  RSYNC_OPTS+=(--mkpath)
+fi
+[[ $DRY_RUN -eq 1 ]] && RSYNC_OPTS+=(--dry-run)
+
+ensure_trailing_slash() {
+  local p="$1"
+  if [[ "$p" != */ ]]; then printf "%s/\n" "$p"; else printf "%s\n" "$p"; fi
+}
+
 # Helpers for filter building
 to_filter_rule() {
   local pat="$1"
