@@ -1,0 +1,450 @@
+= sync.sh — Fast directory sync with .syncignore, unignore, whitelist, optional .gitignore import, and hidden-dir controls
+:toc:
+:toclevels: 2
+
+sync.sh is a small, dependency-light Bash wrapper around rsync that provides:
+
+- One-way or two-way directory synchronization
+- Gitignore-style `.syncignore` files (source and destination)
+- Optional import of `SOURCE/.gitignore` patterns
+- Per-side ignore files and inline patterns (with `!` unignore)
+- “Whitelist” mode to sync only specified paths
+- Optional config file (sync.conf) OR pure CLI usage
+- Default exclusion of `.git/`
+- Optional exclusion of all hidden directories (dot-dirs)
+- Dry-run previews and detailed change output
+
+== Requirements
+
+- Bash 4+
+- rsync 3.1+ (3.2+ recommended)
+
+== Installation
+
+Place `sync.sh` somewhere on your PATH and make it executable:
+
+----
+cp sync.sh /usr/local/bin/sync.sh
+chmod +x /usr/local/bin/sync.sh
+----
+
+== Usage Overview
+
+You can use a config file (sync.conf) or run entirely via CLI flags.
+
+=== With config file
+
+----
+bash sync.sh -c ./sync.conf [options]
+----
+
+=== Without config file (CLI only)
+
+----
+bash sync.sh --source SRC --dest DEST [--mode one-way|two-way] [options]
+----
+
+- `SRC` and `DEST` can be local paths or rsync remote endpoints like `user@host:/path`.
+- When both config and CLI provide the same setting, CLI wins.
+
+== Configuration (optional)
+
+A `sync.conf` is a Bash-sourced file. Supported keys:
+
+- `SOURCE=/path` — source directory or remote endpoint
+- `DEST=/path` — destination directory or remote endpoint
+- `MODE=one-way|two-way` — defaults to `one-way` if not provided via config or CLI
+- `EXCLUDES_FILE=/path/to/excludes` — global excludes (supports `!` unignore)
+- `EXCLUDE=("pat1" "pat2" "!unignore/pat")` — array or string (space/comma-separated)
+- `ONLY_LIST_FILE=/path/to/only.list` — whitelist: one path per line
+- `USE_SOURCE_GITIGNORE=1` — import `SOURCE/.gitignore` patterns
+- `EXCLUDE_HIDDEN_DIRS=1` — exclude hidden directories (dot-dirs) on both sides
+
+Example:
+
+----
+SOURCE="/data/projectA"
+DEST="/mnt/backup/projectA"
+MODE="one-way"
+EXCLUDES_FILE="/data/projectA/global.excludes"
+EXCLUDE=("*.bak" "coverage/" "!coverage/keep/**")
+ONLY_LIST_FILE="/data/projectA/only.list"
+USE_SOURCE_GITIGNORE=1
+EXCLUDE_HIDDEN_DIRS=1
+----
+
+== CLI Options
+
+Core:
+----
+-c, --config PATH            Optional config file (CLI overrides config)
+    --source PATH            Source directory/endpoint (required if no config)
+    --dest PATH              Destination directory/endpoint (required if no config)
+    --mode MODE              one-way | two-way (defaults to one-way if unset)
+    --dry-run                Show actions without making changes
+----
+
+Ignore sources:
+----
+    --no-source-syncignore   Disable using SOURCE/.syncignore
+    --no-dest-syncignore     Disable using DEST/.syncignore
+    --only-syncignore        Use only .syncignore + CLI excludes (ignore config excludes)
+    --use-source-gitignore   Also import SOURCE/.gitignore patterns (supports ! unignore)
+    --ignore-src-file PATH   Extra ignore file for SOURCE side (repeatable)
+    --ignore-dest-file PATH  Extra ignore file for DEST side (repeatable)
+    --ignore-src "pattern"   Extra inline pattern for SOURCE side (repeatable)
+    --ignore-dest "pattern"  Extra inline pattern for DEST side (repeatable)
+# Notes: patterns can start with "!" to unignore; directory patterns should end with "/"
+----
+
+Hidden/implicit rules:
+----
+    --exclude-hidden-dirs    Exclude all hidden directories (dot-dirs) on both sides
+# Default behavior: ".git/" is always excluded on both sides (lowest precedence).
+# You can explicitly unignore it if needed, e.g., --ignore-src "!/.git/**"
+----
+
+Whitelist (“only”) mode:
+----
+    --only PATH              Whitelist a path (repeatable; relative to side root)
+
+Config equivalents (if using config):
+    ONLY_LIST_FILE=/path/to/only.list
+    USE_SOURCE_GITIGNORE=1
+    EXCLUDE_HIDDEN_DIRS=1
+----
+
+== How filtering works
+
+Per side (SOURCE side and DEST side), filters are layered with this precedence
+from low to high (later overrides earlier):
+
+. Whitelist (if provided via `--only`/`ONLY_LIST_FILE`) — starts with exclude-all then includes listed paths
+. Default filters (always `-.git/`; optional hidden dirs if `--exclude-hidden-dirs`/`EXCLUDE_HIDDEN_DIRS=1`)
+. `.syncignore` at that side (if enabled)
+. `SOURCE/.gitignore` (only if `--use-source-gitignore` or `USE_SOURCE_GITIGNORE=1`)
+. Config `EXCLUDES_FILE` (unless `--only-syncignore`)
+. Config `EXCLUDE` patterns (unless `--only-syncignore`)
+. CLI `--ignore-*-file` files (repeatable)
+. CLI `--ignore-*-pattern` patterns (repeatable)
+
+Notes:
+- Patterns are rsync-style. Use trailing slash for directories (e.g., `build/`).
+- Use a leading `!` to unignore (include) a path that would otherwise be excluded.
+- Paths are evaluated relative to the root of the respective side.
+- Because default filters are lowest precedence, explicit unignores can override them.
+
+== One-way vs Two-way
+
+- One-way: Mirrors SOURCE -> DEST, including deletions at DEST (`--delete`) subject to filters.
+- Two-way: Runs two rsync passes (A->B, then B->A). If a file differs on both sides after both passes, the DEST version is preserved as an extra conflict copy at SOURCE with a `.conflict-YYYYmmdd-HHMMSS` suffix.
+
+For complex bidirectional sync and conflict resolution, consider Unison or Syncthing.
+
+== .syncignore and .gitignore
+
+- `.syncignore`:
+  * May exist in SOURCE and/or DEST roots.
+  * One pattern per line. `#` comments and blanks ignored.
+  * `!pattern` unignores.
+  * Directory patterns should end with `/`.
+
+- `.gitignore` (optional import):
+  * Only imported from SOURCE if `--use-source-gitignore` or `USE_SOURCE_GITIGNORE=1` is set.
+  * Parsed with the same rules (comments, blanks, `!` for unignore).
+  * Not automatically imported at DEST (to avoid surprises). If you want that as well, we can add a `--use-dest-gitignore`.
+
+== Whitelist (“only”) mode
+
+- Provide explicit paths to sync and exclude the rest by default.
+- Still layered with ignores/unignores after the whitelist.
+- Paths should be relative to the side root (e.g., `dist/`, `README.md`, `docs/**/*.adoc`).
+- Directories should end with `/` for clarity.
+
+Provide via:
+- CLI: `--only PATH` (repeatable)
+- Config: `ONLY_LIST_FILE=/path/to/only.list` (one path per line; supports comments/blank lines)
+
+== Examples
+
+=== Run without config (CLI only)
+
+Basic one-way dry-run:
+
+----
+bash sync.sh --source ./src --dest ./dst --dry-run
+----
+
+Two-way with source .gitignore and some per-side ignores:
+
+----
+bash sync.sh \
+  --source ./project \
+  --dest user@server:/data/project \
+  --mode two-way \
+  --use-source-gitignore \
+  --ignore-src "node_modules/" \
+  --ignore-dest "backups/" \
+  --ignore-dest "!backups/current/**"
+----
+
+=== With config, override on CLI
+
+----
+bash sync.sh -c ./sync.conf --mode two-way --dry-run
+----
+
+=== Use `.syncignore` and `.gitignore`
+
+Respect both files on SOURCE; use DEST `.syncignore` too:
+
+----
+bash sync.sh \
+  --source ./app \
+  --dest ./backup \
+  --use-source-gitignore
+----
+
+Disable `.syncignore` on SOURCE but still use `.gitignore` on SOURCE:
+
+----
+bash sync.sh \
+  --source ./app \
+  --dest ./backup \
+  --no-source-syncignore \
+  --use-source-gitignore
+----
+
+=== Default .git exclusion
+
+`.git/` is excluded automatically on both sides:
+
+----
+bash sync.sh --source ./repo --dest ./backup
+----
+
+Re-include `.git/` explicitly (override default) on source:
+
+----
+bash sync.sh \
+  --source ./repo \
+  --dest ./backup \
+  --ignore-src "!/.git/**"
+----
+
+Re-include `.git/` explicitly on destination:
+
+----
+bash sync.sh \
+  --source ./repo \
+  --dest ./backup \
+  --ignore-dest "!/.git/**"
+----
+
+=== Exclude all hidden directories
+
+Exclude dot-dirs everywhere:
+
+----
+bash sync.sh --source ./src --dest ./dst --exclude-hidden-dirs
+----
+
+Exclude dot-dirs but keep `.config/` on source:
+
+----
+bash sync.sh \
+  --source ./src \
+  --dest ./dst \
+  --exclude-hidden-dirs \
+  --ignore-src "!.config/**"
+----
+
+Same via config:
+
+----
+EXCLUDE_HIDDEN_DIRS=1
+----
+
+=== Per-side ad-hoc excludes
+
+Only exclude extra cache at destination:
+
+----
+bash sync.sh -c ./sync.conf --ignore-dest ".cache/"
+----
+
+Exclude logs on source but re-include a subfolder:
+
+----
+bash sync.sh -c ./sync.conf \
+  --ignore-src "*.log" \
+  --ignore-src "!logs/structured/**"
+----
+
+=== Whitelist: sync only specific items
+
+CLI only — sync `dist/` and `README.md` (and nothing else), while still honoring ignores:
+
+----
+bash sync.sh \
+  --source ./project \
+  --dest ./backup \
+  --only "dist/" \
+  --only "README.md"
+----
+
+Config file list:
+
+`only.list`:
+----
+dist/
+README.md
+docs/**/*.adoc
+----
+
+`sync.conf`:
+----
+SOURCE="./project"
+DEST="./backup"
+ONLY_LIST_FILE="./only.list"
+----
+
+Run:
+
+----
+bash sync.sh -c ./sync.conf
+----
+
+Whitelist plus excludes: sync only `dist/` but exclude a heavy subtree except a keep folder:
+
+----
+bash sync.sh \
+  --source ./project \
+  --dest ./backup \
+  --only "dist/" \
+  --ignore-src "dist/assets/huge/**" \
+  --ignore-src "!dist/assets/huge/keep/**"
+----
+
+=== Two-way with per-side policies
+
+----
+bash sync.sh -c ./sync.conf \
+  --mode two-way \
+  --ignore-src "node_modules/" \
+  --ignore-dest "backups/" \
+  --ignore-dest "!backups/current/**"
+----
+
+=== Dry-run preview with verbose changes
+
+----
+bash sync.sh -c ./sync.conf --dry-run
+----
+
+== Recipes
+
+=== Keep a build artifact folder at destination untouched
+
+Goal: Don’t delete or modify `backups/` on DEST even if missing on SOURCE.
+
+----
+bash sync.sh -c ./sync.conf --ignore-dest "backups/"
+----
+
+=== Ignore all logs but keep structured reports subfolder
+
+Source:
+
+----
+bash sync.sh -c ./sync.conf \
+  --ignore-src "*.log" \
+  --ignore-src "!reports/important/**"
+----
+
+Destination:
+
+----
+bash sync.sh -c ./sync.conf \
+  --ignore-dest "*.log" \
+  --ignore-dest "!reports/important/**"
+----
+
+=== Sync everything except node_modules, but keep node_modules/.bin
+
+----
+bash sync.sh -c ./sync.conf \
+  --ignore-src "node_modules/" \
+  --ignore-src "!node_modules/.bin/**"
+----
+
+=== Respect only .syncignore files (source and dest), nothing else
+
+----
+bash sync.sh -c ./sync.conf --only-syncignore
+----
+
+=== Use SOURCE/.gitignore to drive filtering (no .syncignore at source)
+
+----
+bash sync.sh \
+  --source ./repo \
+  --dest ./backup \
+  --no-source-syncignore \
+  --use-source-gitignore
+----
+
+=== Whitelist only specific docs, still exclude build artifacts
+
+----
+bash sync.sh \
+  --source ./project \
+  --dest ./backup \
+  --only "docs/**" \
+  --ignore-src "docs/**/tmp/**"
+----
+
+=== Minimal CLI mirror to a remote with whitelist, gitignore import, and hidden-dirs excluded
+
+----
+bash sync.sh \
+  --source ./project \
+  --dest user@server:/srv/project \
+  --mode one-way \
+  --use-source-gitignore \
+  --exclude-hidden-dirs \
+  --only "dist/" \
+  --only "README.md" \
+  --dry-run
+----
+
+== Behavior details
+
+- Trailing slashes matter: `SOURCE/` contents are synced into `DEST/`.
+- In one-way mode, `--delete` ensures DEST mirrors SOURCE (subject to filters).
+- In two-way mode:
+  * First pass copies newer from SOURCE -> DEST.
+  * Second pass copies newer from DEST -> SOURCE.
+  * If a file differs on both sides after both passes, DEST’s version is kept as an additional conflict copy at SOURCE with a `.conflict-YYYYmmdd-HHMMSS` suffix.
+
+== Tips
+
+- Always start with `--dry-run` to validate filters and scope (especially with whitelist).
+- Over SSH, consider `-z` if bandwidth-bound (CPU permitting).
+- Old rsync versions may not support `--mkpath`; the script detects and omits it.
+
+== Troubleshooting
+
+- A pattern isn’t matching?
+  - Ensure directory patterns end with `/`
+  - Try a more explicit glob: `**/pattern/**`
+  - Place unignore (`!`) rules after the corresponding ignore
+  - Use `--dry-run` to inspect itemized changes
+- Windows:
+  - Prefer WSL or Git Bash; native cmd.exe/PowerShell quoting differs
+- Large trees:
+  - rsync is efficient; add `--info=stats2` for detailed metrics
+
+== License
+
+MIT
