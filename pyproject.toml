@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sync_tools_tests"
+version = "0.1.0"
+description = "Integration and BDD tests for sync.sh script."
+authors = [
+    { name="Damian Reeves" }
+]
+dependencies = [
+    "pytest",
+    "behave",
+    "pytest-bdd"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
