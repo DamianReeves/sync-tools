@@ -44,4 +44,4 @@ test: bdd pytest
 
 clean:
 	@echo "[make] Cleaning virtualenv and temporary files"
-	@rm -rf $(VENV) .pytest_cache behave-results reports temp_source temp_dest
+	@rm -rf $(VENV) .pytest_cache behave-results reports

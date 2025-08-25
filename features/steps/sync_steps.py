@@ -6,8 +6,14 @@ from behave import given, when, then
 
 @given('a source directory with files:')
 def step_source_dir_with_files(context):
-    """Create a temporary source directory and populate files from the table."""
-    context.source_dir = tempfile.mkdtemp(prefix='source-')
+    """Create a temporary source directory and populate files from the table.
+
+    Uses tempfile.TemporaryDirectory so directories are created outside the repo and
+    are cleaned up after the scenario.
+    """
+    # Create a TemporaryDirectory object and save it so we can cleanup later
+    context.source_tmpdir = tempfile.TemporaryDirectory(prefix='source-')
+    context.source_dir = context.source_tmpdir.name
     for row in context.table:
         filename = row['filename']
         content = row['content']
@@ -18,8 +24,9 @@ def step_source_dir_with_files(context):
 
 @given('an empty destination directory')
 def step_empty_dest_dir(context):
-    """Create a temporary empty destination directory."""
-    context.dest_dir = tempfile.mkdtemp(prefix='dest-')
+    """Create a temporary empty destination directory using TemporaryDirectory."""
+    context.dest_tmpdir = tempfile.TemporaryDirectory(prefix='dest-')
+    context.dest_dir = context.dest_tmpdir.name
 
 @when('I run sync.sh in one-way mode')
 def step_run_sync_one_way(context):
@@ -48,6 +55,12 @@ def step_verify_dest_files(context):
         with open(dest_file, 'r') as f:
             data = f.read()
         assert data == expected, f"Content mismatch for {filename}: expected '{expected}', got '{data}'"
-    # Clean up temporary directories
-    shutil.rmtree(context.source_dir)
-    shutil.rmtree(context.dest_dir)
+    # Clean up TemporaryDirectory objects (they remove directories)
+    try:
+        context.source_tmpdir.cleanup()
+    except Exception:
+        pass
+    try:
+        context.dest_tmpdir.cleanup()
+    except Exception:
+        pass
