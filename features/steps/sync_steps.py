@@ -123,6 +123,7 @@ def step_conflict_file_exists(context, filename):
 
 
 @given('I whitelist the paths:')
+@when('I whitelist the paths:')
 def step_whitelist_paths(context):
     """Set whitelist items for the upcoming sync run from a table of paths."""
     context.only_items = [row['path'] for row in context.table]
