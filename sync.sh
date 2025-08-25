@@ -138,43 +138,40 @@ if [[ -z "${SOURCE:-}" || -z "${DEST:-}" ]]; then
   print_usage
   die "You must provide SOURCE and DEST via config or --source/--dest"
 fi
+      local p="${pat:1}"
+      # Determine base (strip trailing /** if present)
+      local base="$p"
+      if [[ "$base" == */** ]]; then
+        base="${base%/**}"
+      fi
 
-# 5) Default MODE if still unset
-MODE="${MODE:-one-way}"
+      # Determine if pattern had a leading slash
+      local has_lead=0
+      if [[ "$base" == /* ]]; then has_lead=1; fi
 
-# Normalize/validate MODE
-MODE_LOWER="$(echo "$MODE" | tr '[:upper:]' '[:lower:]')"
-if [[ "$MODE_LOWER" != "one-way" && "$MODE_LOWER" != "two-way" ]]; then
-  die "MODE must be 'one-way' or 'two-way' (got: $MODE)"
-fi
+      # Prepare relative form for splitting (no leading slash)
+      local rel="${base#/}"
+      IFS='/' read -r -a parts <<<"$rel"
+      local accum=""
+      for ((i=0;i<${#parts[@]}-1;i++)); do
+        accum+="${parts[i]}/"
+        if [[ $has_lead -eq 1 ]]; then
+          printf -- "+ /%s\n" "$accum"
+        else
+          printf -- "+ %s\n" "$accum"
+        fi
+      done
 
-# Rsync opts
-RSYNC_OPTS=(-a -v --delete --human-readable --itemize-changes --partial)
-if rsync --version 2>/dev/null | grep -q 'version 3\.[2-9]'; then
-  RSYNC_OPTS+=(--mkpath)
-fi
-[[ $DRY_RUN -eq 1 ]] && RSYNC_OPTS+=(--dry-run)
-
-ensure_trailing_slash() {
-  local p="$1"
-  if [[ "$p" != */ ]]; then printf "%s/\n" "$p"; else printf "%s\n" "$p"; fi
-}
-SRC="$(ensure_trailing_slash "$SOURCE")"
-DST="$(ensure_trailing_slash "$DEST")"
-
-# Collect config-level excludes into arrays
-CONFIG_EXCLUDE_FILES=()
-CONFIG_EXCLUDE_PATS=()
-[[ -n "$EXCLUDES_FILE" ]] && CONFIG_EXCLUDE_FILES+=("$EXCLUDES_FILE")
-if [[ -n "$EXCLUDE" ]]; then
-  if declare -p EXCLUDE 2>/dev/null | grep -q 'declare \-a'; then
-    CONFIG_EXCLUDE_PATS+=("${EXCLUDE[@]}")
-  else
-    # shellcheck disable=SC2206
-    TMP_SPLIT=(${EXCLUDE//,/ })
-    CONFIG_EXCLUDE_PATS+=("${TMP_SPLIT[@]}")
+      # Include the base path and recursive children
+      if [[ $has_lead -eq 1 ]]; then
+        printf -- "+ %s\n" "$base"
+        printf -- "+ %s/**\n" "$base"
+      else
+        printf -- "+ %s\n" "${base%/}"
+        printf -- "+ %s/**\n" "${base%/}"
+      fi
   fi
-fi
+      printf -- "- %s\n" "$pat"
 
 # Helpers for filter building
 to_filter_rule() {
