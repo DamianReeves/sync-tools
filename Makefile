@@ -30,8 +30,8 @@ venv:
 	@$(PY) -m pip install --upgrade pip setuptools wheel
 
 install: venv
-	@echo "[make] Installing project and test deps into venv"
-	@$(PIP) install -e .
+	@echo "[make] Installing project and test deps into venv (dev extras)"
+	@$(PIP) install -e .[dev]
 
 bdd: venv
 	@echo "[make] Running behave BDD tests"

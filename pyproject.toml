@@ -10,9 +10,6 @@ authors = [
     { name="Damian Reeves" }
 ]
 dependencies = [
-    "pytest",
-    "behave",
-    "pytest-bdd",
     "click"
 ]
 
@@ -25,3 +22,10 @@ packages = { find = { include = ["sync_tools*"] } }
 [project.scripts]
 # Console script entrypoint that installs a `sync-tools` launcher which exposes the click CLI group
 sync-tools = "sync_tools.cli:cli"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "behave",
+    "pytest-bdd",
+]
