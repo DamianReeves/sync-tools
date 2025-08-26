@@ -191,3 +191,5 @@ reports/
 # Test artifacts that may be generated during testing
 test_folders/temp_*
 test_folders/tmp_*
+
+.venv_test/
