@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sync-tools"
-version = "0.1.0"
+version = "0.1.1rc1"
 description = "sync-tools: Python wrapper and utilities for the sync.sh rsync-based sync tool."
 authors = [
     { name="Damian Reeves" }
