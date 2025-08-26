@@ -51,8 +51,8 @@ Approach A — twine upload (explicit, simple):
 - name: Publish to PyPI (twine)
   if: startsWith(github.ref, 'refs/tags/v')
   run: |
-    python -m pip install --upgrade twine
-    python -m twine upload -u __token__ -p "${{ secrets.PYPI_API_TOKEN }}" dist/*
+  python3 -m pip install --upgrade twine
+  python3 -m twine upload -u __token__ -p "${{ secrets.PYPI_API_TOKEN }}" dist/*
 ----
 
 Approach B — pypa/gh-action-pypi-publish (convenience action):
@@ -78,8 +78,8 @@ Example Test PyPI step (twine):
 - name: Publish to Test PyPI (dry-run)
   if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v')
   run: |
-    python -m pip install --upgrade twine
-    python -m twine upload --repository-url https://test.pypi.org/legacy/ -u __token__ -p "${{ secrets.TEST_PYPI_API_TOKEN }}" dist/* || true
+  python3 -m pip install --upgrade twine
+  python3 -m twine upload --repository-url https://test.pypi.org/legacy/ -u __token__ -p "${{ secrets.TEST_PYPI_API_TOKEN }}" dist/* || true
 ----
 
 Make the Test PyPI step non-fatal (or conditioned) so it doesn't fail the
@@ -95,7 +95,7 @@ this verification step before uploading:
   if: startsWith(github.ref, 'refs/tags/v')
   run: |
     TAG=${GITHUB_REF#refs/tags/}
-    PKG_VER=$(python -c "import tomllib,sys; print(tomllib.loads(open('pyproject.toml','rb').read())['project']['version'])")
+  PKG_VER=$(python3 -c "import tomllib,sys; print(tomllib.loads(open('pyproject.toml','rb').read())['project']['version'])")
     echo "tag=$TAG pkg=$PKG_VER"
     if [ "v$PKG_VER" != "$TAG" ]; then
       echo "Tag and package version mismatch" >&2
@@ -103,35 +103,27 @@ this verification step before uploading:
     fi
   env:
     GITHUB_REF: ${{ github.ref }}
-----
-
 This enforces a simple rule: tag must be `v<version>` that matches
 `project.version` in `pyproject.toml`.
-
-=== 4) Repository secrets and permissions
-
+      python3 -m pip install --upgrade twine
+      python3 -m twine upload -u __token__ -p "${{ secrets.PYPI_API_TOKEN }}" dist/*
 * `PYPI_API_TOKEN` — required. Store the PyPI API token here.
 * `TEST_PYPI_API_TOKEN` — optional but recommended for Test PyPI.
 
-Repository permissions: the default `GITHUB_TOKEN` is sufficient for creating
-GitHub Releases (already used). Ensure Actions can access repository secrets
 and avoid exposing them to PRs from forks (default GitHub behavior protects
 secrets for fork PRs).
-
-=== 5) Optional: release notes and changelog automation
-
+      python3 -m pip install --upgrade twine
+      python3 -m twine upload --repository-url https://test.pypi.org/legacy/ -u __token__ -p "${{ secrets.TEST_PYPI_API_TOKEN }}" dist/* || true
 Consider adding `release-drafter/action` to automatically draft release notes
 from merged PRs or use GitHub's changelog generation. This is optional but
 useful for producing nicer release descriptions on PyPI and GitHub Release.
 
 === 6) Optional: signing and verification
 
-If you require GPG signing of distributions, add signing steps in CI and
-upload signed artifacts; PyPI supports signed uploads (users can verify with
 GPG). This increases complexity and key management requirements.
 
 == Test and rollout plan (recommended)
-
+       PKG_VER=$(python3 -c "import tomllib,sys; print(tomllib.loads(open('pyproject.toml','rb').read())['project']['version'])")
 1. Add `TEST_PYPI_API_TOKEN` and run a workflow where `dist/` is uploaded to
    Test PyPI. Confirm the package appears on https://test.pypi.org.
 2. Verify a local install from Test PyPI or from downloaded wheel:
@@ -139,28 +131,23 @@ GPG). This increases complexity and key management requirements.
 ----
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple your-package-name
 ----
-
 3. Once Test PyPI validation passes, add `PYPI_API_TOKEN` and enable the
    production publishing step (ensure the trigger condition is correct and
    the version/tag verification step is in place).
 4. Tag a release `vX.Y.Z`, push tag, and watch the release workflow. Confirm
    package is uploaded to PyPI and artifacts are attached to GitHub Release.
 
-== Rollback & safety notes
 
-* If an accidental publish happens, PyPI does not allow overwriting the same
   version. You must increment the version and re-release; consider doing a
   `yanked` release if appropriate.
-* Never store plaintext PyPI tokens in the repo. Use GitHub Actions secrets.
-
+      python3 -m pip install --upgrade twine
+      python3 -m twine upload --repository-url https://test.pypi.org/legacy/ -u __token__ -p "${{ secrets.TEST_PYPI_API_TOKEN }}" dist/* || true
 == Minimal CI snippet to add (copy-paste)
 
-Below is a minimal sequence to append after the existing build step. It does
 Test PyPI (optional) and then the real PyPI upload when running on a tag.
 
-----
-# Optional Test PyPI upload
-- name: Publish to Test PyPI
+      python3 -m pip install --upgrade twine
+      python3 -m twine upload -u __token__ -p "${{ secrets.PYPI_API_TOKEN }}" dist/*
   if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v')
   run: |
     python -m pip install --upgrade twine

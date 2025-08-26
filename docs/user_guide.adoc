@@ -81,7 +81,7 @@ Python matcher against rsync's own decision logic.
 === Basic usage
 
 ----
-PYTHONPATH=. python tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --pattern '!keep.py'
+PYTHONPATH=. python3 tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --pattern '!keep.py'
 ----
 
 To request JSON diagnostics explicitly:
@@ -94,7 +94,7 @@ path.
 
 [source,yaml]
 - name: Parity check
-    PYTHONPATH=. python tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
+  PYTHONPATH=. python3 tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
     if [ -f parity.json ]; then
       echo "Uploading parity.json as artifact"
       # upload artifact step here

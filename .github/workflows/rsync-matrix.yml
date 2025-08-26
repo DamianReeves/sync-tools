@@ -46,7 +46,7 @@ jobs:
           python-version: '3.12'
       - name: Create virtualenv and install deps
         run: |
-          python -m venv .venv
+          python3 -m venv .venv
           source .venv/bin/activate
           pip install -e .
       - name: Run integration tests
@@ -71,14 +71,14 @@ jobs:
           python-version: '3.12'
       - name: Create virtualenv and install deps
         run: |
-          python -m venv .venv
+          python3 -m venv .venv
           source .venv/bin/activate
           pip install -e .
       - name: Run e2e smoke
         run: |
           source .venv/bin/activate
           # run a small smoke script that exercises the CLI against real rsync
-          python - <<'PY'
+          python3 - <<'PY'
           import tempfile, os, subprocess
           from pathlib import Path
           src = tempfile.mkdtemp()
@@ -105,7 +105,7 @@ jobs:
             python-version: '3.12'
         - name: Create virtualenv and install deps
           run: |
-            python -m venv .venv
+            python3 -m venv .venv
             source .venv/bin/activate
             pip install -e .
         - name: Run parity harness on curated fixtures

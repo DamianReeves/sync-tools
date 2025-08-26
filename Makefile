@@ -62,7 +62,7 @@ install-local:
 		python3 -m pip install --user .; \
 		# ensure ~/.local/bin exists
 		mkdir -p $${HOME}/.local/bin; \
-		EXE=$$(python -c 'import shutil,sys; print(shutil.which("sync-tools") or "")'); \
+		EXE=$$(python3 -c 'import shutil,sys; print(shutil.which("sync-tools") or "")'); \
 		if [ -n "$$EXE" ]; then \
 			ln -sf "$$EXE" $${HOME}/.local/bin/sync-tools; \
 			echo "Installed to user site; launcher symlinked to ~/.local/bin/sync-tools"; \

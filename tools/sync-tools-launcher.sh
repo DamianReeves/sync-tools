@@ -11,4 +11,4 @@ fi
 
 # Otherwise run using the repository source as PYTHONPATH
 export PYTHONPATH="$(pwd)"
-exec python -m sync_tools.cli "$@"
+exec python3 -m sync_tools.cli "$@"

@@ -19,7 +19,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rsync
       - name: Create virtualenv and install deps
         run: |
-          python -m venv .venv
+          python3 -m venv .venv
           source .venv/bin/activate
           pip install -e .
       - name: Run tests
@@ -38,7 +38,7 @@ jobs:
           python-version: '3.12'
       - name: Create virtualenv and install deps
         run: |
-          python -m venv .venv
+          python3 -m venv .venv
           source .venv/bin/activate
           pip install -e .
       - name: Run integration tests

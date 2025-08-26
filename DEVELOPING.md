@@ -45,7 +45,7 @@ The project uses Python virtual environments to isolate dependencies. You can us
 
 ```bash
 # Create virtual environment
-python -m venv .venv
+python3 -m venv .venv
 
 # Activate it (Linux/macOS)
 source .venv/bin/activate
@@ -70,7 +70,7 @@ Preferred: use the provided Makefile which creates the virtualenv and installs t
 make install
 
 # Alternatively, if you prefer manual steps:
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
@@ -81,7 +81,7 @@ Check that the required tools are available:
 
 ```bash
 # Check Python and tools
-python --version
+python3 --version
 pytest --version
 behave --version
 
