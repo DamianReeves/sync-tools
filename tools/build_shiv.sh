@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a shiv artifact that includes the package and resolved runtime dependencies.
-# shiv creates a self-extracting zipapp with an embedded bootstrap site-packages.
+# shiv resolves and vendors dependencies into a self-extracting zipapp.
 
 set -euo pipefail
 
@@ -41,21 +41,15 @@ print('\n'.join(d for d in deps if d.split()[0] not in SKIP))
 PY
 )
 
-# Install deps and our wheel into a build dir
-SITE="$TMP/site"
-mkdir -p "$SITE"
-"$VENV_PIP" install --prefix "$SITE" ${RUNTIME_DEPS//$'\n'/ } >/dev/null
-"$VENV_PIP" install --prefix "$SITE" "$WHEEL" >/dev/null
-
-# The prefix layout is like <prefix>/lib/pythonX.Y/site-packages; find it
-SP=$(find "$SITE" -type d -name site-packages -print -quit)
-if [ -z "${SP:-}" ]; then
-  echo "ERROR: Could not locate site-packages in $SITE" >&2
-  exit 1
+REQS_ARGS=()
+if [ -n "$RUNTIME_DEPS" ]; then
+  while IFS= read -r dep; do
+    [ -n "$dep" ] && REQS_ARGS+=("$dep")
+  done <<<"$RUNTIME_DEPS"
 fi
 
-# Build shiv
-"$TMP/venv/bin/shiv" "$SP" -o "$OUT" -e sync_tools:main -p "/usr/bin/env python3"
+# Build shiv: pass requirements and our wheel so shiv resolves and vendors them
+"$TMP/venv/bin/shiv" "${REQS_ARGS[@]}" "$WHEEL" -o "$OUT" -e sync_tools:main -p "/usr/bin/env python3"
 chmod +x "$OUT"
 
 echo "Built $OUT"
