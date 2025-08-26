@@ -65,3 +65,11 @@ build-standalone: clean
 build-standalone-full: clean
 	@echo "[make] Building standalone zipapp with dependencies"
 	@tools/build_zipapp_with_deps.sh
+
+build-pex: clean
+	@echo "[make] Building PEX artifact"
+	@tools/build_pex.sh
+
+build-shiv: clean
+	@echo "[make] Building shiv artifact"
+	@tools/build_shiv.sh
