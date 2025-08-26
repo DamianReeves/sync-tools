@@ -55,6 +55,19 @@ matcher attempts to mirror rsync semantics; however, exact 1:1 parity is
 
 Use `--only` (whitelist) to create an include-only filter set. Files can be
 specified absolute (leading `/`) or relative.
+
+=== Using a GitHub ZIP download URL as source
+
+You can pass an HTTP(S) URL that points to a ZIP archive (for example a GitHub
+archive or release asset) as the `--source`. The CLI will download and
+unpack the archive into a temporary directory and run the sync against the
+extracted tree. This is useful for quick one-off syncs from a repo snapshot.
+
+----
+sync-tools sync --source "https://github.com/<owner>/<repo>/archive/refs/heads/main.zip" --dest /backup --only '/docs/' --dry-run
+----
+
+The downloaded archive is cleaned up after the run.
 == Parity Harness
 A diagnostic tool `tools/rsync_parity_harness.py` is provided to compare the
 Python matcher against rsync's own decision logic.

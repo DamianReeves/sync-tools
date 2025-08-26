@@ -1,6 +1,9 @@
 import click
 import subprocess
 import tempfile
+import urllib.request
+import shutil
+import os
 import shlex
 import logging
 import json
@@ -73,6 +76,34 @@ def sync(config, source, dest, mode, dry_run, use_source_gitignore, exclude_hidd
     You can specify defaults in a TOML config and override them on the command line.
     """
     cfg = {}
+
+    # Support passing a GitHub download / archive URL (zip) as the SOURCE.
+    # If a URL is provided we download and unpack it into a temporary
+    # directory and point `src` at the extracted tree so later discovery
+    # (config, .syncignore, etc) works as if the user had supplied a path.
+    downloaded_zip_path = None
+    extracted_dir = None
+    if source and (source.startswith("http://") or source.startswith("https://")):
+        # Only handle obvious zip/archive URLs; treat other URLs as errors
+        try:
+            # download to a temp file
+            tf = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+            tf.close()
+            with urllib.request.urlopen(source) as resp, open(tf.name, "wb") as out:
+                shutil.copyfileobj(resp, out)
+            downloaded_zip_path = tf.name
+            # extract to a temp dir
+            extracted_dir = tempfile.mkdtemp(prefix="sync_tools_zip_")
+            shutil.unpack_archive(downloaded_zip_path, extracted_dir)
+            # If the archive created a single top-level dir (common for GitHub), use it
+            parts = [p for p in Path(extracted_dir).iterdir() if p.exists()]
+            if len(parts) == 1 and parts[0].is_dir():
+                source = str(parts[0].resolve())
+            else:
+                source = str(Path(extracted_dir).resolve())
+        except Exception as e:
+            # If download or extraction fails, raise a clear Click error
+            raise click.BadParameter(f"Failed to download/extract source URL: {e}")
 
     # If the user provided a config file use it. Otherwise we'll try to
     # auto-discover a config file in the source directory (if provided).
@@ -174,6 +205,18 @@ def sync(config, source, dest, mode, dry_run, use_source_gitignore, exclude_hidd
         # wire logger into run_rsync so it can log prepared commands
         run_rsync(src, dst, rsync_opts, src_filter=src_filter, dst_filter=dst_filter, dump_commands=dump_commands, logger=logger, report_path=report, list_filtered=list_filtered)
     finally:
+        # cleanup downloaded/extracted temp paths if used
+        for _p in (downloaded_zip_path, extracted_dir):
+            if _p:
+                try:
+                    pth = Path(_p)
+                    if pth.exists():
+                        if pth.is_dir():
+                            shutil.rmtree(pth)
+                        else:
+                            pth.unlink()
+                except Exception:
+                    logger.debug("Failed to cleanup temp path %s", _p)
         for p in (src_tmp, dst_tmp):
             if p:
                 try:
