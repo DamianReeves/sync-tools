@@ -8,7 +8,7 @@ Feature: Hidden directory exclusion
     When I add extra args:
       | arg                   | value |
       | --exclude-hidden-dirs |       |
-    And I run sync.sh in one-way mode
+  And I run sync-tools sync in one-way mode
     Then the destination directory should contain the files:
       | filename         | content |
       | visible/file.txt | y       |

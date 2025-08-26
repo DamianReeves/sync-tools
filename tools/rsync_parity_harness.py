@@ -5,8 +5,8 @@ This small utility runs rsync in dry-run mode with the same filter file
 the Python code would pass, captures the list of files rsync would transfer,
 and compares that to the decisions returned by `decision_for_path`.
 
-Usage: python tools/rsync_parity_harness.py --src SRC --patterns file.txt
-or:    python tools/rsync_parity_harness.py --src SRC --pattern "*.py" --pattern "!keep.py"
+Usage: python3 tools/rsync_parity_harness.py --src SRC --patterns file.txt
+or:    python3 tools/rsync_parity_harness.py --src SRC --pattern "*.py" --pattern "!keep.py"
 """
 import argparse
 import subprocess

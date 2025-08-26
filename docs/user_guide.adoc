@@ -12,14 +12,36 @@ harness, and recommended CI integration.
 
 == Installation
 
-A minimal setup uses Python 3.12 and the provided virtualenv pattern. From the
-repository root:
+A minimal setup uses Python 3.12 and the provided virtualenv pattern. From the repository root:
 
 ----
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -e .
 ----
+
+Alternatively, use a packaged single-file build (no virtualenv needed):
+
+----
+# PEX
+./dist/sync-tools.pex --help
+
+# shiv
+./dist/sync-tools.shiv --help
+
+# PyInstaller (Linux)
+./dist/sync-tools --help
+----
+
+We build and publish these artifacts as part of Releases. You can also build locally:
+
+----
+make build-pex
+make build-shiv
+make build-pyinstaller
+----
+
+Note: PEX and shiv include resolved dependencies and generally work across systems sharing the same Python ABI. The PyInstaller binary is platform-specific to the build environment.
 
 === Installable distribution
 
@@ -81,7 +103,7 @@ Python matcher against rsync's own decision logic.
 === Basic usage
 
 ----
-PYTHONPATH=. python tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --pattern '!keep.py'
+PYTHONPATH=. python3 tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --pattern '!keep.py'
 ----
 
 To request JSON diagnostics explicitly:
@@ -94,7 +116,7 @@ path.
 
 [source,yaml]
 - name: Parity check
-    PYTHONPATH=. python tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
+  PYTHONPATH=. python3 tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
     if [ -f parity.json ]; then
       echo "Uploading parity.json as artifact"
       # upload artifact step here
@@ -122,6 +144,10 @@ extend the report by stat'ing files for size/mtime.
   creating a minimal reproduction tree and running the harness against it.
 
 == Development notes
+== Deprecation: legacy sync.sh
+
+The Bash script `sync.sh` is deprecated and archived under `docs/archive/sync.sh`. Prefer the Python CLI `sync-tools` or the packaged single-file artifacts.
+
 
 Contributions to the matcher should include unit tests in `tests/test_pattern_matching.py`.
 

@@ -10,7 +10,7 @@ Feature: Ignore and unignore behavior
       !secret.log
       """
     And an empty destination directory
-    When I run sync.sh in one-way mode
+  When I run sync-tools sync in one-way mode
     Then the destination directory should contain the files:
       | filename      | content  |
       | keep.txt      | keep     |

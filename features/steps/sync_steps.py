@@ -70,22 +70,24 @@ def step_empty_dest_dir(context):
     context.dest_tmpdir = tempfile.TemporaryDirectory(prefix='dest-')
     context.dest_dir = context.dest_tmpdir.name
 
-@when('I run sync.sh in one-way mode')
+@when('I run sync-tools sync in one-way mode')
 def step_run_sync_one_way(context):
-    """Execute the sync.sh script with one-way mode."""
+    """Execute the Python CLI with one-way mode (legacy wording kept in feature)."""
     _run_sync_with_mode(context, mode='one-way')
 
 
-@when('I run sync.sh in two-way mode')
+@when('I run sync-tools sync in two-way mode')
 def step_run_sync_two_way(context):
-    """Execute the sync.sh script with two-way mode."""
+    """Execute the Python CLI with two-way mode (legacy wording kept in feature)."""
     _run_sync_with_mode(context, mode='two-way')
 
 
 def _run_sync_with_mode(context, mode='one-way'):
-    script_path = os.path.abspath(os.path.join(os.getcwd(), 'sync.sh'))
-    # Build command
-    cmd = ['bash', script_path, '--source', context.source_dir, '--dest', context.dest_dir, '--mode', mode]
+    # Prefer venv python if present, else fallback to system python3
+    venv_py = os.path.join(os.getcwd(), '.venv', 'bin', 'python')
+    py = venv_py if os.path.exists(venv_py) else 'python3'
+    # Build command to run the package module (triggers __main__.py -> CLI)
+    cmd = [py, '-m', 'sync_tools', 'sync', '--source', context.source_dir, '--dest', context.dest_dir, '--mode', mode]
     # Include any whitelist items passed in context
     if hasattr(context, 'only_items') and context.only_items:
         for item in context.only_items:
@@ -167,3 +169,51 @@ def step_add_extra_args(context):
             context.extra_args.append(arg)
         else:
             context.extra_args.append((arg, val))
+
+# New step for initializing a git repository as source
+@given('a git repository with files:')
+def step_git_repo_with_files(context):
+    import tempfile, os
+    # Create a temp directory for the git repo named with .git suffix to trigger clone
+    parent = tempfile.TemporaryDirectory(prefix='gitparent-')
+    repo_dir = os.path.join(parent.name, 'source.git')
+    os.makedirs(repo_dir, exist_ok=True)
+    context.gitparent = parent
+    context.git_repo_dir = repo_dir
+    # Populate files
+    for row in context.table:
+        filename = row['filename']
+        content = row['content']
+        path = os.path.join(repo_dir, filename)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(content)
+    # Initialize git repo and commit
+    subprocess.run(['git', 'init'], cwd=repo_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(['git', 'add', '.'], cwd=repo_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(['git', 'commit', '-m', 'initial'], cwd=repo_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Set source_dir to the git URL path
+    context.source_dir = repo_dir
+
+
+@then('the report file should contain:')
+def step_report_file_contains(context):
+    import os
+    # Find report file argument from extra_args
+    report_path = None
+    for arg in getattr(context, 'extra_args', []):
+        if isinstance(arg, (list, tuple)) and arg[0] == '--report':
+            report_path = arg[1]
+            break
+    assert report_path, 'No --report argument provided'
+    abs_path = os.path.abspath(report_path)
+    assert os.path.exists(abs_path), f'Report file not found: {abs_path}'
+    content = open(abs_path).read()
+    for row in context.table:
+        line = row['line']
+        assert line in content, f'Expected line {line!r} in report'
+    # Cleanup report file
+    try:
+        os.unlink(abs_path)
+    except Exception:
+        pass
