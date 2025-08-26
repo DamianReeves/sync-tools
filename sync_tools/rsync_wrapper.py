@@ -202,11 +202,18 @@ def build_filter_file(patterns: List[str], only: bool = False, default_excludes:
         lines = to_filter_lines(patterns or [])
 
 
+    # Create a temp file to hold the filter lines. Some tests monkeypatch
+    # tempfile.NamedTemporaryFile to return a lightweight object that only
+    # has a .name attribute. To be robust, close it and reopen by path.
     tf = tempfile.NamedTemporaryFile(delete=False, mode="w", prefix="sync_filter_")
-    tf.write("\n".join(lines))
-    tf.flush()
-    tf.close()
-    return tf.name, lines
+    path = tf.name
+    try:
+        tf.close()
+    except Exception:
+        pass
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+    return path, lines
 
 
 def run_rsync(src: str, dst: str, opts: List[str], src_filter: Optional[Tuple[str, List[str]]] = None,

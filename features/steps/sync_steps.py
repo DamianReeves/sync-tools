@@ -169,3 +169,51 @@ def step_add_extra_args(context):
             context.extra_args.append(arg)
         else:
             context.extra_args.append((arg, val))
+
+# New step for initializing a git repository as source
+@given('a git repository with files:')
+def step_git_repo_with_files(context):
+    import tempfile, os
+    # Create a temp directory for the git repo named with .git suffix to trigger clone
+    parent = tempfile.TemporaryDirectory(prefix='gitparent-')
+    repo_dir = os.path.join(parent.name, 'source.git')
+    os.makedirs(repo_dir, exist_ok=True)
+    context.gitparent = parent
+    context.git_repo_dir = repo_dir
+    # Populate files
+    for row in context.table:
+        filename = row['filename']
+        content = row['content']
+        path = os.path.join(repo_dir, filename)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(content)
+    # Initialize git repo and commit
+    subprocess.run(['git', 'init'], cwd=repo_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(['git', 'add', '.'], cwd=repo_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(['git', 'commit', '-m', 'initial'], cwd=repo_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Set source_dir to the git URL path
+    context.source_dir = repo_dir
+
+
+@then('the report file should contain:')
+def step_report_file_contains(context):
+    import os
+    # Find report file argument from extra_args
+    report_path = None
+    for arg in getattr(context, 'extra_args', []):
+        if isinstance(arg, (list, tuple)) and arg[0] == '--report':
+            report_path = arg[1]
+            break
+    assert report_path, 'No --report argument provided'
+    abs_path = os.path.abspath(report_path)
+    assert os.path.exists(abs_path), f'Report file not found: {abs_path}'
+    content = open(abs_path).read()
+    for row in context.table:
+        line = row['line']
+        assert line in content, f'Expected line {line!r} in report'
+    # Cleanup report file
+    try:
+        os.unlink(abs_path)
+    except Exception:
+        pass
