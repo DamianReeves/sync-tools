@@ -83,6 +83,25 @@ def sync(config, source, dest, mode, dry_run, use_source_gitignore, exclude_hidd
     # (config, .syncignore, etc) works as if the user had supplied a path.
     downloaded_zip_path = None
     extracted_dir = None
+    clone_dir = None
+    # Heuristic to detect git repository URLs (ssh/git protocol, .git suffix, or common hosts)
+    def _looks_like_git_url(u: str) -> bool:
+        if not u:
+            return False
+        return u.startswith("git@") or u.startswith("git://") or u.endswith(".git") or ("github.com" in u and ".zip" not in u)
+    # If source looks like a git repo, perform a shallow clone and use that as source
+    if source and _looks_like_git_url(source):
+        try:
+            clone_dir = tempfile.mkdtemp(prefix="sync_tools_git_clone_")
+            # shallow clone; allow upstream to fail and surface a Click error
+            res = subprocess.run(["git", "clone", "--depth", "1", source, clone_dir], check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if getattr(res, "returncode", 1) != 0:
+                raise click.BadParameter(f"Failed to clone git repo {source}: {getattr(res, 'stderr', '') or getattr(res, 'stdout', '')}")
+            source = str(Path(clone_dir).resolve())
+        except click.BadParameter:
+            raise
+        except Exception as e:
+            raise click.BadParameter(f"Failed to clone git repo {source}: {e}")
     if source and (source.startswith("http://") or source.startswith("https://")):
         # Only handle obvious zip/archive URLs; treat other URLs as errors
         try:

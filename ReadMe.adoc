@@ -1,8 +1,8 @@
-= sync.sh — Fast directory sync with .syncignore, unignore, whitelist, optional .gitignore import, and hidden-dir controls
+== sync-tools — Fast directory sync with .syncignore, unignore, whitelist, optional .gitignore import, and hidden-dir controls
 :toc:
 :toclevels: 2
 
-sync.sh is a small, dependency-light Bash wrapper around rsync that provides:
+sync-tools is a Python CLI wrapper around rsync that provides:
 
 - One-way or two-way directory synchronization
 - Gitignore-style `.syncignore` files (source and destination)
@@ -14,18 +14,59 @@ sync.sh is a small, dependency-light Bash wrapper around rsync that provides:
 - Optional exclusion of all hidden directories (dot-dirs)
 - Dry-run previews and detailed change output
 
-== Requirements
+== Quick start
 
-- Bash 4+
-- rsync 3.1+ (3.2+ recommended)
+Requires: Python 3.8+ and rsync 3.1+ (3.2+ recommended).
+
+Install and run via pip:
+
+----
+python3 -m pip install sync-tools  # or install the wheel from Releases
+sync-tools --help
+----
+
+Run without installing (from a checkout):
+
+----
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
+sync-tools --help
+----
+
+Single-file builds (no virtualenv required):
+
+- PEX: `./dist/sync-tools.pex --help`
+- shiv: `./dist/sync-tools.shiv --help`
+- PyInstaller (Linux binary): `./dist/sync-tools --help`
+
+Download prebuilt artifacts from the GitHub Release, or build them locally:
+
+----
+make build-pex            # dist/sync-tools.pex
+make build-shiv           # dist/sync-tools.shiv
+make build-pyinstaller    # dist/sync-tools (Linux)
+----
 
 == Installation
 
-Place `sync.sh` somewhere on your PATH and make it executable:
+We publish wheels and source distributions to GitHub Releases (and optionally PyPI). Install with pip:
 
 ----
-cp sync.sh /usr/local/bin/sync.sh
-chmod +x /usr/local/bin/sync.sh
+pip install ./dist/sync_tools-<version>-py3-none-any.whl
+----
+
+Alternatively, use the single-file artifacts:
+
+----
+# PEX (multi-platform per-ABI)
+./dist/sync-tools.pex --help
+
+# shiv (self-extracting zipapp)
+./dist/sync-tools.shiv --help
+
+# PyInstaller onefile (Linux binary built on the release runner)
+./dist/sync-tools --help
 ----
 
 == Usage Overview
@@ -35,13 +76,13 @@ You can use a config file (sync.conf) or run entirely via CLI flags.
 === With config file
 
 ----
-bash sync.sh -c ./sync.conf [options]
+sync-tools sync -c ./sync.conf [options]
 ----
 
 === Without config file (CLI only)
 
 ----
-bash sync.sh --source SRC --dest DEST [--mode one-way|two-way] [options]
+sync-tools sync --source SRC --dest DEST [--mode one-way|two-way] [options]
 ----
 
 - `SRC` and `DEST` can be local paths or rsync remote endpoints like `user@host:/path`.
@@ -78,16 +119,16 @@ EXCLUDE_HIDDEN_DIRS=1
 Core:
 ----
 -c, --config PATH            Optional config file (CLI overrides config)
-    --source PATH            Source directory/endpoint (required if no config)
-    --dest PATH              Destination directory/endpoint (required if no config)
-    --mode MODE              one-way | two-way (defaults to one-way if unset)
+  --source PATH            Source directory/endpoint (required if no config)
+  --dest PATH              Destination directory/endpoint (required if no config)
+  --mode MODE              one-way | two-way (defaults to one-way if unset)
 ----
 Ignore sources:
 ----
-    --no-source-syncignore   Disable using SOURCE/.syncignore
-    --only-syncignore        Use only .syncignore + CLI excludes (ignore config excludes)
-    --ignore-src-file PATH   Extra ignore file for SOURCE side (repeatable)
-    --ignore-dest "pattern"  Extra inline pattern for DEST side (repeatable)
+  --no-source-syncignore   Disable using SOURCE/.syncignore
+  --only-syncignore        Use only .syncignore + CLI excludes (ignore config excludes)
+  --ignore-src-file PATH   Extra ignore file for SOURCE side (repeatable)
+  --ignore-dest "pattern"  Extra inline pattern for DEST side (repeatable)
 # Notes: patterns can start with "!" to unignore; directory patterns should end with "/"
 ----
 
@@ -169,13 +210,13 @@ Provide via:
 Basic one-way dry-run:
 
 ----
-bash sync.sh --source ./src --dest ./dst --dry-run
+sync-tools sync --source ./src --dest ./dst --dry-run
 ----
 
 Two-way with source .gitignore and some per-side ignores:
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./project \
   --dest user@server:/data/project \
   --mode two-way \
@@ -188,7 +229,7 @@ bash sync.sh \
 === With config, override on CLI
 
 ----
-bash sync.sh -c ./sync.conf --mode two-way --dry-run
+sync-tools sync -c ./sync.conf --mode two-way --dry-run
 ----
 
 === Use `.syncignore` and `.gitignore`
@@ -196,7 +237,7 @@ bash sync.sh -c ./sync.conf --mode two-way --dry-run
 Respect both files on SOURCE; use DEST `.syncignore` too:
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./app \
   --dest ./backup \
   --use-source-gitignore
@@ -205,7 +246,7 @@ bash sync.sh \
 Disable `.syncignore` on SOURCE but still use `.gitignore` on SOURCE:
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./app \
   --dest ./backup \
   --no-source-syncignore \
@@ -217,13 +258,13 @@ bash sync.sh \
 `.git/` is excluded automatically on both sides:
 
 ----
-bash sync.sh --source ./repo --dest ./backup
+sync-tools sync --source ./repo --dest ./backup
 ----
 
 Re-include `.git/` explicitly (override default) on source:
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./repo \
   --dest ./backup \
   --ignore-src "!/.git/**"
@@ -232,7 +273,7 @@ bash sync.sh \
 Re-include `.git/` explicitly on destination:
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./repo \
   --dest ./backup \
   --ignore-dest "!/.git/**"
@@ -243,13 +284,13 @@ bash sync.sh \
 Exclude dot-dirs everywhere:
 
 ----
-bash sync.sh --source ./src --dest ./dst --exclude-hidden-dirs
+sync-tools sync --source ./src --dest ./dst --exclude-hidden-dirs
 ----
 
 Exclude dot-dirs but keep `.config/` on source:
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./src \
   --dest ./dst \
   --exclude-hidden-dirs \
@@ -267,7 +308,7 @@ EXCLUDE_HIDDEN_DIRS=1
 Only exclude extra cache at destination:
 
 ----
-bash sync.sh -c ./sync.conf --ignore-dest ".cache/"
+sync-tools sync -c ./sync.conf --ignore-dest ".cache/"
 ----
 
 Exclude logs on source but re-include a subfolder:
@@ -354,7 +395,7 @@ bash sync.sh -c ./sync.conf --ignore-dest "backups/"
 Source:
 
 ----
-bash sync.sh -c ./sync.conf \
+sync-tools sync -c ./sync.conf \
   --ignore-src "*.log" \
   --ignore-src "!reports/important/**"
 ----
@@ -362,7 +403,7 @@ bash sync.sh -c ./sync.conf \
 Destination:
 
 ----
-bash sync.sh -c ./sync.conf \
+sync-tools sync -c ./sync.conf \
   --ignore-dest "*.log" \
   --ignore-dest "!reports/important/**"
 ----
@@ -370,7 +411,7 @@ bash sync.sh -c ./sync.conf \
 === Sync everything except node_modules, but keep node_modules/.bin
 
 ----
-bash sync.sh -c ./sync.conf \
+sync-tools sync -c ./sync.conf \
   --ignore-src "node_modules/" \
   --ignore-src "!node_modules/.bin/**"
 ----
@@ -378,13 +419,13 @@ bash sync.sh -c ./sync.conf \
 === Respect only .syncignore files (source and dest), nothing else
 
 ----
-bash sync.sh -c ./sync.conf --only-syncignore
+sync-tools sync -c ./sync.conf --only-syncignore
 ----
 
 === Use SOURCE/.gitignore to drive filtering (no .syncignore at source)
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./repo \
   --dest ./backup \
   --no-source-syncignore \
@@ -394,7 +435,7 @@ bash sync.sh \
 === Whitelist only specific docs, still exclude build artifacts
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./project \
   --dest ./backup \
   --only "docs/**" \
@@ -404,7 +445,7 @@ bash sync.sh \
 === Minimal CLI mirror to a remote with whitelist, gitignore import, and hidden-dirs excluded
 
 ----
-bash sync.sh \
+sync-tools sync \
   --source ./project \
   --dest user@server:/srv/project \
   --mode one-way \
@@ -538,3 +579,44 @@ make package-install-local # build sdist/wheel and install from dist/ into user 
 Use `make install-local` to make the `sync-tools` console script available on your PATH (ensure `~/.local/bin` is on PATH). Use `make package-install-local` to verify packaging before publishing.
 
 Note: `make package-install-local` invokes `python3 -m build` and `python3 -m pip` and therefore requires a system Python with pip available. If your system Python doesn't have pip, create and activate a virtualenv with `python3 -m venv .venv` and run `pip install -e .` to test locally instead.
+
+Running the CLI from the repository (local development)
+
+You can run the CLI without installing the package globally in two ways:
+
+- Using the module runner (no install required):
+
+----
+python3 -m sync_tools.cli --help
+----
+
+- Install the project in editable mode into your venv and use the console script:
+
+----
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+sync-tools --help
+----
+
+Installing for a single user (global-like)
+
+To make `sync-tools` available on your PATH without system-wide install, install to your user site and symlink the console script into `~/.local/bin`:
+
+----
+python3 -m pip install --user .
+mkdir -p ~/.local/bin
+ln -sf "$(python3 -c 'import shutil,sys; print(shutil.which("sync-tools") or "")')" ~/.local/bin/sync-tools
+export PATH="$HOME/.local/bin:$PATH"
+----
+
+System-wide install (requires sudo):
+== Deprecation notice: sync.sh
+
+The legacy Bash script `sync.sh` has been archived (see `docs/archive/sync.sh`). Please use the Python CLI `sync-tools` or the single-file builds described above.
+
+
+----
+sudo python3 -m pip install .
+sudo ln -sf "$(sudo python3 -c 'import shutil,sys; print(shutil.which("sync-tools") or "")')" /usr/local/bin/sync-tools
+----

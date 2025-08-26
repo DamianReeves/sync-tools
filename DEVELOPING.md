@@ -75,6 +75,45 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+### Running the CLI locally without install
+
+You can run the CLI directly from the repository without installing the package globally. Two options:
+
+- Module runner (quick, no install):
+
+```bash
+python3 -m sync_tools.cli --help
+```
+
+- Editable install into venv (recommended for development):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+sync-tools --help
+```
+
+### Making the CLI available globally / for your user
+
+To make `sync-tools` available like a global command:
+
+User-local (no sudo):
+
+```bash
+python3 -m pip install --user .
+mkdir -p ~/.local/bin
+ln -sf "$(python3 -c 'import shutil,sys; print(shutil.which("sync-tools") or "")')" ~/.local/bin/sync-tools
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+System-wide (requires sudo):
+
+```bash
+sudo python3 -m pip install .
+sudo ln -sf "$(sudo python3 -c 'import shutil,sys; print(shutil.which("sync-tools") or "")')" /usr/local/bin/sync-tools
+```
+
 ### 4. Verify Installation
 
 Check that the required tools are available:

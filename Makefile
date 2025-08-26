@@ -73,3 +73,7 @@ build-pex: clean
 build-shiv: clean
 	@echo "[make] Building shiv artifact"
 	@tools/build_shiv.sh
+
+build-pyinstaller: clean
+	@echo "[make] Building PyInstaller onefile binary"
+	@tools/build_pyinstaller.sh
