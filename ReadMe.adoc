@@ -515,3 +515,24 @@ For development without installing, run the helper:
 ----
 ./tools/sync-tools-launcher.sh sync --source ./project --dest ./backup --dry-run
 ----
+
+== Makefile targets
+
+This repository provides convenient Makefile targets for common developer
+workflows. From the repository root, use:
+
+----
+make venv              # create Python virtualenv at .venv and upgrade pip/setuptools/wheel
+make install           # install project (editable) and test deps into .venv
+make bdd               # run behave BDD tests (requires venv)
+make pytest            # run pytest (requires venv)
+make test              # run behave then pytest
+make clean             # remove .venv and common temp files
+
+# Installation helpers
+make install-local     # install package into user site and symlink launcher to ~/.local/bin
+make install-local sudo=1  # install system-wide (requires sudo) and make launcher available in /usr/local/bin
+make package-install-local # build sdist/wheel and install from dist/ into user site
+----
+
+Use `make install-local` to make the `sync-tools` console script available on your PATH (ensure `~/.local/bin` is on PATH). Use `make package-install-local` to verify packaging before publishing.

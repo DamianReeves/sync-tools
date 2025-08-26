@@ -34,22 +34,12 @@ pip install ./sync_tools-0.1.0-py3-none-any.whl
 # From a source checkout
 pip install -e .
 ----
-
-When installed, a console launcher `sync-tools` is available on your PATH. It
-exposes the same CLI described below and can be run simply as:
-
-----
-sync-tools sync --source ./project --dest ./backup --dry-run
-----
-
 == CLI
 
 The main Python CLI is in `sync_tools/cli.py` and exposes the same options as the
 legacy `sync.sh` script but with enhanced logging and reporting.
 
-=== Common options
 
-- `--config PATH` — Load a TOML configuration (CLI overrides values)
 - `--source`, `--dest` — Source and destination
 - `--mode` — one-way or two-way
 - `--dry-run` — run rsync with `--dry-run`
@@ -59,29 +49,21 @@ legacy `sync.sh` script but with enhanced logging and reporting.
 - `--list-filtered {src,dst,both}` — locally list files that would be filtered
 
 == Filters and Patterns
-
 Filters support rsync-like patterns including `*`, `?`, `**`, trailing `/` to
 indicate directories, and `!` for explicit includes (unignore). The Python
 matcher attempts to mirror rsync semantics; however, exact 1:1 parity is
-non-trivial.
 
 Use `--only` (whitelist) to create an include-only filter set. Files can be
 specified absolute (leading `/`) or relative.
-
 == Parity Harness
-
 A diagnostic tool `tools/rsync_parity_harness.py` is provided to compare the
 Python matcher against rsync's own decision logic.
 
-=== What it does
 
-- Builds the same filter file the Python code would use
 - Runs `rsync --dry-run --out-format='%i %n'` from `src/` to an empty temp
   dir and captures the files rsync would transfer
 - Walks the source tree and compares `decision_for_path` results to rsync's
-  inclusion list
 - Prints mismatches and (optionally) writes a JSON diagnostic file with
-  decisions and mismatches for CI artifact upload
 
 === Basic usage
 
@@ -90,21 +72,15 @@ PYTHONPATH=. python tools/rsync_parity_harness.py --src /path/to/src --pattern '
 ----
 
 To request JSON diagnostics explicitly:
-
 ----
-PYTHONPATH=. python tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --dump-json /tmp/parity.json
 ----
 
 When the harness finds mismatches it exits with code 2 and writes the JSON
-payload by default to a temp file; you can give `--dump-json` to control the
 path.
-
 === Example CI step (GitHub Actions)
 
 [source,yaml]
-----
 - name: Parity check
-  run: |
     PYTHONPATH=. python tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
     if [ -f parity.json ]; then
       echo "Uploading parity.json as artifact"
