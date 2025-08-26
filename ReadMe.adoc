@@ -500,3 +500,18 @@ If you want, I can:
 
 - Run the full suite in CI-like Docker image(s) to validate behavior across multiple rsync versions.
 - Add a small matrix of additional behave scenarios to cover remote endpoints and destination-side unignores.
+
+== Installing the Python distribution
+
+We provide a Python console script `sync-tools` when the package is installed via
+pip. After installing the wheel or `pip install -e .` you can run the tool as:
+
+----
+sync-tools sync --source ./project --dest ./backup --dry-run
+----
+
+For development without installing, run the helper:
+
+----
+./tools/sync-tools-launcher.sh sync --source ./project --dest ./backup --dry-run
+----

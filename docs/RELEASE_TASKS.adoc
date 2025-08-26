@@ -1,0 +1,203 @@
+= Release Tasks: Enable automatic PyPI publishing
+
+This document lists the remaining actions and recommended steps to configure
+the existing GitHub Actions workflow to automatically publish built artifacts
+to PyPI when a release tag is pushed.
+
+NOTE: The project already builds sdist and wheel and uploads them to a GitHub
+Release (see `.github/workflows/release.yml`). The tasks below cover the
+additional steps required to safely and reliably publish the same artifacts to
+PyPI (and Test PyPI) from the CI pipeline.
+
+== Assumptions
+
+* You want to publish packages to PyPI.org when a tag `vX.Y.Z` is pushed.
+* The current workflow builds artifacts into `dist/` and creates a GitHub
+  Release with them.
+* You have administrative access to the repository to add secrets.
+
+== High level checklist
+
+1. Create PyPI API token and store it as a GitHub secret (required)
+2. (Optional) Create a Test PyPI API token for dry-run publishing (recommended)
+3. Update `release.yml` to optionally publish to Test PyPI then PyPI using the
+   token(s) (required)
+4. Add a small verification step in CI to ensure package version matches the
+   git tag (recommended)
+5. (Optional) Add release notes automation (release-drafter) and/or changelog
+6. Verify the flow against Test PyPI, then enable production publish
+
+== Detailed steps
+
+=== 1) Create PyPI API token and add to GitHub
+
+1. Sign in to https://pypi.org and go to your account > API tokens.
+2. Create a token scoped to this project (recommended) or a global token.
+3. Copy the token (it will not be shown again).
+4. In GitHub repo settings > Secrets and variables > Actions, add a new
+   repository secret named `PYPI_API_TOKEN` with the token value.
+
+If you prefer a separate Test PyPI run, repeat the process on https://test.pypi.org
+and store the token as `TEST_PYPI_API_TOKEN`.
+
+=== 2) Workflow changes (recommended update to `.github/workflows/release.yml`)
+
+Add a publishing step after the existing build step(s). The example below shows
+two approaches: (A) using `twine` directly and (B) using the pypa action.
+
+Approach A — twine upload (explicit, simple):
+
+----
+- name: Publish to PyPI (twine)
+  if: startsWith(github.ref, 'refs/tags/v')
+  run: |
+    python -m pip install --upgrade twine
+    python -m twine upload -u __token__ -p "${{ secrets.PYPI_API_TOKEN }}" dist/*
+----
+
+Approach B — pypa/gh-action-pypi-publish (convenience action):
+
+----
+- name: Publish to PyPI (action)
+  if: startsWith(github.ref, 'refs/tags/v')
+  uses: pypa/gh-action-pypi-publish@v1.5.0
+  with:
+    password: ${{ secrets.PYPI_API_TOKEN }}
+----
+
+Notes:
+
+* Keep the `if: startsWith(github.ref, 'refs/tags/v')` guard so publishing
+  only happens on tag pushes.
+* If you want a Test PyPI dry-run, add an earlier step with `--repository-url`
+  pointing to `https://test.pypi.org/legacy/` and using `TEST_PYPI_API_TOKEN`.
+
+Example Test PyPI step (twine):
+
+----
+- name: Publish to Test PyPI (dry-run)
+  if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v')
+  run: |
+    python -m pip install --upgrade twine
+    python -m twine upload --repository-url https://test.pypi.org/legacy/ -u __token__ -p "${{ secrets.TEST_PYPI_API_TOKEN }}" dist/* || true
+----
+
+Make the Test PyPI step non-fatal (or conditioned) so it doesn't fail the
+entire release if it already exists on Test PyPI.
+
+=== 3) Verification: ensure package version matches git tag (recommended)
+
+To avoid publishing a package with a version that doesn't match the tag, add
+this verification step before uploading:
+
+----
+- name: Verify version matches tag
+  if: startsWith(github.ref, 'refs/tags/v')
+  run: |
+    TAG=${GITHUB_REF#refs/tags/}
+    PKG_VER=$(python -c "import tomllib,sys; print(tomllib.loads(open('pyproject.toml','rb').read())['project']['version'])")
+    echo "tag=$TAG pkg=$PKG_VER"
+    if [ "v$PKG_VER" != "$TAG" ]; then
+      echo "Tag and package version mismatch" >&2
+      exit 1
+    fi
+  env:
+    GITHUB_REF: ${{ github.ref }}
+----
+
+This enforces a simple rule: tag must be `v<version>` that matches
+`project.version` in `pyproject.toml`.
+
+=== 4) Repository secrets and permissions
+
+* `PYPI_API_TOKEN` — required. Store the PyPI API token here.
+* `TEST_PYPI_API_TOKEN` — optional but recommended for Test PyPI.
+
+Repository permissions: the default `GITHUB_TOKEN` is sufficient for creating
+GitHub Releases (already used). Ensure Actions can access repository secrets
+and avoid exposing them to PRs from forks (default GitHub behavior protects
+secrets for fork PRs).
+
+=== 5) Optional: release notes and changelog automation
+
+Consider adding `release-drafter/action` to automatically draft release notes
+from merged PRs or use GitHub's changelog generation. This is optional but
+useful for producing nicer release descriptions on PyPI and GitHub Release.
+
+=== 6) Optional: signing and verification
+
+If you require GPG signing of distributions, add signing steps in CI and
+upload signed artifacts; PyPI supports signed uploads (users can verify with
+GPG). This increases complexity and key management requirements.
+
+== Test and rollout plan (recommended)
+
+1. Add `TEST_PYPI_API_TOKEN` and run a workflow where `dist/` is uploaded to
+   Test PyPI. Confirm the package appears on https://test.pypi.org.
+2. Verify a local install from Test PyPI or from downloaded wheel:
+
+----
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple your-package-name
+----
+
+3. Once Test PyPI validation passes, add `PYPI_API_TOKEN` and enable the
+   production publishing step (ensure the trigger condition is correct and
+   the version/tag verification step is in place).
+4. Tag a release `vX.Y.Z`, push tag, and watch the release workflow. Confirm
+   package is uploaded to PyPI and artifacts are attached to GitHub Release.
+
+== Rollback & safety notes
+
+* If an accidental publish happens, PyPI does not allow overwriting the same
+  version. You must increment the version and re-release; consider doing a
+  `yanked` release if appropriate.
+* Never store plaintext PyPI tokens in the repo. Use GitHub Actions secrets.
+
+== Minimal CI snippet to add (copy-paste)
+
+Below is a minimal sequence to append after the existing build step. It does
+Test PyPI (optional) and then the real PyPI upload when running on a tag.
+
+----
+# Optional Test PyPI upload
+- name: Publish to Test PyPI
+  if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v')
+  run: |
+    python -m pip install --upgrade twine
+    python -m twine upload --repository-url https://test.pypi.org/legacy/ -u __token__ -p "${{ secrets.TEST_PYPI_API_TOKEN }}" dist/* || true
+
+# Verify version matches tag (safe-guard)
+- name: Verify version matches tag
+  if: startsWith(github.ref, 'refs/tags/v')
+  run: |
+    TAG=${GITHUB_REF#refs/tags/}
+    PKG_VER=$(python -c "import tomllib,sys; print(tomllib.loads(open('pyproject.toml','rb').read())['project']['version'])")
+    echo "tag=$TAG pkg=$PKG_VER"
+    if [ "v$PKG_VER" != "$TAG" ]; then
+      echo "Tag and package version mismatch" >&2
+      exit 1
+    fi
+  env:
+    GITHUB_REF: ${{ github.ref }}
+
+# Production publish
+- name: Publish to PyPI
+  if: startsWith(github.ref, 'refs/tags/v')
+  run: |
+    python -m pip install --upgrade twine
+    python -m twine upload -u __token__ -p "${{ secrets.PYPI_API_TOKEN }}" dist/*
+----
+
+== Final checklist (actionable)
+
+[] Create PyPI API token and add as `PYPI_API_TOKEN` secret
+[] (optional) Create Test PyPI API token and add as `TEST_PYPI_API_TOKEN`
+[] Add the publish steps (Test PyPI + verify + production publish) to
+   `.github/workflows/release.yml` (or a separate release workflow)
+[] Run a dry-run upload to Test PyPI and verify installation
+[] Push a `vX.Y.Z` tag and confirm successful publish to PyPI
+[] Optionally add release-drafter and changelog automation
+
+If you'd like, I can open a PR that updates `.github/workflows/release.yml`
+with the minimal snippet above and add a verification step that enforces
+tag/version parity.

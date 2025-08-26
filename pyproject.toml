@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sync_tools_tests"
+name = "sync-tools"
 version = "0.1.0"
-description = "Integration and BDD tests for sync.sh script."
+description = "sync-tools: Python wrapper and utilities for the sync.sh rsync-based sync tool."
 authors = [
     { name="Damian Reeves" }
 ]
@@ -21,3 +21,7 @@ testpaths = ["tests"]
 
 [tool.setuptools]
 packages = { find = { include = ["sync_tools*"] } }
+
+[project.scripts]
+# Console script entrypoint that installs a `sync-tools` launcher which exposes the click CLI group
+sync-tools = "sync_tools.cli:cli"
