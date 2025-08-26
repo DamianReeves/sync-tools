@@ -89,35 +89,34 @@ jobs:
           subprocess.check_call(cmd)
           PY
 
-    parity:
-      name: Parity harness (fixtures)
-    if: "github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'"
-      runs-on: ubuntu-latest
-      needs: test
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4
-        - name: Install system deps
-          run: sudo apt-get update && sudo apt-get install -y rsync
-        - name: Set up Python
-          uses: actions/setup-python@v4
-          with:
-            python-version: '3.12'
-        - name: Create virtualenv and install deps
-          run: |
-            python3 -m venv .venv
-            source .venv/bin/activate
-            pip install -e .
-        - name: Run parity harness on curated fixtures
-          run: |
-            source .venv/bin/activate
-            export PYTHONPATH=.
-            # run harness against well-known fixtures and write diagnostics to parity.json
-            .venv/bin/python tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
-        - name: Upload parity diagnostics
-          uses: actions/upload-artifact@v4
-          with:
-            name: parity-diagnostics
-            path: |
-              parity.json
-              $(mktemp -u || true)
+  parity:
+    name: Parity harness (fixtures)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y rsync
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Create virtualenv and install deps
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -e .
+      - name: Run parity harness on curated fixtures
+        run: |
+          source .venv/bin/activate
+          export PYTHONPATH=.
+          # run harness against well-known fixtures and write diagnostics to parity.json
+          .venv/bin/python tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
+      - name: Upload parity diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-diagnostics
+          path: |
+            parity.json
