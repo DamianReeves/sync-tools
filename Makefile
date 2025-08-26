@@ -79,6 +79,8 @@ install-local:
 
 package-install-local: clean
 	@echo "[make] Building distributions and installing from dist/ to user site"
+	@echo "[make] Removing any existing ~/.local/bin/sync-tools symlink to avoid stale targets"
+	@rm -f $${HOME}/.local/bin/sync-tools || true; \
 	# Try to create virtualenv; if it fails, fall back to system python3 (if pip is available)
 	@if [ ! -x "$(PY)" ]; then \
 		if ! $(MAKE) venv; then \
