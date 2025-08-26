@@ -536,3 +536,5 @@ make package-install-local # build sdist/wheel and install from dist/ into user 
 ----
 
 Use `make install-local` to make the `sync-tools` console script available on your PATH (ensure `~/.local/bin` is on PATH). Use `make package-install-local` to verify packaging before publishing.
+
+Note: `make package-install-local` invokes `python3 -m build` and `python3 -m pip` and therefore requires a system Python with pip available. If your system Python doesn't have pip, create and activate a virtualenv with `python3 -m venv .venv` and run `pip install -e .` to test locally instead.

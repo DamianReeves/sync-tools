@@ -99,11 +99,24 @@ package-install-local: clean
 	fi; \
 	$$PYEXEC -m pip install --upgrade build; \
 	$$PYEXEC -m build --sdist --wheel; \
-	# If we're using the project venv python, install into the venv; otherwise install to user site
-	if [ "$$PYEXEC" = "$(PY)" ]; then \
-		$$PYEXEC -m pip install dist/*; \
+	# Choose wheel if available, otherwise fall back to sdist. Install into venv when using project python,
+	# otherwise install to user site. This avoids pip trying to install both wheel+sdist and raising
+	# ResolutionImpossible due to duplicate package spec sources.
+	WHEEL=$$(ls dist/*.whl 2>/dev/null | head -n1 || true); \
+	if [ -n "$$WHEEL" ]; then \
+		TARGET="$$WHEEL"; \
 	else \
-		$$PYEXEC -m pip install --user dist/*; \
+		SDIST=$$(ls dist/*.tar.gz 2>/dev/null | head -n1 || true); \
+		TARGET="$$SDIST"; \
+	fi; \
+	if [ -z "$$TARGET" ]; then \
+		echo "ERROR: No distribution found in dist/ to install" >&2; \
+		exit 1; \
+	fi; \
+	if [ "$$PYEXEC" = "$(PY)" ]; then \
+		$$PYEXEC -m pip install "$$TARGET"; \
+	else \
+		$$PYEXEC -m pip install --user "$$TARGET"; \
 	fi; \
 	mkdir -p $${HOME}/.local/bin; \
 	# If venv produced an executable, symlink that directly into ~/.local/bin
