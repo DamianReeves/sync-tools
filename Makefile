@@ -24,7 +24,7 @@ help:
 venv:
 	@echo "[make] Ensuring virtualenv exists at $(VENV)"
 	@if [ ! -d "$(VENV)" ]; then \
-		python -m venv $(VENV); \
+		python3 -m venv $(VENV); \
 	fi
 	@echo "[make] Upgrading pip, setuptools, wheel in venv"
 	@$(PY) -m pip install --upgrade pip setuptools wheel
@@ -47,18 +47,19 @@ clean:
 	@echo "[make] Cleaning virtualenv and temporary files"
 	@rm -rf $(VENV) .pytest_cache behave-results reports
 
+
 install-local:
 	@echo "[make] Installing package for local user (or system-wide if sudo=1)"
-	if [ "$(sudo)" = "1" ]; then \
+	@if [ "$(sudo)" = "1" ]; then \
 		# system-wide install (requires sudo)
-		sudo python -m pip install --upgrade pip setuptools wheel; \
-		sudo python -m pip install .; \
+		sudo python3 -m pip install --upgrade pip setuptools wheel; \
+		sudo python3 -m pip install .; \
 		if [ -f "$(VENV)/bin/sync-tools" ]; then true; fi; \
-		sudo ln -sf "$(shell python -c 'import shutil,sys; print(shutil.which("sync-tools") or "")')" /usr/local/bin/sync-tools || true; \
+		sudo ln -sf "$(shell python3 -c 'import shutil,sys; print(shutil.which("sync-tools") or "")')" /usr/local/bin/sync-tools || true; \
 		echo "Installed system-wide (sync-tools available on PATH)"; \
 	else \
-		python -m pip install --user --upgrade pip setuptools wheel; \
-		python -m pip install --user .; \
+		python3 -m pip install --user --upgrade pip setuptools wheel; \
+		python3 -m pip install --user .; \
 		# ensure ~/.local/bin exists
 		mkdir -p $${HOME}/.local/bin; \
 		EXE=$$(python -c 'import shutil,sys; print(shutil.which("sync-tools") or "")'); \
@@ -75,16 +76,44 @@ install-local:
 	fi
 
 
+
 package-install-local: clean
 	@echo "[make] Building distributions and installing from dist/ to user site"
-	python -m pip install --upgrade build
-	python -m build --sdist --wheel
-	python -m pip install --user dist/*
-	mkdir -p $${HOME}/.local/bin
-	EXE=$$(python -c 'import shutil,sys; print(shutil.which("sync-tools") or "")'); \
-	if [ -n "$$EXE" ]; then \
-		ln -sf "$$EXE" $${HOME}/.local/bin/sync-tools; \
-		echo "Installed from dist/ to user site; launcher symlinked to ~/.local/bin/sync-tools"; \
+	# Try to create virtualenv; if it fails, fall back to system python3 (if pip is available)
+	@if [ ! -x "$(PY)" ]; then \
+		if ! $(MAKE) venv; then \
+			echo "[make] Warning: failed to create venv, will attempt system python3 fallback"; \
+		fi; \
+	fi; \
+	if [ -x "$(PY)" ]; then \
+		PYEXEC="$(PY)"; \
 	else \
-		echo "Failed to locate installed 'sync-tools' executable after package install"; \
+		PYEXEC=python3; \
+	fi; \
+	# Ensure the chosen python has pip
+	if ! $$PYEXEC -m pip --version >/dev/null 2>&1; then \
+		echo "ERROR: pip is not available for $$PYEXEC. Please install system pip or python3-venv and retry." >&2; \
+		exit 1; \
+	fi; \
+	$$PYEXEC -m pip install --upgrade build; \
+	$$PYEXEC -m build --sdist --wheel; \
+	# If we're using the project venv python, install into the venv; otherwise install to user site
+	if [ "$$PYEXEC" = "$(PY)" ]; then \
+		$$PYEXEC -m pip install dist/*; \
+	else \
+		$$PYEXEC -m pip install --user dist/*; \
+	fi; \
+	mkdir -p $${HOME}/.local/bin; \
+	# If venv produced an executable, symlink that directly into ~/.local/bin
+	if [ -x "$(VENV)/bin/sync-tools" ]; then \
+		ln -sf "$(CURDIR)/$(VENV)/bin/sync-tools" $${HOME}/.local/bin/sync-tools; \
+		echo "Symlinked venv executable to ~/.local/bin/sync-tools"; \
+	else \
+		EXE=$$($$PYEXEC -c 'import shutil,sys; print(shutil.which("sync-tools") or "")'); \
+		if [ -n "$$EXE" ]; then \
+			ln -sf "$$EXE" $${HOME}/.local/bin/sync-tools; \
+			echo "Installed from dist/ to user site; launcher symlinked to ~/.local/bin/sync-tools"; \
+		else \
+			echo "Failed to locate installed 'sync-tools' executable after package install"; \
+		fi; \
 	fi
