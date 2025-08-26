@@ -10,7 +10,7 @@ Feature: Whitelist (only) mode
       | path         |
       | keep.txt     |
       | docs/readme.adoc |
-    And I run sync.sh in one-way mode
+  And I run sync-tools sync in one-way mode
     Then the destination directory should contain the files:
       | filename      | content  |
       | keep.txt      | keep     |

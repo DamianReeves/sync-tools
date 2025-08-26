@@ -70,13 +70,13 @@ def step_empty_dest_dir(context):
     context.dest_tmpdir = tempfile.TemporaryDirectory(prefix='dest-')
     context.dest_dir = context.dest_tmpdir.name
 
-@when('I run sync.sh in one-way mode')
+@when('I run sync-tools sync in one-way mode')
 def step_run_sync_one_way(context):
     """Execute the Python CLI with one-way mode (legacy wording kept in feature)."""
     _run_sync_with_mode(context, mode='one-way')
 
 
-@when('I run sync.sh in two-way mode')
+@when('I run sync-tools sync in two-way mode')
 def step_run_sync_two_way(context):
     """Execute the Python CLI with two-way mode (legacy wording kept in feature)."""
     _run_sync_with_mode(context, mode='two-way')
@@ -86,8 +86,8 @@ def _run_sync_with_mode(context, mode='one-way'):
     # Prefer venv python if present, else fallback to system python3
     venv_py = os.path.join(os.getcwd(), '.venv', 'bin', 'python')
     py = venv_py if os.path.exists(venv_py) else 'python3'
-    # Build command to run the CLI module
-    cmd = [py, '-m', 'sync_tools.cli', 'sync', '--source', context.source_dir, '--dest', context.dest_dir, '--mode', mode]
+    # Build command to run the package module (triggers __main__.py -> CLI)
+    cmd = [py, '-m', 'sync_tools', 'sync', '--source', context.source_dir, '--dest', context.dest_dir, '--mode', mode]
     # Include any whitelist items passed in context
     if hasattr(context, 'only_items') and context.only_items:
         for item in context.only_items:

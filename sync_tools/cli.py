@@ -199,30 +199,71 @@ def sync(config, source, dest, mode, dry_run, use_source_gitignore, exclude_hidd
     if dry_run:
         rsync_opts.append("--dry-run")
 
-    # default excludes such as .git
-    default_excludes = ["/.git/"]
+    # default excludes such as .git (use rsync filter syntax with leading dash)
+    default_excludes = ["- /.git/"]
     if exclude_hidden_dirs:
-        default_excludes.append(".*/")
+        default_excludes.append("- .*/")
 
     src_filter = None
     dst_filter = None
     src_tmp = None
     dst_tmp = None
     try:
+        # Source patterns: start with .syncignore and optional .gitignore imports
+        src_patterns: List[str] = []
+        syncignore_path = Path(src) / ".syncignore"
+        if syncignore_path.exists():
+            src_patterns += [ln.strip() for ln in syncignore_path.read_text().splitlines() if ln.strip()]
+        if use_source_gitignore:
+            gitignore_path = Path(src) / ".gitignore"
+            if gitignore_path.exists():
+                src_patterns += [ln.strip() for ln in gitignore_path.read_text().splitlines() if ln.strip()]
+        # CLI-provided ignores and whitelist
+        src_patterns += list(ignore_src_list)
+
         # only_list implies whitelist-only mode for source
         if only_list:
             src_tmp, src_lines = build_filter_file(only_list, only=True, default_excludes=default_excludes)
             src_filter = (src_tmp, src_lines)
-        elif ignore_src_list:
-            src_tmp, src_lines = build_filter_file(ignore_src_list, only=False, default_excludes=default_excludes)
+        else:
+            # Build a non-only filter with patterns and default excludes, even if empty
+            src_tmp, src_lines = build_filter_file(src_patterns, only=False, default_excludes=default_excludes)
             src_filter = (src_tmp, src_lines)
 
+        # Destination patterns
         if ignore_dest_list:
             dst_tmp, dst_lines = build_filter_file(ignore_dest_list, only=False, default_excludes=default_excludes)
             dst_filter = (dst_tmp, dst_lines)
 
-        # wire logger into run_rsync so it can log prepared commands
-        run_rsync(src, dst, rsync_opts, src_filter=src_filter, dst_filter=dst_filter, dump_commands=dump_commands, logger=logger, report_path=report, list_filtered=list_filtered)
+        # Two-way minimal behavior: if a file exists on both sides and contents differ,
+        # preserve the source copy as a conflict file before syncing from dest to src.
+        if mode == "two-way":
+            # First, copy src -> dst (normal direction)
+            run_rsync(src, dst, rsync_opts, src_filter=src_filter, dst_filter=dst_filter, dump_commands=dump_commands, logger=logger)
+            # Detect conflicts and preserve on source
+            for root, _, files in os.walk(src):
+                for name in files:
+                    s_full = os.path.join(root, name)
+                    rel = os.path.relpath(s_full, src)
+                    d_full = os.path.join(dst, rel)
+                    if os.path.exists(d_full):
+                        try:
+                            if open(s_full, 'rb').read() != open(d_full, 'rb').read():
+                                # write conflict copy next to source file
+                                ts = int(Path(d_full).stat().st_mtime)
+                                conflict = os.path.join(os.path.dirname(s_full), os.path.basename(s_full) + f".conflict-{ts}")
+                                try:
+                                    shutil.copy2(s_full, conflict)
+                                except Exception:
+                                    # best-effort
+                                    shutil.copy(s_full, conflict)
+                        except Exception:
+                            pass
+            # Then propagate dst -> src to bring source up to date with destination changes
+            run_rsync(dst, src, rsync_opts, src_filter=dst_filter, dst_filter=src_filter, dump_commands=dump_commands, logger=logger)
+        else:
+            # One-way: just copy src -> dst
+            run_rsync(src, dst, rsync_opts, src_filter=src_filter, dst_filter=dst_filter, dump_commands=dump_commands, logger=logger, report_path=report, list_filtered=list_filtered)
     finally:
         # cleanup downloaded/extracted temp paths if used
         for _p in (downloaded_zip_path, extracted_dir):

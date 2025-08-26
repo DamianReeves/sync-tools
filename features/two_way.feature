@@ -6,5 +6,5 @@ Feature: Two-way sync and conflict preservation
     And a destination directory with files:
       | filename      | content  |
       | file1.txt     | B        |
-    When I run sync.sh in two-way mode
+  When I run sync-tools sync in two-way mode
     Then a conflict file should exist for "file1.txt" on the source
