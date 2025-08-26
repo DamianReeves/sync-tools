@@ -61,3 +61,7 @@ package-install-local: clean
 build-standalone: clean
 	@echo "[make] Building standalone zipapp artifact"
 	@tools/build_zipapp.sh
+
+build-standalone-full: clean
+	@echo "[make] Building standalone zipapp with dependencies"
+	@tools/build_zipapp_with_deps.sh
