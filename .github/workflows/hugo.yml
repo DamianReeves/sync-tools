@@ -52,12 +52,17 @@ jobs:
       - name: Install Node.js dependencies
         run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true"
         working-directory: ./docs
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
       - name: Build with Hugo
         env:
           # For maximum backward compatibility with Hugo modules
           HUGO_ENVIRONMENT: production
           HUGO_ENV: production
         run: |
+          hugo mod get -u
           hugo \
             --gc \
             --minify \
