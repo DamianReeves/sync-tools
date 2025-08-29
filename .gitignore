@@ -39,3 +39,10 @@ demo_source/
 demo_dest/
 **/temp_*
 **/tmp_*
+
+# BDD test artifacts
+test/bdd/test_src/
+test/bdd/test_dst/
+test/bdd/*.patch
+test/bdd/*.diff
+**/sync_test_*
