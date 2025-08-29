@@ -1,0 +1,59 @@
+baseURL = 'https://damianreeves.github.io/sync-tools'
+languageCode = 'en-us'
+title = 'sync-tools Documentation'
+theme = 'docsy'
+
+[params]
+  version = '1.0'
+  github_repo = 'https://github.com/DamianReeves/sync-tools'
+  github_branch = 'main'
+
+[params.ui]
+  sidebar_menu_compact = false
+  navbar_logo = true
+  sidebar_search_disable = false
+
+[params.ui.feedback]
+  enable = true
+  'yes' = 'Glad to hear it! Please <a href="https://github.com/DamianReeves/sync-tools/issues/new">tell us how we can improve</a>.'
+  'no' = 'Sorry to hear that. Please <a href="https://github.com/DamianReeves/sync-tools/issues/new">tell us how we can improve</a>.'
+
+[params.links]
+
+[[params.links.user]]
+  name = "GitHub"
+  url = "https://github.com/DamianReeves/sync-tools"
+  icon = "fab fa-github"
+  desc = "Development takes place here!"
+
+[[params.links.user]]
+  name = "Issues"
+  url = "https://github.com/DamianReeves/sync-tools/issues"
+  icon = "fab fa-github"
+  desc = "Report bugs and request features"
+
+[[params.links.developer]]
+  name = "GitHub"
+  url = "https://github.com/DamianReeves/sync-tools"
+  icon = "fab fa-github"
+  desc = "Development takes place here!"
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.highlight]
+    style = "github"
+    lineNos = true
+
+[menu]
+
+[[menu.main]]
+  name = "Documentation"
+  url = "/docs/"
+  weight = 10
+
+[[menu.main]]
+  name = "GitHub"
+  url = "https://github.com/DamianReeves/sync-tools"
+  weight = 50
