@@ -1,7 +1,7 @@
 # sync-tools Development Tracker
 
 **Last Updated**: 2025-08-29  
-**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete with Report Integration
+**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete with Preview and Apply Support
 
 ## TASKS
 
@@ -43,7 +43,7 @@
 
 ## Changelog
 
-### 2025-08-29: Git Patch Generation Feature Complete with Report Integration
+### 2025-08-29: Git Patch Generation Feature Complete with Preview and Apply Support
 **Completed Work**:
 - ✅ **Git Patch Generation Feature** [Priority: P1 - High]
   - Added --patch CLI flag to sync command for patch generation instead of syncing
@@ -53,6 +53,9 @@
   - Created comprehensive BDD test suite with 6 scenarios covering all use cases
   - All BDD scenarios passing: patch creation, new files, deletions, ignore patterns, whitelist mode, dry-run
   - **Enhanced --report flag with intelligent format detection** for .patch/.diff files
+  - **Added --apply-patch flag** to apply generated patches with user confirmation
+  - **Added -y/--yes flag** for automatic confirmation (Unix-style)
+  - **Added --preview flag** for colored diff preview with paging support
 
 **Key Outcomes**:
 - Users can now generate git patch files instead of performing actual sync operations

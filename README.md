@@ -60,6 +60,15 @@ sync-tools sync --source ./docs --dest ./backup --only "*.md" --only "*.txt"
 
 # Generate git patch instead of syncing
 sync-tools sync --source ./src --dest ./dst --patch changes.patch
+
+# Preview changes with colored diff (with paging, press 'q' to quit)
+sync-tools sync --source ./src --dest ./dst --preview
+
+# Generate patch and apply it with confirmation
+sync-tools sync --source ./src --dest ./dst --patch changes.patch --apply-patch
+
+# Generate patch and auto-apply without confirmation
+sync-tools sync --source ./src --dest ./dst --patch changes.patch --apply-patch -y
 ```
 
 ## 📜 SyncFile Format
@@ -173,6 +182,19 @@ log_format = "text"
 
 ## 🔍 Advanced Usage
 
+### Preview and Interactive Features
+
+```bash
+# Preview changes with colored diff (uses less pager, press 'q' to quit)
+sync-tools sync --source ./src --dest ./dst --preview
+
+# Preview changes before generating patch
+sync-tools sync --source ./src --dest ./dst --preview --patch changes.patch
+
+# Interactive mode with Bubble Tea UI
+sync-tools sync --source ./src --dest ./dst --interactive
+```
+
 ### Logging & Output
 
 ```bash
@@ -214,6 +236,12 @@ sync-tools sync --source ./docs --dest ./backup --patch docs-only.patch --only "
 
 # Two-way patch generation shows differences in both directions
 sync-tools sync --source ./local --dest ./remote --patch bidirectional.patch --mode two-way
+
+# Apply patch with confirmation prompt
+sync-tools sync --source ./src --dest ./dst --patch changes.patch --apply-patch
+
+# Apply patch automatically without confirmation
+sync-tools sync --source ./src --dest ./dst --patch changes.patch --apply-patch -y
 ```
 
 ### Filter Examples

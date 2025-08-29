@@ -34,6 +34,9 @@ type Options struct {
 	ListFiltered        string
 	Interactive         bool
 	Patch               string
+	ApplyPatch          bool
+	Yes                 bool
+	Preview             bool
 }
 
 // Runner handles rsync operations
@@ -50,6 +53,11 @@ func NewRunner(logger logging.Logger) *Runner {
 
 // Sync performs the synchronization operation
 func (r *Runner) Sync(opts *Options) error {
+	// Check if preview mode is requested
+	if opts.Preview {
+		return r.showPreview(opts)
+	}
+	
 	// Check if patch mode is requested (either via --patch flag or --report with .patch extension)
 	if opts.Patch != "" {
 		r.logger.Infof("Starting patch generation: %s -> %s (output: %s, dry-run: %v)",
@@ -357,6 +365,12 @@ func (r *Runner) generatePatch(opts *Options) error {
 	}
 
 	r.logger.Infof("Patch file generated: %s", opts.Patch)
+	
+	// Apply patch if requested
+	if opts.ApplyPatch {
+		return r.applyPatchWithConfirmation(opts)
+	}
+	
 	return nil
 }
 
@@ -381,4 +395,185 @@ func (r *Runner) generateSimplePatch(opts *Options, patchFile *os.File) error {
 	})
 	
 	return err
+}
+
+// applyPatchWithConfirmation applies the generated patch with user confirmation
+func (r *Runner) applyPatchWithConfirmation(opts *Options) error {
+	patchPath := opts.Patch
+	if opts.Report != "" && opts.Patch == "" {
+		// When using --report with patch format, the patch path is in Report field
+		patchPath = opts.Report
+	}
+	
+	// Check if patch file exists
+	if _, err := os.Stat(patchPath); os.IsNotExist(err) {
+		return fmt.Errorf("patch file does not exist: %s", patchPath)
+	}
+	
+	// Show patch preview
+	r.logger.Info("Patch contents:")
+	previewCmd := exec.Command("git", "apply", "--stat", patchPath)
+	previewOutput, err := previewCmd.CombinedOutput()
+	if err != nil {
+		r.logger.Warnf("Could not preview patch stats: %v", err)
+		// Fallback to showing first few lines of the patch
+		if patchContent, readErr := os.ReadFile(patchPath); readErr == nil {
+			lines := strings.Split(string(patchContent), "\n")
+			maxLines := 10
+			if len(lines) > maxLines {
+				lines = lines[:maxLines]
+				lines = append(lines, "... (truncated)")
+			}
+			r.logger.Info(strings.Join(lines, "\n"))
+		}
+	} else {
+		r.logger.Info(string(previewOutput))
+	}
+	
+	// Get confirmation unless --yes flag is used
+	if !opts.Yes {
+		if !r.confirmPatchApplication(patchPath) {
+			r.logger.Info("Patch application cancelled by user")
+			return nil
+		}
+	} else {
+		r.logger.Info("Auto-confirming patch application (--yes flag)")
+	}
+	
+	// Apply the patch
+	r.logger.Infof("Applying patch: %s", patchPath)
+	
+	// Convert to absolute path if needed
+	absPatchPath, err := filepath.Abs(patchPath)
+	if err != nil {
+		return fmt.Errorf("error getting absolute path for patch: %w", err)
+	}
+	
+	applyCmd := exec.Command("git", "apply", absPatchPath)
+	applyCmd.Dir = opts.Dest
+	
+	if output, err := applyCmd.CombinedOutput(); err != nil {
+		r.logger.Errorf("Failed to apply patch: %v", err)
+		r.logger.Errorf("Git apply output: %s", string(output))
+		return fmt.Errorf("failed to apply patch: %w", err)
+	}
+	
+	r.logger.Info("Patch applied successfully!")
+	return nil
+}
+
+// confirmPatchApplication prompts the user for confirmation
+func (r *Runner) confirmPatchApplication(patchPath string) bool {
+	fmt.Printf("\nDo you want to apply the patch '%s'? [y/N]: ", patchPath)
+	
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		return false
+	}
+	
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes"
+}
+
+// showPreview generates and displays a colored diff preview
+func (r *Runner) showPreview(opts *Options) error {
+	r.logger.Infof("Generating preview: %s -> %s",
+		opts.Source, opts.Dest)
+	
+	// Generate diff using git diff with color
+	cmd := exec.Command("git", "diff", "--no-index", "--no-prefix", "--color=always", opts.Dest, opts.Source)
+	cmd.Dir = filepath.Dir(opts.Source)
+	
+	output, err := cmd.CombinedOutput()
+	// git diff returns exit code 1 when there are differences, which is expected
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			// This is expected when there are differences
+		} else {
+			r.logger.Debugf("git diff command failed: %v", err)
+			// Fall back to a simple diff if git is not available
+			return r.showSimplePreview(opts)
+		}
+	}
+	
+	// If there's no output, there are no differences
+	if len(output) == 0 {
+		r.logger.Info("No differences found between source and destination")
+		return nil
+	}
+	
+	// Check if less is available for paging
+	if _, err := exec.LookPath("less"); err == nil {
+		// Use less with options similar to git diff
+		lessCmd := exec.Command("less", "-R", "-FX")
+		lessCmd.Stdin = strings.NewReader(string(output))
+		lessCmd.Stdout = os.Stdout
+		lessCmd.Stderr = os.Stderr
+		
+		r.logger.Debug("Displaying preview with pager (press 'q' to quit)")
+		return lessCmd.Run()
+	} else {
+		// Fall back to direct output if less is not available
+		r.logger.Debug("Pager not available, displaying preview directly")
+		fmt.Print(string(output))
+		return nil
+	}
+}
+
+// showSimplePreview shows a simple preview when git is not available
+func (r *Runner) showSimplePreview(opts *Options) error {
+	// Use rsync's dry-run to show what would be changed
+	r.logger.Info("Git not available, showing rsync dry-run preview:")
+	
+	// Build filter files
+	sourceFilter, err := r.buildSourceFilter(opts)
+	if err != nil {
+		return fmt.Errorf("error building source filter: %w", err)
+	}
+	defer r.cleanupTempFile(sourceFilter)
+	
+	var destFilter string
+	if len(opts.IgnoreDest) > 0 {
+		destFilter, err = r.buildDestFilter(opts)
+		if err != nil {
+			return fmt.Errorf("error building dest filter: %w", err)
+		}
+		defer r.cleanupTempFile(destFilter)
+	}
+	
+	// Build rsync command with dry-run and itemize changes
+	args := []string{
+		"--archive",
+		"--verbose",
+		"--human-readable",
+		"--delete",
+		"--delete-excluded",
+		"--dry-run",
+		"--itemize-changes",
+	}
+	
+	// Add filter files
+	if sourceFilter != "" {
+		args = append(args, "--filter", fmt.Sprintf(". %s", sourceFilter))
+	}
+	if destFilter != "" {
+		args = append(args, "--filter", fmt.Sprintf(". %s", destFilter))
+	}
+	
+	// Add source and destination
+	source := opts.Source
+	if !strings.HasSuffix(source, "/") {
+		source += "/"
+	}
+	args = append(args, source, opts.Dest)
+	
+	cmd := exec.Command("rsync", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil && !strings.Contains(err.Error(), "exit status 23") {
+		// Exit status 23 is partial transfer due to error, often from dry-run
+		return fmt.Errorf("rsync preview failed: %w", err)
+	}
+	
+	fmt.Print(string(output))
+	return nil
 }

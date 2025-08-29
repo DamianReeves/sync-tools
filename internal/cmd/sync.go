@@ -48,6 +48,9 @@ var (
 	flagListFiltered      string
 	flagInteractive       bool
 	flagPatch             string
+	flagApplyPatch        bool
+	flagYes               bool
+	flagPreview           bool
 )
 
 func init() {
@@ -78,6 +81,9 @@ func init() {
 	syncCmd.Flags().StringVar(&flagReport, "report", "", "Write a sync report to this path (format detected from extension: .md/.markdown for markdown, .patch for patch)")
 	syncCmd.Flags().StringVar(&flagListFiltered, "list-filtered", "", "List items that would be filtered: src, dst, or both")
 	syncCmd.Flags().StringVar(&flagPatch, "patch", "", "Generate git patch file instead of syncing")
+	syncCmd.Flags().BoolVar(&flagApplyPatch, "apply-patch", false, "Apply the generated patch after creation (with confirmation)")
+	syncCmd.Flags().BoolVarP(&flagYes, "yes", "y", false, "Automatically confirm patch application (skip confirmation prompt)")
+	syncCmd.Flags().BoolVar(&flagPreview, "preview", false, "Show a colored diff preview of changes (with paging)")
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
@@ -155,6 +161,9 @@ func mergeOptionsWithConfig(cfg *config.Config) *rsync.Options {
 		ListFiltered:        flagListFiltered,
 		Interactive:         flagInteractive,
 		Patch:               flagPatch,
+		ApplyPatch:          flagApplyPatch,
+		Yes:                 flagYes,
+		Preview:             flagPreview,
 	}
 
 	// Merge with config values (config provides defaults)
