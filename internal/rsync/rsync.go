@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +74,13 @@ func (r *Runner) Sync(opts *Options) error {
 		patchOpts := *opts
 		patchOpts.Patch = opts.Report
 		return r.generatePatch(&patchOpts)
+	}
+	
+	// Check if markdown report is requested
+	if opts.Report != "" && (strings.HasSuffix(strings.ToLower(opts.Report), ".md") || strings.HasSuffix(strings.ToLower(opts.Report), ".markdown")) {
+		r.logger.Infof("Starting markdown report generation: %s -> %s (output: %s, dry-run: %v)",
+			opts.Source, opts.Dest, opts.Report, opts.DryRun)
+		return r.generateMarkdownReport(opts)
 	}
 
 	r.logger.Infof("Starting sync: %s -> %s (mode: %s, dry-run: %v)",
@@ -576,4 +584,359 @@ func (r *Runner) showSimplePreview(opts *Options) error {
 	
 	fmt.Print(string(output))
 	return nil
+}
+
+// SyncChange represents a single file change in the sync operation
+type SyncChange struct {
+	Action   string // "create", "update", "delete"
+	Path     string
+	Size     int64
+	ModTime  time.Time
+	IsDir    bool
+}
+
+// SyncReport contains the report data for a sync operation
+type SyncReport struct {
+	Source      string
+	Destination string
+	Mode        string
+	DryRun      bool
+	Timestamp   time.Time
+	Changes     []SyncChange
+	Stats       SyncStats
+}
+
+// SyncStats contains statistics about the sync operation
+type SyncStats struct {
+	FilesCreated   int
+	FilesUpdated   int
+	FilesDeleted   int
+	DirsCreated    int
+	DirsDeleted    int
+	TotalSize      int64
+	FilteredCount  int
+}
+
+// generateMarkdownReport creates a markdown report of the sync operation
+func (r *Runner) generateMarkdownReport(opts *Options) error {
+	r.logger.Debug("Generating markdown report")
+	
+	// Collect sync information using dry-run
+	report, err := r.collectSyncInfo(opts)
+	if err != nil {
+		return fmt.Errorf("error collecting sync information: %w", err)
+	}
+	
+	// Write the markdown report
+	if err := r.writeMarkdownReport(report, opts.Report); err != nil {
+		return fmt.Errorf("error writing markdown report: %w", err)
+	}
+	
+	r.logger.Infof("Markdown report generated: %s", opts.Report)
+	
+	// If not in dry-run mode, also perform the actual sync
+	if !opts.DryRun {
+		r.logger.Info("Performing actual sync after report generation")
+		switch opts.Mode {
+		case "one-way":
+			return r.runOneWay(opts)
+		case "two-way":
+			return r.runTwoWay(opts)
+		default:
+			return fmt.Errorf("unsupported mode: %s", opts.Mode)
+		}
+	}
+	
+	return nil
+}
+
+// collectSyncInfo gathers information about what would be synced
+func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
+	report := &SyncReport{
+		Source:      opts.Source,
+		Destination: opts.Dest,
+		Mode:        opts.Mode,
+		DryRun:      opts.DryRun,
+		Timestamp:   time.Now(),
+		Changes:     []SyncChange{},
+	}
+	
+	// Build filter files
+	sourceFilter, err := r.buildSourceFilter(opts)
+	if err != nil {
+		return nil, fmt.Errorf("error building source filter: %w", err)
+	}
+	defer r.cleanupTempFile(sourceFilter)
+	
+	var destFilter string
+	if len(opts.IgnoreDest) > 0 {
+		destFilter, err = r.buildDestFilter(opts)
+		if err != nil {
+			return nil, fmt.Errorf("error building dest filter: %w", err)
+		}
+		defer r.cleanupTempFile(destFilter)
+	}
+	
+	// Build rsync command with dry-run and itemize changes
+	args := []string{
+		"--archive",
+		"--verbose",
+		"--human-readable",
+		"--delete",
+		"--delete-excluded",
+		"--dry-run",
+		"--itemize-changes",
+		"--out-format=%i %n %L %l %t",
+	}
+	
+	// Add filter files
+	if sourceFilter != "" {
+		args = append(args, "--filter", fmt.Sprintf(". %s", sourceFilter))
+	}
+	if destFilter != "" {
+		args = append(args, "--filter", fmt.Sprintf(". %s", destFilter))
+	}
+	
+	// Add source and destination
+	source := opts.Source
+	if !strings.HasSuffix(source, "/") {
+		source += "/"
+	}
+	args = append(args, source, opts.Dest)
+	
+	cmd := exec.Command("rsync", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil && !strings.Contains(err.Error(), "exit status 23") {
+		// Exit status 23 is partial transfer due to error, often from dry-run
+		return nil, fmt.Errorf("rsync dry-run failed: %w", err)
+	}
+	
+	// Parse rsync output to extract changes
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		
+		// Parse itemize-changes format
+		if len(line) > 11 && line[0] != ' ' {
+			change := r.parseRsyncChange(line)
+			if change != nil {
+				report.Changes = append(report.Changes, *change)
+				
+				// Update statistics
+				switch change.Action {
+				case "create":
+					if change.IsDir {
+						report.Stats.DirsCreated++
+					} else {
+						report.Stats.FilesCreated++
+						report.Stats.TotalSize += change.Size
+					}
+				case "update":
+					report.Stats.FilesUpdated++
+					report.Stats.TotalSize += change.Size
+				case "delete":
+					if change.IsDir {
+						report.Stats.DirsDeleted++
+					} else {
+						report.Stats.FilesDeleted++
+					}
+				}
+			}
+		}
+	}
+	
+	return report, nil
+}
+
+// parseRsyncChange parses a line from rsync's itemize-changes output
+func (r *Runner) parseRsyncChange(line string) *SyncChange {
+	// Itemize format: YXcstpoguax
+	// Y: type of update
+	// X: file type
+	// c: checksum differs
+	// s: size differs
+	// t: mod time differs
+	// etc.
+	
+	if len(line) < 11 {
+		return nil
+	}
+	
+	flags := line[:11]
+	rest := strings.TrimSpace(line[11:])
+	
+	if rest == "" {
+		return nil
+	}
+	
+	// Parse the flags
+	change := &SyncChange{}
+	
+	// Determine action based on flags
+	if flags[0] == '>' || flags[0] == '<' {
+		if flags[1] == 'f' {
+			if flags[2] == '+' {
+				change.Action = "create"
+			} else {
+				change.Action = "update"
+			}
+		} else if flags[1] == 'd' {
+			change.IsDir = true
+			if flags[2] == '+' {
+				change.Action = "create"
+			} else {
+				change.Action = "update"
+			}
+		}
+	} else if flags[0] == '*' {
+		if flags[1] == 'd' {
+			change.Action = "delete"
+			change.IsDir = true
+		} else {
+			change.Action = "delete"
+		}
+	}
+	
+	// Extract path from the rest of the line
+	parts := strings.Fields(rest)
+	if len(parts) > 0 {
+		change.Path = parts[0]
+	}
+	
+	// Try to extract size if available
+	if len(parts) > 3 {
+		if size, err := strconv.ParseInt(parts[3], 10, 64); err == nil {
+			change.Size = size
+		}
+	}
+	
+	// Try to extract modification time if available
+	if len(parts) > 4 {
+		if modTime, err := time.Parse("2006/01/02-15:04:05", parts[4]); err == nil {
+			change.ModTime = modTime
+		}
+	}
+	
+	return change
+}
+
+// writeMarkdownReport writes the sync report in markdown format
+func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) error {
+	file, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	
+	w := bufio.NewWriter(file)
+	defer w.Flush()
+	
+	// Write header
+	fmt.Fprintf(w, "# Sync Report\n\n")
+	fmt.Fprintf(w, "Generated by sync-tools on %s\n\n", report.Timestamp.Format("2006-01-02 15:04:05"))
+	
+	// Write configuration section
+	fmt.Fprintf(w, "## Configuration\n\n")
+	fmt.Fprintf(w, "| Setting | Value |\n")
+	fmt.Fprintf(w, "|---------|-------|\n")
+	fmt.Fprintf(w, "| Source | `%s` |\n", report.Source)
+	fmt.Fprintf(w, "| Destination | `%s` |\n", report.Destination)
+	fmt.Fprintf(w, "| Mode | %s |\n", report.Mode)
+	fmt.Fprintf(w, "| Dry Run | %v |\n", report.DryRun)
+	fmt.Fprintf(w, "\n")
+	
+	// Write statistics section
+	fmt.Fprintf(w, "## Summary Statistics\n\n")
+	fmt.Fprintf(w, "| Metric | Count |\n")
+	fmt.Fprintf(w, "|--------|-------|\n")
+	fmt.Fprintf(w, "| Files Created | %d |\n", report.Stats.FilesCreated)
+	fmt.Fprintf(w, "| Files Updated | %d |\n", report.Stats.FilesUpdated)
+	fmt.Fprintf(w, "| Files Deleted | %d |\n", report.Stats.FilesDeleted)
+	fmt.Fprintf(w, "| Directories Created | %d |\n", report.Stats.DirsCreated)
+	fmt.Fprintf(w, "| Directories Deleted | %d |\n", report.Stats.DirsDeleted)
+	fmt.Fprintf(w, "| Total Size | %s |\n", r.formatSize(report.Stats.TotalSize))
+	fmt.Fprintf(w, "| Total Changes | %d |\n", len(report.Changes))
+	fmt.Fprintf(w, "\n")
+	
+	// Write changes section
+	if len(report.Changes) > 0 {
+		fmt.Fprintf(w, "## Changes\n\n")
+		
+		// Group changes by action
+		creates := []SyncChange{}
+		updates := []SyncChange{}
+		deletes := []SyncChange{}
+		
+		for _, change := range report.Changes {
+			switch change.Action {
+			case "create":
+				creates = append(creates, change)
+			case "update":
+				updates = append(updates, change)
+			case "delete":
+				deletes = append(deletes, change)
+			}
+		}
+		
+		// Write creates
+		if len(creates) > 0 {
+			fmt.Fprintf(w, "### Files/Directories to Create (%d)\n\n", len(creates))
+			for _, change := range creates {
+				if change.IsDir {
+					fmt.Fprintf(w, "- 📁 `%s/`\n", change.Path)
+				} else {
+					fmt.Fprintf(w, "- 📄 `%s` (%s)\n", change.Path, r.formatSize(change.Size))
+				}
+			}
+			fmt.Fprintf(w, "\n")
+		}
+		
+		// Write updates
+		if len(updates) > 0 {
+			fmt.Fprintf(w, "### Files to Update (%d)\n\n", len(updates))
+			for _, change := range updates {
+				fmt.Fprintf(w, "- 🔄 `%s` (%s)\n", change.Path, r.formatSize(change.Size))
+			}
+			fmt.Fprintf(w, "\n")
+		}
+		
+		// Write deletes
+		if len(deletes) > 0 {
+			fmt.Fprintf(w, "### Files/Directories to Delete (%d)\n\n", len(deletes))
+			for _, change := range deletes {
+				if change.IsDir {
+					fmt.Fprintf(w, "- ❌ `%s/`\n", change.Path)
+				} else {
+					fmt.Fprintf(w, "- ❌ `%s`\n", change.Path)
+				}
+			}
+			fmt.Fprintf(w, "\n")
+		}
+	} else {
+		fmt.Fprintf(w, "## Changes\n\n")
+		fmt.Fprintf(w, "No changes detected.\n\n")
+	}
+	
+	// Write footer
+	fmt.Fprintf(w, "---\n")
+	fmt.Fprintf(w, "*Report generated by [sync-tools](https://github.com/DamianReeves/sync-tools)*\n")
+	
+	return nil
+}
+
+// formatSize formats a size in bytes to a human-readable string
+func (r *Runner) formatSize(size int64) string {
+	const unit = 1024
+	if size < unit {
+		return fmt.Sprintf("%d B", size)
+	}
+	div, exp := int64(unit), 0
+	for n := size / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGTPE"[exp])
 }
