@@ -1,7 +1,7 @@
 # sync-tools Development Tracker
 
 **Last Updated**: 2025-08-29  
-**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete
+**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete with Report Integration
 
 ## TASKS
 
@@ -43,7 +43,7 @@
 
 ## Changelog
 
-### 2025-08-29: Git Patch Generation Feature Complete  
+### 2025-08-29: Git Patch Generation Feature Complete with Report Integration
 **Completed Work**:
 - ✅ **Git Patch Generation Feature** [Priority: P1 - High]
   - Added --patch CLI flag to sync command for patch generation instead of syncing
@@ -52,6 +52,7 @@
   - Integrated with existing filter system (respects .syncignore, whitelist mode, etc.)
   - Created comprehensive BDD test suite with 6 scenarios covering all use cases
   - All BDD scenarios passing: patch creation, new files, deletions, ignore patterns, whitelist mode, dry-run
+  - **Enhanced --report flag with intelligent format detection** for .patch/.diff files
 
 **Key Outcomes**:
 - Users can now generate git patch files instead of performing actual sync operations
@@ -59,12 +60,16 @@
 - Feature respects all existing filtering rules and configurations
 - Dry-run mode shows what would be included in patch without creating files
 - Complete BDD test coverage ensures feature reliability and prevents regressions
+- **Dual patch generation methods**: --patch flag OR --report with .patch/.diff extension
+- **Intelligent format detection** eliminates need for additional CLI flags
 
 **Technical Implementation**:
 - Extended rsync.Options struct with Patch field
 - Added generatePatch method with git diff integration and fallback
 - Integrated patch mode detection in main Sync workflow
+- **Added file extension-based format detection** for --report flag (.patch, .diff)
 - BDD tests validate all scenarios: mixed files, new files, deletions, filters, whitelist, dry-run
+- Updated documentation with comprehensive examples and usage patterns
 
 ### 2025-08-29: Go Migration and BDD Framework Complete
 **Completed Work**:

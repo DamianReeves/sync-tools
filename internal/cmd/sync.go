@@ -75,7 +75,7 @@ func init() {
 	syncCmd.Flags().StringVar(&flagLogFile, "log-file", "", "Path to write logs")
 	syncCmd.Flags().StringVar(&flagLogFormat, "log-format", "text", "Log format: text or json")
 	syncCmd.Flags().StringVar(&flagDumpCommands, "dump-commands", "", "Write rsync command and filters to JSON file")
-	syncCmd.Flags().StringVar(&flagReport, "report", "", "Write a markdown sync report to this path")
+	syncCmd.Flags().StringVar(&flagReport, "report", "", "Write a sync report to this path (format detected from extension: .md/.markdown for markdown, .patch for patch)")
 	syncCmd.Flags().StringVar(&flagListFiltered, "list-filtered", "", "List items that would be filtered: src, dst, or both")
 	syncCmd.Flags().StringVar(&flagPatch, "patch", "", "Generate git patch file instead of syncing")
 }

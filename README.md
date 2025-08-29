@@ -18,8 +18,8 @@ sync-tools is a powerful, modern Go CLI wrapper around rsync that provides:
 - **⚙️ Flexible Configuration**: TOML config files OR pure CLI usage
 - **🔍 Smart Defaults**: Excludes `.git/`, optional hidden directory exclusion
 - **🎭 Dry-run previews** and detailed change output
-- **📊 Multiple Output Formats**: Text, JSON logging, and Markdown reports
-- **🔧 Git Patch Generation**: Create git-format patch files instead of syncing for review and manual application
+- **📊 Multiple Output Formats**: Text, JSON logging, Markdown reports, and git patches
+- **🔧 Git Patch Generation**: Create git-format patch files instead of syncing (via --patch flag or --report with .patch/.diff extension)
 
 ## 🚀 Quick Start
 
@@ -185,6 +185,9 @@ sync-tools sync --source ./src --dest ./dst -vv
 # Generate Markdown report
 sync-tools sync --source ./src --dest ./dst --report sync-report.md
 
+# Generate patch report (format auto-detected from extension)
+sync-tools sync --source ./src --dest ./dst --report changes.patch
+
 # Dump rsync commands to JSON
 sync-tools sync --source ./src --dest ./dst --dump-commands commands.json
 ```
@@ -194,8 +197,11 @@ sync-tools sync --source ./src --dest ./dst --dump-commands commands.json
 Generate git-format patch files for review and manual application instead of automatic syncing:
 
 ```bash
-# Generate patch file from differences
+# Generate patch file from differences (using --patch flag)
 sync-tools sync --source ./src --dest ./dst --patch changes.patch
+
+# Generate patch file from differences (using --report flag with .patch extension)
+sync-tools sync --source ./src --dest ./dst --report changes.patch
 
 # Preview what would be patched (dry-run)
 sync-tools sync --source ./src --dest ./dst --patch preview.patch --dry-run
@@ -242,6 +248,10 @@ When using `--patch filename.patch`, sync-tools:
 - **Includes metadata** header with source, destination, and generation timestamp
 - **Dry-run mode** shows what would be patched without creating the file
 - **No actual syncing** occurs - only the patch file is generated
+
+**Two Ways to Generate Patches:**
+1. **Dedicated flag**: Use `--patch filename.patch` for explicit patch generation
+2. **Report flag**: Use `--report filename.patch` where format is auto-detected from extension (.patch/.diff)
 
 Generated patches can be applied using standard git tools:
 ```bash
@@ -306,16 +316,26 @@ Common use cases for git patch generation:
 
 ### Code Review Workflow
 ```bash
-# Generate patch of changes for review
+# Generate patch of changes for review (using --patch flag)
 sync-tools sync --source ./feature-branch --dest ./main-branch --patch review.patch
+
+# Alternative: using --report with .patch extension
+sync-tools sync --source ./feature-branch --dest ./main-branch --report review.patch
+
 git apply review.patch  # Apply the patch for testing
 ```
 
 ### Deployment Preparation
 ```bash
-# Create deployment patch with only production files
+# Create deployment patch with only production files (using --patch flag)
 sync-tools sync --source ./local --dest ./production \
   --patch deployment.patch \
+  --only "src/" --only "config/prod.conf" \
+  --ignore-src "*.test" --ignore-src "dev/"
+
+# Alternative: using --report with .patch extension
+sync-tools sync --source ./local --dest ./production \
+  --report deployment.patch \
   --only "src/" --only "config/prod.conf" \
   --ignore-src "*.test" --ignore-src "dev/"
 ```

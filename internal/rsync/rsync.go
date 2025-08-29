@@ -50,11 +50,21 @@ func NewRunner(logger logging.Logger) *Runner {
 
 // Sync performs the synchronization operation
 func (r *Runner) Sync(opts *Options) error {
-	// Check if patch mode is requested
+	// Check if patch mode is requested (either via --patch flag or --report with .patch extension)
 	if opts.Patch != "" {
 		r.logger.Infof("Starting patch generation: %s -> %s (output: %s, dry-run: %v)",
 			opts.Source, opts.Dest, opts.Patch, opts.DryRun)
 		return r.generatePatch(opts)
+	}
+	
+	// Check if report with patch format is requested (based on file extension)
+	if opts.Report != "" && (strings.HasSuffix(strings.ToLower(opts.Report), ".patch") || strings.HasSuffix(strings.ToLower(opts.Report), ".diff")) {
+		r.logger.Infof("Starting patch report generation: %s -> %s (output: %s, dry-run: %v)",
+			opts.Source, opts.Dest, opts.Report, opts.DryRun)
+		// Use the report path as patch path
+		patchOpts := *opts
+		patchOpts.Patch = opts.Report
+		return r.generatePatch(&patchOpts)
 	}
 
 	r.logger.Infof("Starting sync: %s -> %s (mode: %s, dry-run: %v)",
