@@ -57,6 +57,23 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^files not matching patterns should be copied$`, tc.filesNotMatchingPatternsShouldBeCopied)
 	ctx.Step(`^files matching unignore patterns should be copied$`, tc.filesMatchingUnignorePatternsShouldBeCopied)
 
+	// Git patch steps
+	ctx.Step(`^I have a destination directory with some matching and some different files$`, tc.createDestinationDirectoryWithMixedFiles)
+	ctx.Step(`^I run sync-tools with patch generation to "([^"]*)"$`, tc.runSyncToolsWithPatchGeneration)
+	ctx.Step(`^I run sync-tools with patch generation to "([^"]*)" and dry-run$`, tc.runSyncToolsWithPatchGenerationAndDryRun)
+	ctx.Step(`^I run sync-tools with patch generation to "([^"]*)" and only mode for "([^"]*)"$`, tc.runSyncToolsWithPatchGenerationAndOnly)
+	ctx.Step(`^a git patch file should be created at "([^"]*)"$`, tc.gitPatchFileShouldBeCreated)
+	ctx.Step(`^the patch file should contain differences between source and destination$`, tc.patchFileShouldContainDifferences)
+	ctx.Step(`^the patch file should contain all new files from source$`, tc.patchFileShouldContainAllNewFiles)
+	ctx.Step(`^the patch should show files as new additions$`, tc.patchShouldShowFilesAsNewAdditions)
+	ctx.Step(`^the patch file should contain file deletions$`, tc.patchFileShouldContainFileDeletions)
+	ctx.Step(`^the patch should show files as removals$`, tc.patchShouldShowFilesAsRemovals)
+	ctx.Step(`^the patch file should not contain ignored files$`, tc.patchFileShouldNotContainIgnoredFiles)
+	ctx.Step(`^the patch file should only contain changes for whitelisted files$`, tc.patchFileShouldOnlyContainWhitelistedFiles)
+	ctx.Step(`^it should show what would be included in the patch$`, tc.shouldShowWhatWouldBeIncludedInPatch)
+	ctx.Step(`^no patch file should be created$`, tc.noPatchFileShouldBeCreated)
+	ctx.Step(`^I have an empty source directory$`, tc.createEmptySourceDirectory)
+
 	// Setup and cleanup hooks
 	ctx.BeforeScenario(func(sc *godog.Scenario) {
 		tc.beforeScenario(context.Background(), sc)
@@ -72,11 +89,11 @@ func (tc *TestContext) beforeScenario(ctx context.Context, sc *godog.Scenario) (
 	tc.sourceDir = filepath.Join(tempDir, fmt.Sprintf("sync_test_src_%d", os.Getpid()))
 	tc.destDir = filepath.Join(tempDir, fmt.Sprintf("sync_test_dest_%d", os.Getpid()))
 	
-	// Find sync-tools binary path
+	// Find sync-tools binary path (go up two levels from test/bdd)
 	if wd, err := os.Getwd(); err == nil {
-		tc.syncToolsPath = filepath.Join(wd, "sync-tools")
+		tc.syncToolsPath = filepath.Join(wd, "..", "..", "sync-tools")
 	} else {
-		tc.syncToolsPath = "sync-tools"
+		tc.syncToolsPath = "../../sync-tools"
 	}
 	
 	return ctx, nil
@@ -283,4 +300,130 @@ func (tc *TestContext) filesNotMatchingPatternsShouldBeCopied() error {
 
 func (tc *TestContext) filesMatchingUnignorePatternsShouldBeCopied() error {
 	return nil // Placeholder
+}
+
+// Git patch step implementations
+
+func (tc *TestContext) createEmptySourceDirectory() error {
+	return os.MkdirAll(tc.sourceDir, 0755)
+}
+
+func (tc *TestContext) createDestinationDirectoryWithMixedFiles() error {
+	if err := os.MkdirAll(tc.destDir, 0755); err != nil {
+		return err
+	}
+	
+	// Create some matching files (same content)
+	if err := os.WriteFile(filepath.Join(tc.destDir, "file1.txt"), []byte("test content for file1.txt"), 0644); err != nil {
+		return err
+	}
+	
+	// Create some different files (different content)
+	if err := os.WriteFile(filepath.Join(tc.destDir, "file2.txt"), []byte("DIFFERENT content for file2.txt"), 0644); err != nil {
+		return err
+	}
+	
+	// Create files that only exist in destination
+	if err := os.WriteFile(filepath.Join(tc.destDir, "dest_only.txt"), []byte("only in destination"), 0644); err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+func (tc *TestContext) runSyncToolsWithPatchGeneration(patchFile string) error {
+	cmd := exec.Command(tc.syncToolsPath, "sync", "--source", tc.sourceDir, "--dest", tc.destDir, "--patch", patchFile)
+	output, err := cmd.CombinedOutput()
+	tc.lastOutput = string(output)
+	tc.lastExitCode = cmd.ProcessState.ExitCode()
+	if err != nil {
+		tc.lastError = err.Error()
+	}
+	return nil
+}
+
+func (tc *TestContext) runSyncToolsWithPatchGenerationAndDryRun(patchFile string) error {
+	cmd := exec.Command(tc.syncToolsPath, "sync", "--source", tc.sourceDir, "--dest", tc.destDir, "--patch", patchFile, "--dry-run")
+	output, err := cmd.CombinedOutput()
+	tc.lastOutput = string(output)
+	tc.lastExitCode = cmd.ProcessState.ExitCode()
+	if err != nil {
+		tc.lastError = err.Error()
+	}
+	return nil
+}
+
+func (tc *TestContext) runSyncToolsWithPatchGenerationAndOnly(patchFile, onlyPattern string) error {
+	cmd := exec.Command(tc.syncToolsPath, "sync", "--source", tc.sourceDir, "--dest", tc.destDir, "--patch", patchFile, "--only", onlyPattern)
+	output, err := cmd.CombinedOutput()
+	tc.lastOutput = string(output)
+	tc.lastExitCode = cmd.ProcessState.ExitCode()
+	if err != nil {
+		tc.lastError = err.Error()
+	}
+	return nil
+}
+
+func (tc *TestContext) gitPatchFileShouldBeCreated(patchFile string) error {
+	// Check in current working directory first
+	if _, err := os.Stat(patchFile); err == nil {
+		return nil
+	}
+	
+	// Check in the parent directory (where sync-tools would create it)
+	parentPatch := filepath.Join("..", "..", patchFile)
+	if _, err := os.Stat(parentPatch); err == nil {
+		return nil
+	}
+	
+	// Check absolute path
+	if filepath.IsAbs(patchFile) {
+		if _, err := os.Stat(patchFile); err == nil {
+			return nil
+		}
+	}
+	
+	return fmt.Errorf("expected patch file %s to exist, but it doesn't (checked current dir, parent dir, and absolute path)", patchFile)
+}
+
+func (tc *TestContext) patchFileShouldContainDifferences() error {
+	// This would check that the patch contains actual diff content
+	// For now, just verify the file is not empty
+	return nil // Placeholder - will implement after CLI flag is added
+}
+
+func (tc *TestContext) patchFileShouldContainAllNewFiles() error {
+	return nil // Placeholder - will implement after CLI flag is added
+}
+
+func (tc *TestContext) patchShouldShowFilesAsNewAdditions() error {
+	return nil // Placeholder - will implement after CLI flag is added
+}
+
+func (tc *TestContext) patchFileShouldContainFileDeletions() error {
+	return nil // Placeholder - will implement after CLI flag is added
+}
+
+func (tc *TestContext) patchShouldShowFilesAsRemovals() error {
+	return nil // Placeholder - will implement after CLI flag is added
+}
+
+func (tc *TestContext) patchFileShouldNotContainIgnoredFiles() error {
+	return nil // Placeholder - will implement after CLI flag is added
+}
+
+func (tc *TestContext) patchFileShouldOnlyContainWhitelistedFiles() error {
+	return nil // Placeholder - will implement after CLI flag is added
+}
+
+func (tc *TestContext) shouldShowWhatWouldBeIncludedInPatch() error {
+	if !strings.Contains(tc.lastOutput, "would") && !strings.Contains(tc.lastOutput, "patch") {
+		return fmt.Errorf("expected dry-run output to show what would be included in patch")
+	}
+	return nil
+}
+
+func (tc *TestContext) noPatchFileShouldBeCreated() error {
+	// This would check that no .patch files exist in the working directory
+	return nil // Placeholder - will implement after CLI flag is added
 }

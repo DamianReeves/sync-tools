@@ -19,6 +19,7 @@ sync-tools is a powerful, modern Go CLI wrapper around rsync that provides:
 - **🔍 Smart Defaults**: Excludes `.git/`, optional hidden directory exclusion
 - **🎭 Dry-run previews** and detailed change output
 - **📊 Multiple Output Formats**: Text, JSON logging, and Markdown reports
+- **🔧 Git Patch Generation**: Create git-format patch files instead of syncing for review and manual application
 
 ## 🚀 Quick Start
 
@@ -56,6 +57,9 @@ sync-tools sync --source ./code --dest ./backup --use-gitignore --ignore-src "*.
 
 # Whitelist mode (only sync specific files)
 sync-tools sync --source ./docs --dest ./backup --only "*.md" --only "*.txt"
+
+# Generate git patch instead of syncing
+sync-tools sync --source ./src --dest ./dst --patch changes.patch
 ```
 
 ## 📜 SyncFile Format
@@ -118,6 +122,7 @@ sync-tools syncfile --dry-run
 | `INCLUDE pattern` | Include files (unignore) | `INCLUDE !important.tmp` |
 | `ONLY pattern` | Whitelist mode | `ONLY *.go` |
 | `DRYRUN true\|false` | Enable/disable dry run | `DRYRUN true` |
+| `PATCH filename` | Generate git patch file | `PATCH changes.patch` |
 | `GITIGNORE true\|false` | Use .gitignore patterns | `GITIGNORE true` |
 | `HIDDENDIRS exclude\|include` | Handle hidden directories | `HIDDENDIRS exclude` |
 | `VAR name=value` | Define variable | `VAR BASE=/home/user` |
@@ -184,6 +189,27 @@ sync-tools sync --source ./src --dest ./dst --report sync-report.md
 sync-tools sync --source ./src --dest ./dst --dump-commands commands.json
 ```
 
+### Git Patch Generation
+
+Generate git-format patch files for review and manual application instead of automatic syncing:
+
+```bash
+# Generate patch file from differences
+sync-tools sync --source ./src --dest ./dst --patch changes.patch
+
+# Preview what would be patched (dry-run)
+sync-tools sync --source ./src --dest ./dst --patch preview.patch --dry-run
+
+# Generate patch with filtering (respects .syncignore)
+sync-tools sync --source ./project --dest ./backup --patch filtered.patch --use-source-gitignore
+
+# Patch with whitelist mode (only specific files)
+sync-tools sync --source ./docs --dest ./backup --patch docs-only.patch --only "*.md" --only "*.txt"
+
+# Two-way patch generation shows differences in both directions
+sync-tools sync --source ./local --dest ./remote --patch bidirectional.patch --mode two-way
+```
+
 ### Filter Examples
 
 ```bash
@@ -202,6 +228,25 @@ sync-tools sync --source ./docs --dest ./backup \
 # Unignore specific files in .syncignore
 echo "temp/" > .syncignore
 echo "!temp/important.txt" >> .syncignore
+```
+
+### Patch Generation Behavior
+
+When using `--patch filename.patch`, sync-tools:
+
+- **Creates git-format patches** using `git diff --no-index` for proper formatting
+- **Respects all filters** (.syncignore, --only, --ignore-*, --use-source-gitignore)  
+- **Shows file additions** (new files in source) as `+++ /dev/null` 
+- **Shows file deletions** (files only in destination) as `--- /dev/null`
+- **Shows modifications** with unified diff format showing line changes
+- **Includes metadata** header with source, destination, and generation timestamp
+- **Dry-run mode** shows what would be patched without creating the file
+- **No actual syncing** occurs - only the patch file is generated
+
+Generated patches can be applied using standard git tools:
+```bash
+git apply changes.patch    # Apply the patch
+git apply --check changes.patch    # Validate patch without applying
 ```
 
 ## 🛠️ Development
@@ -254,6 +299,52 @@ sync-tools has been completely rewritten in Go from the original Python implemen
 - **🔧 Better Tooling**: Modern Go build system and toolchain
 
 All original functionality is preserved and enhanced.
+
+## 📋 Patch Recipes
+
+Common use cases for git patch generation:
+
+### Code Review Workflow
+```bash
+# Generate patch of changes for review
+sync-tools sync --source ./feature-branch --dest ./main-branch --patch review.patch
+git apply review.patch  # Apply the patch for testing
+```
+
+### Deployment Preparation
+```bash
+# Create deployment patch with only production files
+sync-tools sync --source ./local --dest ./production \
+  --patch deployment.patch \
+  --only "src/" --only "config/prod.conf" \
+  --ignore-src "*.test" --ignore-src "dev/"
+```
+
+### Documentation Updates
+```bash
+# Generate patch for documentation changes only
+sync-tools sync --source ./docs-new --dest ./docs-current \
+  --patch docs-update.patch \
+  --only "*.md" --only "*.rst" --only "images/"
+```
+
+### Selective Updates
+```bash
+# Preview changes before applying to sensitive environment
+sync-tools sync --source ./staging --dest ./production \
+  --patch staging-to-prod.patch --dry-run
+  
+# Review the patch, then apply manually:
+# git apply staging-to-prod.patch
+```
+
+### Backup Validation
+```bash
+# Generate patch to see what would be backed up
+sync-tools sync --source ./project --dest ./backup \
+  --patch backup-preview.patch \
+  --use-source-gitignore --exclude-hidden-dirs
+```
 
 ## 🤝 Contributing
 
