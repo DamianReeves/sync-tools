@@ -1,79 +1,120 @@
-SHELL := /bin/bash
+# Go Makefile for sync-tools
 
-.PHONY: help venv install bdd pytest test clean
-.PHONY: install-local package-install-local
+BINARY_NAME=sync-tools
+VERSION=0.2.0
+BUILD_DIR=build
+MAIN_PATH=cmd/sync-tools/main.go
 
-VENV := .venv
-PY := $(VENV)/bin/python
-PIP := $(VENV)/bin/pip
+# Default target
+.PHONY: help
+help: ## Show this help message
+	@echo "sync-tools Go Build System"
+	@echo ""
+	@echo "Usage:"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-BEHAVE_ARGS ?=
-PYTEST_ARGS ?=
+.PHONY: clean
+clean: ## Clean build artifacts
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(BUILD_DIR) $(BINARY_NAME) dist/
+	@go clean
 
-help:
-	@echo "Makefile for sync-tools"
-	@echo
-	@echo "Targets:"
-	@echo "  make venv       - create virtualenv and upgrade packaging tools"
-	@echo "  make install    - install project and test dependencies into venv"
-	@echo "  make bdd        - run behave BDD tests (set BEHAVE_ARGS to pass extra args)"
-	@echo "  make pytest     - run pytest (set PYTEST_ARGS to pass extra args)"
-	@echo "  make test       - run behave then pytest"
-	@echo "  make install-local [sudo=1] - install the package locally and make the 'sync-tools' launcher available (~/.local/bin), optionally install system-wide with sudo=1"
+.PHONY: deps
+deps: ## Download and verify dependencies
+	@echo "Downloading dependencies..."
+	@go mod download
+	@go mod verify
 
-venv:
-	@echo "[make] Ensuring virtualenv exists at $(VENV)"
-	@if [ ! -d "$(VENV)" ]; then \
-		python3 -m venv $(VENV); \
-	fi
-	@echo "[make] Upgrading pip, setuptools, wheel in venv"
-	@$(PY) -m pip install --upgrade pip setuptools wheel
+.PHONY: tidy
+tidy: ## Tidy up go.mod and go.sum
+	@echo "Tidying up dependencies..."
+	@go mod tidy
 
-install: venv
-	@echo "[make] Installing project and test deps into venv (dev extras)"
-	@$(PIP) install -e .[dev]
+.PHONY: build
+build: deps ## Build the binary
+	@echo "Building $(BINARY_NAME)..."
+	@go build -o $(BINARY_NAME) $(MAIN_PATH)
 
-bdd: venv
-	@echo "[make] Running behave BDD tests"
-	@$(PY) -m behave $(BEHAVE_ARGS)
+.PHONY: build-all
+build-all: clean deps ## Build for all platforms
+	@echo "Building for all platforms..."
+	@mkdir -p $(BUILD_DIR)
+	@GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
+	@GOOS=linux GOARCH=arm64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 $(MAIN_PATH)
+	@GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PATH)
+	@GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 $(MAIN_PATH)
+	@GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
+	@echo "Built binaries:"
+	@ls -la $(BUILD_DIR)/
 
-pytest: venv
-	@echo "[make] Running pytest"
-	@$(PY) -m pytest $(PYTEST_ARGS)
+.PHONY: install
+install: build ## Install the binary to $GOPATH/bin
+	@echo "Installing $(BINARY_NAME) to $$(go env GOPATH)/bin/..."
+	@go install $(MAIN_PATH)
 
-test: bdd pytest
+.PHONY: test
+test: ## Run tests
+	@echo "Running tests..."
+	@go test -v ./...
 
-clean:
-	@echo "[make] Cleaning virtualenv and temporary files"
-	@rm -rf $(VENV) .pytest_cache behave-results reports
+.PHONY: test-coverage
+test-coverage: ## Run tests with coverage
+	@echo "Running tests with coverage..."
+	@go test -v -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
 
+.PHONY: lint
+lint: ## Run golangci-lint
+	@echo "Running linter..."
+	@which golangci-lint > /dev/null || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+	@golangci-lint run
 
-install-local:
-	@echo "[make] Installing package for local user (or system-wide if sudo=1)"
-	@tools/install_local.sh $(sudo)
+.PHONY: fmt
+fmt: ## Format code
+	@echo "Formatting code..."
+	@go fmt ./...
 
+.PHONY: vet
+vet: ## Run go vet
+	@echo "Running go vet..."
+	@go vet ./...
 
+.PHONY: check
+check: fmt vet lint test ## Run all checks
 
-package-install-local: clean
-	@echo "[make] Building distributions and installing from dist/ to user site"
-	@tools/package_install_local.sh
+.PHONY: dev
+dev: clean deps check build ## Full development build
 
-build-standalone: clean
-	@echo "[make] Building standalone zipapp artifact"
-	@tools/build_zipapp.sh
+.PHONY: release
+release: clean check build-all ## Prepare release build
 
-build-standalone-full: clean
-	@echo "[make] Building standalone zipapp with dependencies"
-	@tools/build_zipapp_with_deps.sh
+.PHONY: run
+run: build ## Build and run with arguments (use: make run ARGS="--help")
+	@echo "Running $(BINARY_NAME) $(ARGS)..."
+	@./$(BINARY_NAME) $(ARGS)
 
-build-pex: clean
-	@echo "[make] Building PEX artifact"
-	@tools/build_pex.sh
+.PHONY: demo
+demo: build ## Run a demo sync operation
+	@echo "Running demo sync..."
+	@mkdir -p demo_source demo_dest
+	@echo "Hello from Go sync-tools!" > demo_source/demo.txt
+	@./$(BINARY_NAME) sync --source demo_source --dest demo_dest --dry-run -v
 
-build-shiv: clean
-	@echo "[make] Building shiv artifact"
-	@tools/build_shiv.sh
+.PHONY: demo-interactive
+demo-interactive: build ## Run interactive demo
+	@echo "Starting interactive demo..."
+	@mkdir -p demo_source demo_dest
+	@echo "Hello from Go sync-tools!" > demo_source/demo.txt
+	@./$(BINARY_NAME) sync --source demo_source --dest demo_dest --interactive
 
-build-pyinstaller: clean
-	@echo "[make] Building PyInstaller onefile binary"
-	@tools/build_pyinstaller.sh
+.PHONY: demo-syncfile
+demo-syncfile: build ## Run SyncFile demo
+	@echo "Creating demo SyncFile..."
+	@mkdir -p demo_source demo_dest
+	@echo "Hello from SyncFile!" > demo_source/syncfile_demo.txt
+	@echo "# Demo SyncFile" > DemoSyncFile
+	@echo "VAR SOURCE=demo_source" >> DemoSyncFile
+	@echo "VAR DEST=demo_dest" >> DemoSyncFile
+	@echo "SYNC \$${SOURCE} \$${DEST}" >> DemoSyncFile
+	@echo "DRYRUN true" >> DemoSyncFile
+	@./$(BINARY_NAME) syncfile DemoSyncFile -v
