@@ -56,6 +56,7 @@
   - **Added --apply-patch flag** to apply generated patches with user confirmation
   - **Added -y/--yes flag** for automatic confirmation (Unix-style)
   - **Added --preview flag** for colored diff preview with paging support
+  - **Enhanced SyncFile format** with patch instructions: PATCH, APPLYPATCH, PREVIEW, AUTOCONFIRM
 
 **Key Outcomes**:
 - Users can now generate git patch files instead of performing actual sync operations
@@ -65,14 +66,18 @@
 - Complete BDD test coverage ensures feature reliability and prevents regressions
 - **Dual patch generation methods**: --patch flag OR --report with .patch/.diff extension
 - **Intelligent format detection** eliminates need for additional CLI flags
+- **Interactive patch workflow**: preview, generate, apply, and confirm patches
+- **Declarative patch operations**: SyncFile support for all patch functionality
 
 **Technical Implementation**:
 - Extended rsync.Options struct with Patch field
 - Added generatePatch method with git diff integration and fallback
 - Integrated patch mode detection in main Sync workflow
 - **Added file extension-based format detection** for --report flag (.patch, .diff)
+- **Extended SyncFile with 4 new instructions** for comprehensive patch workflow support
 - BDD tests validate all scenarios: mixed files, new files, deletions, filters, whitelist, dry-run
 - Updated documentation with comprehensive examples and usage patterns
+- Enhanced syncfile --list output to display all patch-related configuration
 
 ### 2025-08-29: Go Migration and BDD Framework Complete
 **Completed Work**:

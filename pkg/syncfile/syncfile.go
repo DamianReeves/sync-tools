@@ -33,6 +33,12 @@ const (
 	InstUseGitignore InstructionType = "GITIGNORE"  // GITIGNORE true|false
 	InstHiddenDirs  InstructionType = "HIDDENDIRS"  // HIDDENDIRS exclude|include
 	
+	// Patch instructions
+	InstPatch       InstructionType = "PATCH"       // PATCH filename
+	InstApplyPatch  InstructionType = "APPLYPATCH"  // APPLYPATCH true|false
+	InstPreview     InstructionType = "PREVIEW"     // PREVIEW true|false
+	InstAutoConfirm InstructionType = "AUTOCONFIRM" // AUTOCONFIRM true|false (like -y flag)
+	
 	// Variable and environment instructions
 	InstVar         InstructionType = "VAR"         // VAR name=value
 	InstEnv         InstructionType = "ENV"         // ENV name=value (exported to rsync)
@@ -135,9 +141,13 @@ func parseInstruction(line string, lineNum int) (Instruction, error) {
 		if len(args) != 1 || (args[0] != "one-way" && args[0] != "two-way") {
 			return Instruction{}, fmt.Errorf("MODE must be 'one-way' or 'two-way'")
 		}
-	case InstDryRun, InstUseGitignore:
+	case InstDryRun, InstUseGitignore, InstApplyPatch, InstPreview, InstAutoConfirm:
 		if len(args) != 1 || (args[0] != "true" && args[0] != "false") {
 			return Instruction{}, fmt.Errorf("%s must be 'true' or 'false'", instType)
+		}
+	case InstPatch:
+		if len(args) != 1 {
+			return Instruction{}, fmt.Errorf("PATCH requires exactly 1 argument: filename")
 		}
 	case InstHiddenDirs:
 		if len(args) != 1 || (args[0] != "exclude" && args[0] != "include") {
@@ -257,6 +267,30 @@ func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 				pattern := expandVariables(inst.Args[0], sf.Variables)
 				currentOpts.Only = append(currentOpts.Only, pattern)
 			}
+		
+		case InstPatch:
+			if currentOpts != nil {
+				patchFile := expandVariables(inst.Args[0], sf.Variables)
+				currentOpts.Patch = patchFile
+			}
+		
+		case InstApplyPatch:
+			if currentOpts != nil {
+				applyPatch, _ := strconv.ParseBool(inst.Args[0])
+				currentOpts.ApplyPatch = applyPatch
+			}
+		
+		case InstPreview:
+			if currentOpts != nil {
+				preview, _ := strconv.ParseBool(inst.Args[0])
+				currentOpts.Preview = preview
+			}
+		
+		case InstAutoConfirm:
+			if currentOpts != nil {
+				autoConfirm, _ := strconv.ParseBool(inst.Args[0])
+				currentOpts.Yes = autoConfirm
+			}
 		}
 	}
 
@@ -280,25 +314,36 @@ func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 VAR PROJECT_ROOT=/home/user/projects
 VAR BACKUP_ROOT=/backup
 
-# Sync documentation
-SYNC ${PROJECT_ROOT}/docs ${BACKUP_ROOT}/docs --dry-run
+# Preview changes before syncing
+SYNC ${PROJECT_ROOT}/docs ${BACKUP_ROOT}/docs
 MODE one-way
+PREVIEW true
 EXCLUDE *.tmp
 EXCLUDE .DS_Store
 INCLUDE !important.tmp
 
-# Sync source code
+# Generate patch file for source code changes
 SYNC ${PROJECT_ROOT}/src ${BACKUP_ROOT}/src
 MODE two-way
+PATCH src-changes.patch
+APPLYPATCH true
+AUTOCONFIRM false  # Will prompt for confirmation
 GITIGNORE true
 HIDDENDIRS exclude
 ONLY *.go
 ONLY *.py
 ONLY *.js
 
-# Sync config files
+# Sync config files with auto-applied patch
 SYNC ${PROJECT_ROOT}/config ${BACKUP_ROOT}/config
-DRYRUN false
+PATCH config-update.patch
+APPLYPATCH true
+AUTOCONFIRM true  # Like -y flag, no confirmation prompt
 EXCLUDE secrets/
 INCLUDE !config/main.conf
+
+# Traditional sync without patches
+SYNC ${PROJECT_ROOT}/data ${BACKUP_ROOT}/data
+DRYRUN false
+EXCLUDE cache/
 */

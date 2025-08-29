@@ -78,29 +78,35 @@ sync-tools introduces a powerful **SyncFile format** — a Dockerfile-inspired d
 ### Example SyncFile
 
 ```dockerfile
-# Multi-project sync configuration
+# Multi-project sync configuration with patch support
 VAR PROJECT_ROOT=/home/user/projects
 VAR BACKUP_ROOT=/backup
 
-# Sync documentation
+# Preview documentation changes before syncing
 SYNC ${PROJECT_ROOT}/docs ${BACKUP_ROOT}/docs
 MODE one-way
+PREVIEW true
 EXCLUDE *.tmp
 EXCLUDE .DS_Store
 INCLUDE !important.tmp
 
-# Sync source code with two-way sync
+# Generate and apply patch for source code with confirmation
 SYNC ${PROJECT_ROOT}/src ${BACKUP_ROOT}/src
 MODE two-way
+PATCH src-changes.patch
+APPLYPATCH true
+AUTOCONFIRM false  # Will prompt for confirmation
 GITIGNORE true
 HIDDENDIRS exclude
 ONLY *.go
 ONLY *.py
 ONLY *.js
 
-# Sync configuration files
+# Auto-apply configuration patches without confirmation
 SYNC ${PROJECT_ROOT}/config ${BACKUP_ROOT}/config
-DRYRUN false
+PATCH config-update.patch
+APPLYPATCH true
+AUTOCONFIRM true  # Like -y flag, no prompts
 EXCLUDE secrets/
 INCLUDE !config/main.conf
 ```
@@ -132,6 +138,9 @@ sync-tools syncfile --dry-run
 | `ONLY pattern` | Whitelist mode | `ONLY *.go` |
 | `DRYRUN true\|false` | Enable/disable dry run | `DRYRUN true` |
 | `PATCH filename` | Generate git patch file | `PATCH changes.patch` |
+| `APPLYPATCH true\|false` | Apply patch after creation | `APPLYPATCH true` |
+| `PREVIEW true\|false` | Show colored diff preview | `PREVIEW true` |
+| `AUTOCONFIRM true\|false` | Auto-confirm patch application | `AUTOCONFIRM true` |
 | `GITIGNORE true\|false` | Use .gitignore patterns | `GITIGNORE true` |
 | `HIDDENDIRS exclude\|include` | Handle hidden directories | `HIDDENDIRS exclude` |
 | `VAR name=value` | Define variable | `VAR BASE=/home/user` |

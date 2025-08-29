@@ -25,15 +25,19 @@ Example SyncFile:
   VAR PROJECT_ROOT=/home/user/projects
   VAR BACKUP_ROOT=/backup
 
-  # Sync documentation
+  # Preview changes before syncing
   SYNC ${PROJECT_ROOT}/docs ${BACKUP_ROOT}/docs
   MODE one-way
+  PREVIEW true
   EXCLUDE *.tmp
   INCLUDE !important.tmp
 
-  # Sync source code with two-way sync
+  # Generate and apply patch for source code
   SYNC ${PROJECT_ROOT}/src ${BACKUP_ROOT}/src
   MODE two-way
+  PATCH src-changes.patch
+  APPLYPATCH true
+  AUTOCONFIRM false  # Prompt for confirmation
   GITIGNORE true
   ONLY *.go
   ONLY *.py
@@ -45,6 +49,10 @@ Available Instructions:
   INCLUDE pattern            - Include files (unignore pattern)
   ONLY pattern               - Whitelist mode - only sync matching files
   DRYRUN true|false         - Enable/disable dry run mode
+  PATCH filename            - Generate git patch file instead of syncing
+  APPLYPATCH true|false     - Apply generated patch after creation
+  PREVIEW true|false        - Show colored diff preview before sync
+  AUTOCONFIRM true|false    - Auto-confirm patch application (like -y)
   GITIGNORE true|false      - Use source .gitignore patterns
   HIDDENDIRS exclude|include - Exclude or include hidden directories
   VAR name=value            - Define a variable
@@ -130,6 +138,14 @@ func runSyncfile(cmd *cobra.Command, args []string) error {
 			logger.Infof("  Dest:   %s", opts.Dest)
 			logger.Infof("  Mode:   %s", opts.Mode)
 			logger.Infof("  DryRun: %v", opts.DryRun)
+			if opts.Patch != "" {
+				logger.Infof("  Patch: %s", opts.Patch)
+				logger.Infof("  ApplyPatch: %v", opts.ApplyPatch)
+				logger.Infof("  AutoConfirm: %v", opts.Yes)
+			}
+			if opts.Preview {
+				logger.Infof("  Preview: %v", opts.Preview)
+			}
 			if len(opts.IgnoreSrc) > 0 {
 				logger.Infof("  Filters: %v", opts.IgnoreSrc)
 			}
