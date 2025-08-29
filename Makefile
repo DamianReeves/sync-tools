@@ -53,9 +53,9 @@ install: build ## Install the binary to $GOPATH/bin
 	@go install $(MAIN_PATH)
 
 .PHONY: test
-test: ## Run unit tests
+test: ## Run unit tests (excluding BDD)
 	@echo "Running unit tests..."
-	@go test -v ./... -short
+	@go test -v $$(go list ./... | grep -v '/test/bdd') -short
 
 .PHONY: test-bdd
 test-bdd: build ## Run BDD tests with Godog
@@ -88,7 +88,7 @@ vet: ## Run go vet
 	@go vet ./...
 
 .PHONY: check
-check: fmt vet lint test-all ## Run all checks
+check: fmt vet lint test ## Run all checks (excluding BDD tests)
 
 .PHONY: dev
 dev: clean deps check build ## Full development build
