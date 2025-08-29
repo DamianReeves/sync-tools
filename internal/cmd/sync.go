@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/DamianReeves/sync-tools/internal/config"
 	"github.com/DamianReeves/sync-tools/internal/logging"
 	"github.com/DamianReeves/sync-tools/internal/rsync"
+	"github.com/DamianReeves/sync-tools/pkg/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -190,8 +192,18 @@ func mergeOptionsWithConfig(cfg *config.Config) *rsync.Options {
 }
 
 func runInteractiveSync(opts *rsync.Options, logger logging.Logger) error {
-	// This will be implemented with Bubble Tea
-	return fmt.Errorf("interactive mode not yet implemented")
+	// Create the Bubble Tea model
+	model := tui.NewModel(opts, logger)
+
+	// Create the program
+	p := tea.NewProgram(model, tea.WithAltScreen())
+
+	// Run the program
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("error running interactive sync: %w", err)
+	}
+
+	return nil
 }
 
 func runTraditionalSync(opts *rsync.Options, logger logging.Logger) error {

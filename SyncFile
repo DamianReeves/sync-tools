@@ -1,0 +1,15 @@
+# Sample SyncFile - Dockerfile-like syntax for sync operations
+# This demonstrates the SyncFile format
+
+VAR SOURCE_DIR=test_source
+VAR DEST_DIR=test_dest
+
+# Basic sync with variable expansion
+SYNC ${SOURCE_DIR} ${DEST_DIR}
+MODE one-way
+DRYRUN true
+
+# Demonstrate filters
+EXCLUDE *.tmp
+EXCLUDE .DS_Store
+INCLUDE !important.tmp
