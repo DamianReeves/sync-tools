@@ -43,6 +43,33 @@
 
 ## Changelog
 
+### 2025-08-29: Sync From Subcommand and Markdown Report Generation Complete
+
+**Completed Work**:
+- ✅ **Sync From Subcommand** [Priority: P2 - Medium]
+  - Added `sync from SOURCE_DIR` convenience subcommand for syncing to current directory
+  - Automatically uses current working directory as destination
+  - Inherits all relevant flags from main sync command (filters, reports, preview, etc.)
+  - Prevents syncing directory to itself with validation
+  - Includes comprehensive BDD test scenarios for all use cases
+  - Simplifies common workflow of syncing into current working directory
+
+**Key Features**:
+- Quick syntax: `sync-tools sync from ~/backup` instead of `sync-tools sync --source ~/backup --dest .`
+- All filtering options available: --only, --ignore-src, --exclude-hidden-dirs, etc.
+- Full reporting support: markdown reports, patch generation, preview mode
+- Error handling for non-existent sources and self-sync attempts
+- Comprehensive help documentation with usage examples
+
+**Usage Examples**:
+```bash
+sync-tools sync from ~/projects/myapp            # Basic sync to current dir
+sync-tools sync from ~/data --dry-run           # Preview changes
+sync-tools sync from ~/source --report sync.md  # Generate markdown report
+sync-tools sync from ~/docs --only "*.md"       # Filter specific files
+sync-tools sync from ~/backup --preview         # Show colored diff
+```
+
 ### 2025-08-29: Markdown Report Generation Complete
 **Completed Work**:
 - ✅ **Markdown Report Generation** [Priority: P2 - Medium]
