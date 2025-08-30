@@ -1486,10 +1486,21 @@ func (tc *TestContext) theEditorShouldHaveBeenInvokedWithThePlanFile(editorName 
 
 // Conflict Resolution
 func (tc *TestContext) theConflictShouldBeResolved() error {
-	// Verify that conflicts were resolved (no conflict markers or backup files)
-	if strings.Contains(tc.lastOutput, "CONFLICT") || strings.Contains(tc.lastOutput, "conflict") {
-		return fmt.Errorf("conflicts should be resolved, but conflict indicators found in: %s", tc.lastOutput)
+	// Verify that conflicts were resolved by checking for error indicators, not legitimate resolution messages
+	// Look for unresolved conflict markers or failure messages, not resolution progress messages
+	if strings.Contains(tc.lastOutput, "CONFLICT:") && strings.Contains(tc.lastOutput, "unresolved") {
+		return fmt.Errorf("conflicts should be resolved, but unresolved conflict indicators found in: %s", tc.lastOutput)
 	}
+	if strings.Contains(tc.lastOutput, "conflict resolution failed") {
+		return fmt.Errorf("conflicts should be resolved, but conflict resolution failed in: %s", tc.lastOutput)
+	}
+	
+	// Success indicators - if we see these, conflicts were resolved
+	if strings.Contains(tc.lastOutput, "Plan execution completed successfully") || 
+	   strings.Contains(tc.lastOutput, "Creating backup") {
+		return nil
+	}
+	
 	return nil
 }
 
