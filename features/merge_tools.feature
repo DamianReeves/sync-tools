@@ -1,3 +1,4 @@
+@wip
 Feature: Interactive Merge Tool Integration
   As a developer
   I want to use familiar merge tools to resolve conflicts

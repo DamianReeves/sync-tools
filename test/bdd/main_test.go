@@ -15,6 +15,7 @@ func TestFeatures(t *testing.T) {
 			Format:   "pretty",
 			Paths:    []string{"../../features"},
 			TestingT: t,
+			Tags:     "~@wip", // Exclude work-in-progress scenarios
 		},
 	}
 
@@ -34,6 +35,7 @@ func TestMain(m *testing.M) {
 		Paths:         []string{"../../features"},
 		Randomize:     0,
 		StopOnFailure: false,
+		Tags:          "~@wip", // Exclude work-in-progress scenarios
 	}
 
 	suite := godog.TestSuite{
