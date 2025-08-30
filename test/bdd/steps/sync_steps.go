@@ -725,8 +725,9 @@ func (tc *TestContext) destinationFileShouldContain(filename, expectedContent st
 }
 
 func (tc *TestContext) errorShouldContain(expectedError string) error {
-	if !strings.Contains(tc.lastError, expectedError) {
-		return fmt.Errorf("expected error to contain '%s', but got '%s'", expectedError, tc.lastError)
+	// Check both error field and output for error messages (since CLI errors go to combined output)
+	if !strings.Contains(tc.lastError, expectedError) && !strings.Contains(tc.lastOutput, expectedError) {
+		return fmt.Errorf("expected error to contain '%s', but got error: '%s', output: '%s'", expectedError, tc.lastError, tc.lastOutput)
 	}
 	return nil
 }

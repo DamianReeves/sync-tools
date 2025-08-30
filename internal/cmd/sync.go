@@ -61,6 +61,11 @@ var (
 	flagConflictStrategy  string
 	flagSkipConflicts     bool
 	flagGenerateConflictPlan string
+	// Merge tool flags
+	flagInteractiveMerge  bool
+	flagMergeTool         string
+	flagMergeTimeout      int
+	flagUseGitBase        bool
 )
 
 func init() {
@@ -106,6 +111,12 @@ func init() {
 	syncCmd.Flags().StringVar(&flagConflictStrategy, "conflict-strategy", "", "Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup")
 	syncCmd.Flags().BoolVar(&flagSkipConflicts, "skip-conflicts", false, "Skip conflicting files during plan execution")
 	syncCmd.Flags().StringVar(&flagGenerateConflictPlan, "generate-conflict-plan", "", "Generate a separate plan file containing only conflicts")
+	
+	// Merge tool flags
+	syncCmd.Flags().BoolVar(&flagInteractiveMerge, "interactive-merge", false, "Enable interactive merge tool for conflict resolution")
+	syncCmd.Flags().StringVar(&flagMergeTool, "merge-tool", "", "Specify merge tool to use (overrides EDITOR env var)")
+	syncCmd.Flags().IntVar(&flagMergeTimeout, "merge-timeout", 300, "Timeout in seconds for merge tool operations")
+	syncCmd.Flags().BoolVar(&flagUseGitBase, "use-git-base", false, "Use git base commit for three-way merge")
 }
 
 func runSync(cmd *cobra.Command, args []string) error {

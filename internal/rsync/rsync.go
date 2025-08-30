@@ -1010,6 +1010,31 @@ func (r *Runner) filesAreIdentical(path1, path2 string) bool {
 	return string(content1) == string(content2)
 }
 
+// isBinaryFile checks if a file is binary by examining its content
+func (r *Runner) isBinaryFile(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false // If we can't read it, assume text
+	}
+	defer file.Close()
+	
+	// Read first 512 bytes to detect binary content
+	buf := make([]byte, 512)
+	n, err := file.Read(buf)
+	if err != nil && n == 0 {
+		return false
+	}
+	
+	// Check for null bytes which indicate binary content
+	for i := 0; i < n; i++ {
+		if buf[i] == 0 {
+			return true
+		}
+	}
+	
+	return false
+}
+
 // parseRsyncChange parses a line from rsync's itemize-changes output
 func (r *Runner) parseRsyncChange(line string) *SyncChange {
 	// Parse rsync output format: flags filename size timestamp
@@ -1545,6 +1570,11 @@ func (r *Runner) resolveConflict(op PlanOperation, srcPath, destPath string, src
 		}
 	}
 	
+	// Check if this is a binary file
+	if !srcInfo.IsDir() && !destInfo.IsDir() && r.isBinaryFile(srcPath) {
+		r.logger.Infof("Binary file conflict detected, using binary conflict resolution strategy (newest-wins by default)")
+	}
+	
 	// Default strategy: newest-wins
 	strategy := r.getConflictStrategy(op, opts)
 	
@@ -1591,6 +1621,7 @@ func (r *Runner) getConflictStrategy(op PlanOperation, opts *Options) ConflictSt
 
 // resolveNewestWins syncs the newer file to the older location
 func (r *Runner) resolveNewestWins(srcPath, destPath string, srcInfo, destInfo os.FileInfo, opts *Options) error {
+	r.logger.Infof("Using newest-wins conflict resolution strategy")
 	if srcInfo.ModTime().After(destInfo.ModTime()) {
 		r.logger.Infof("Source is newer, syncing to destination: %s", srcPath)
 		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir(), opts.DryRun)
