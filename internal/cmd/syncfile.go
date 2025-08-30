@@ -106,7 +106,24 @@ func runSyncfile(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error parsing SyncFile: %w", err)
 	}
 
-	// Convert to rsync options
+	// Change to SyncFile directory for relative path resolution
+	syncfileDir := filepath.Dir(syncfilePath)
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("error getting current directory: %w", err)
+	}
+	
+	err = os.Chdir(syncfileDir)
+	if err != nil {
+		return fmt.Errorf("error changing to SyncFile directory: %w", err)
+	}
+	
+	// Ensure we return to original directory
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
+
+	// Convert to rsync options (now relative to SyncFile directory)
 	optsList, err := sf.ToRsyncOptions()
 	if err != nil {
 		return fmt.Errorf("error converting SyncFile to rsync options: %w", err)

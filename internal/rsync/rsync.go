@@ -201,7 +201,6 @@ func (r *Runner) buildRsyncCommand(opts *Options, sourceFilter, destFilter strin
 		"--verbose",          // -v
 		"--human-readable",   // -h
 		"--delete",           // Remove files from dest that don't exist in source
-		"--delete-excluded",  // Also delete excluded files from dest
 	}
 
 	if opts.DryRun {
@@ -555,7 +554,6 @@ func (r *Runner) showSimplePreview(opts *Options) error {
 		"--verbose",
 		"--human-readable",
 		"--delete",
-		"--delete-excluded",
 		"--dry-run",
 		"--itemize-changes",
 	}
@@ -683,7 +681,6 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 		"--verbose",
 		"--human-readable",
 		"--delete",
-		"--delete-excluded",
 		"--dry-run",
 		"--itemize-changes",
 		"--out-format=%i %n %L %l %t",
