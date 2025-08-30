@@ -592,7 +592,13 @@ func (tc *TestContext) planFileShouldNotContain(text string) error {
 
 func (tc *TestContext) createPlanFile(filename string, content *godog.DocString) error {
 	fullPath := filepath.Join(tc.workingDir, filename)
-	return os.WriteFile(fullPath, []byte(content.Content), 0644)
+	
+	// Replace test path placeholders with actual directory paths
+	updatedContent := content.Content
+	updatedContent = strings.ReplaceAll(updatedContent, "./test_source", tc.sourceDir)
+	updatedContent = strings.ReplaceAll(updatedContent, "./test_dest", tc.destDir)
+	
+	return os.WriteFile(fullPath, []byte(updatedContent), 0644)
 }
 
 func (tc *TestContext) createSyncFile(filename string, content *godog.DocString) error {

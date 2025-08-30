@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/DamianReeves/sync-tools/internal/logging"
 	"github.com/DamianReeves/sync-tools/internal/rsync"
@@ -68,6 +70,7 @@ Variables can be referenced using ${name} or $name syntax.`,
 var (
 	flagSyncfileDryRun bool
 	flagSyncfileList   bool
+	flagSyncfilePlan   string
 )
 
 func init() {
@@ -75,6 +78,7 @@ func init() {
 
 	syncfileCmd.Flags().BoolVar(&flagSyncfileDryRun, "dry-run", false, "Override all SYNC operations to use dry-run mode")
 	syncfileCmd.Flags().BoolVar(&flagSyncfileList, "list", false, "List sync operations without executing")
+	syncfileCmd.Flags().StringVar(&flagSyncfilePlan, "plan", "", "Generate a sync plan file instead of executing")
 }
 
 func runSyncfile(cmd *cobra.Command, args []string) error {
@@ -173,6 +177,12 @@ func runSyncfile(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Handle plan generation if requested
+	if flagSyncfilePlan != "" {
+		logger.Infof("Generating sync plan: %s", flagSyncfilePlan)
+		return generateSyncfilePlan(optsList, flagSyncfilePlan, syncfilePath, logger)
+	}
+
 	// Execute sync operations
 	runner := rsync.NewRunner(logger)
 	
@@ -195,5 +205,86 @@ func runSyncfile(cmd *cobra.Command, args []string) error {
 	}
 
 	logger.Info("All sync operations completed successfully")
+	return nil
+}
+
+// generateSyncfilePlan generates a plan file from SyncFile operations
+func generateSyncfilePlan(optsList []*rsync.Options, planFile string, syncfilePath string, logger logging.Logger) error {
+	runner := rsync.NewRunner(logger)
+	
+	// For SyncFile plans, we need to generate combined plan content from all operations
+	var planContent strings.Builder
+	
+	// Generate header
+	planContent.WriteString(fmt.Sprintf("# Sync Plan Generated: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	planContent.WriteString(fmt.Sprintf("# Generated from: sync-tools syncfile %s --plan %s\n", syncfilePath, planFile))
+	planContent.WriteString(fmt.Sprintf("# SyncFile: %s\n", syncfilePath))
+	
+	// Process each sync operation
+	for i, opts := range optsList {
+		logger.Infof("Analyzing sync operation %d/%d", i+1, len(optsList))
+		
+		// Set plan file for this operation
+		tempPlan := fmt.Sprintf("%s.temp.%d", planFile, i)
+		opts.Plan = tempPlan
+		
+		// Generate plan for this operation
+		if err := runner.GeneratePlan(opts); err != nil {
+			logger.Warnf("Failed to generate plan for operation %d: %v", i+1, err)
+			continue
+		}
+		
+		// Read the temporary plan file
+		tempContent, err := os.ReadFile(tempPlan)
+		if err != nil {
+			logger.Warnf("Failed to read temporary plan for operation %d: %v", i+1, err)
+			continue
+		}
+		
+		// Add operation header
+		if i > 0 {
+			planContent.WriteString("\n")
+		}
+		planContent.WriteString(fmt.Sprintf("# Operation %d: %s -> %s\n", i+1, opts.Source, opts.Dest))
+		planContent.WriteString(fmt.Sprintf("# Source: %s\n", opts.Source))
+		planContent.WriteString(fmt.Sprintf("# Destination: %s\n", opts.Dest))
+		planContent.WriteString(fmt.Sprintf("# Mode: %s\n", opts.Mode))
+		
+		// Add filters info if any
+		if len(opts.IgnoreSrc) > 0 || len(opts.Only) > 0 {
+			filters := []string{}
+			if len(opts.IgnoreSrc) > 0 {
+				filters = append(filters, fmt.Sprintf("EXCLUDE %s", strings.Join(opts.IgnoreSrc, ", ")))
+			}
+			if opts.UseSourceGitignore {
+				filters = append(filters, "GITIGNORE true")
+			}
+			if len(opts.Only) > 0 {
+				filters = append(filters, fmt.Sprintf("ONLY %s", strings.Join(opts.Only, ", ")))
+			}
+			planContent.WriteString(fmt.Sprintf("# Filters: %s\n", strings.Join(filters, ", ")))
+		}
+		planContent.WriteString("#\n")
+		
+		// Extract operation lines from temp plan (skip headers and comments)
+		tempLines := strings.Split(string(tempContent), "\n")
+		for _, line := range tempLines {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "#") {
+				planContent.WriteString(line + "\n")
+			}
+		}
+		
+		// Clean up temporary file
+		os.Remove(tempPlan)
+	}
+	
+	// Write the combined plan file
+	err := os.WriteFile(planFile, []byte(planContent.String()), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write plan file: %w", err)
+	}
+	
+	logger.Infof("SyncFile plan generated successfully: %s", planFile)
 	return nil
 }

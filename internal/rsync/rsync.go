@@ -947,29 +947,20 @@ func (r *Runner) formatSize(size int64) string {
 func (r *Runner) GeneratePlan(opts *Options) error {
 	r.logger.Infof("Generating sync plan: %s", opts.Plan)
 	
-	// Create a basic plan file for now
-	// TODO: Implement proper plan generation with change detection
-	planContent := fmt.Sprintf(`# Sync Plan Generated: %s
-# Generated from: sync-tools sync --source %s --dest %s --plan %s
-# Source: %s
-# Destination: %s
-# Mode: %s
-
-# TODO: Add actual file operations here
-# << file   example.txt                   123B  2025-08-30T10:30:00  [new-in-source]
-
-# Summary:
-# Files matching filter: 0
-# New in source: 0
-# New in dest: 0
-# Updates: 0
-# Conflicts: 0
-`, 
-		time.Now().Format("2006-01-02 15:04:05"),
-		opts.Source, opts.Dest, opts.Plan,
-		opts.Source, opts.Dest, opts.Mode)
+	// Collect sync information using dry-run analysis
+	syncInfo, err := r.collectSyncInfo(opts)
+	if err != nil {
+		return fmt.Errorf("failed to analyze sync operations: %w", err)
+	}
 	
-	err := os.WriteFile(opts.Plan, []byte(planContent), 0644)
+	// Generate plan content from analysis
+	planContent, err := r.generatePlanContent(opts, syncInfo)
+	if err != nil {
+		return fmt.Errorf("failed to generate plan content: %w", err)
+	}
+	
+	// Write plan file
+	err = os.WriteFile(opts.Plan, []byte(planContent), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write plan file: %w", err)
 	}
@@ -978,25 +969,378 @@ func (r *Runner) GeneratePlan(opts *Options) error {
 	return nil
 }
 
+// PlanData represents the parsed content of a plan file
+type PlanData struct {
+	Source     string
+	Dest       string
+	Mode       string
+	Operations []PlanOperation
+}
+
+// PlanOperation represents a single operation from a plan file
+type PlanOperation struct {
+	Alias string // <<, >>, <>, s2d, d2s, bid, etc.
+	Type  string // "file" or "dir"
+	Path  string
+	Size  string
+	Time  string
+	Flags string
+}
+
 // ExecutePlan executes operations from a sync plan file
 func (r *Runner) ExecutePlan(opts *Options) error {
 	r.logger.Infof("Executing sync plan: %s", opts.ApplyPlan)
 	
 	// Read and parse plan file
-	// TODO: Implement proper plan parsing and execution
 	content, err := os.ReadFile(opts.ApplyPlan)
 	if err != nil {
 		return fmt.Errorf("failed to read plan file: %w", err)
 	}
 	
-	r.logger.Infof("Plan file content length: %d bytes", len(content))
-	
-	// For now, just validate the plan file exists and is readable
 	if len(content) == 0 {
 		return fmt.Errorf("plan file is empty")
 	}
 	
-	// TODO: Parse plan file and execute operations
-	r.logger.Info("Plan execution completed (placeholder implementation)")
+	// Parse plan file to extract metadata and operations
+	planData, err := r.parsePlan(string(content))
+	if err != nil {
+		return fmt.Errorf("failed to parse plan file: %w", err)
+	}
+	
+	// Override source/dest with values from plan file if not provided
+	if opts.Source == "" {
+		opts.Source = planData.Source
+	}
+	if opts.Dest == "" {
+		opts.Dest = planData.Dest
+	}
+	if opts.Mode == "" {
+		opts.Mode = planData.Mode
+	}
+	
+	// Resolve relative paths to absolute paths
+	if opts.Source != "" {
+		if absSource, err := filepath.Abs(opts.Source); err == nil {
+			opts.Source = absSource
+		}
+	}
+	if opts.Dest != "" {
+		if absDest, err := filepath.Abs(opts.Dest); err == nil {
+			opts.Dest = absDest
+		}
+	}
+	
+	// Execute each operation in the plan
+	for _, op := range planData.Operations {
+		if err := r.executePlanOperation(op, opts); err != nil {
+			return fmt.Errorf("failed to execute operation %s %s: %w", op.Alias, op.Path, err)
+		}
+	}
+	
+	r.logger.Infof("Plan execution completed successfully: %d operations", len(planData.Operations))
 	return nil
+}
+
+// parsePlan parses a plan file content and extracts metadata and operations
+func (r *Runner) parsePlan(content string) (*PlanData, error) {
+	lines := strings.Split(content, "\n")
+	planData := &PlanData{
+		Operations: []PlanOperation{},
+	}
+	
+	// Parse metadata from comments
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// Skip empty lines
+		if line == "" {
+			continue
+		}
+		
+		// Parse metadata comments
+		if strings.HasPrefix(line, "# Source:") {
+			planData.Source = strings.TrimSpace(strings.TrimPrefix(line, "# Source:"))
+			continue
+		}
+		if strings.HasPrefix(line, "# Destination:") {
+			planData.Dest = strings.TrimSpace(strings.TrimPrefix(line, "# Destination:"))
+			continue
+		}
+		if strings.HasPrefix(line, "# Mode:") {
+			planData.Mode = strings.TrimSpace(strings.TrimPrefix(line, "# Mode:"))
+			continue
+		}
+		
+		// Skip other comment lines
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		
+		// Parse operation lines (format: alias type path size time flags)
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			// Check if this looks like an operation line that's malformed
+			if len(fields) > 0 && (strings.HasPrefix(fields[0], "<<") || strings.HasPrefix(fields[0], ">>") || strings.HasPrefix(fields[0], "<>")) {
+				return nil, fmt.Errorf("invalid plan syntax: malformed operation line: %s", line)
+			}
+			continue // Skip other malformed lines
+		}
+		
+		op := PlanOperation{
+			Alias: fields[0],
+			Type:  fields[1],
+			Path:  fields[2],
+		}
+		
+		// Parse optional fields
+		if len(fields) > 3 {
+			op.Size = fields[3]
+		}
+		if len(fields) > 4 {
+			op.Time = fields[4]
+		}
+		if len(fields) > 5 {
+			op.Flags = strings.Join(fields[5:], " ")
+		}
+		
+		planData.Operations = append(planData.Operations, op)
+	}
+	
+	return planData, nil
+}
+
+// executePlanOperation executes a single plan operation
+func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
+	r.logger.Infof("Executing: %s %s %s", op.Alias, op.Type, op.Path)
+	
+	// Determine sync direction based on alias
+	var srcPath, destPath string
+	switch op.Alias {
+	case "<<", "s2d", "sync-to-dest":
+		// Source to destination
+		srcPath = filepath.Join(opts.Source, op.Path)
+		destPath = filepath.Join(opts.Dest, op.Path)
+	case ">>", "d2s", "dest-to-source":
+		// Destination to source  
+		srcPath = filepath.Join(opts.Dest, op.Path)
+		destPath = filepath.Join(opts.Source, op.Path)
+	case "<>", "bid", "bidirectional":
+		// TODO: Implement bidirectional sync or conflict resolution
+		return fmt.Errorf("bidirectional operations not yet implemented for path: %s", op.Path)
+	default:
+		return fmt.Errorf("unknown operation alias: %s", op.Alias)
+	}
+	
+	// Execute the file operation using rsync or file operations
+	if err := r.syncSingleFile(srcPath, destPath, op.Type == "dir"); err != nil {
+		return fmt.Errorf("failed to sync %s: %w", op.Path, err)
+	}
+	
+	return nil
+}
+
+// syncSingleFile syncs a single file or directory using rsync
+func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool) error {
+	// Ensure destination directory exists
+	destDir := filepath.Dir(destPath)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+	
+	// Build rsync command for single file/directory
+	args := []string{"-a"}  // Archive mode
+	
+	if isDir {
+		// For directories, ensure source ends with / and create dest directory
+		if !strings.HasSuffix(srcPath, "/") {
+			srcPath += "/"
+		}
+		if err := os.MkdirAll(destPath, 0755); err != nil {
+			return fmt.Errorf("failed to create destination directory: %w", err)
+		}
+	}
+	
+	args = append(args, srcPath, destPath)
+	cmd := exec.Command("rsync", args...)
+	
+	r.logger.Debugf("Executing rsync command: %s", strings.Join(cmd.Args, " "))
+	
+	// Execute the command
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("rsync failed: %w, output: %s", err, string(output))
+	}
+	
+	return nil
+}
+
+// generatePlanContent creates the plan file content from sync analysis
+func (r *Runner) generatePlanContent(opts *Options, report *SyncReport) (string, error) {
+	var content strings.Builder
+	
+	// Generate header with metadata
+	content.WriteString(fmt.Sprintf("# Sync Plan Generated: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	content.WriteString(fmt.Sprintf("# Generated from: sync-tools sync --source %s --dest %s --plan %s\n", 
+		opts.Source, opts.Dest, opts.Plan))
+	content.WriteString(fmt.Sprintf("# Source: %s\n", opts.Source))
+	content.WriteString(fmt.Sprintf("# Destination: %s\n", opts.Dest))
+	content.WriteString(fmt.Sprintf("# Mode: %s\n", opts.Mode))
+	
+	// Add change filter info if specified
+	if len(opts.IncludeChanges) > 0 {
+		content.WriteString(fmt.Sprintf("# Include changes: %s\n", strings.Join(opts.IncludeChanges, ", ")))
+	}
+	if len(opts.ExcludeChanges) > 0 {
+		content.WriteString(fmt.Sprintf("# Exclude changes: %s\n", strings.Join(opts.ExcludeChanges, ", ")))
+	}
+	
+	content.WriteString("#\n")
+	content.WriteString("# Commands:\n")
+	content.WriteString("#   s2d, sync-to-dest, <<    - Sync from source to destination (source >> dest)\n")
+	content.WriteString("#   d2s, dest-to-source, >>  - Sync from destination to source (dest >> source)\n")
+	content.WriteString("#   bid, bidirectional, <>   - Sync in both directions (bidirectional)\n")
+	content.WriteString("#   skip                     - Skip this item (commented out)\n")
+	content.WriteString("#\n")
+	content.WriteString("# Visual aliases make direction intuitive:\n")
+	content.WriteString("#   << = source flows to dest (like << redirection)\n")  
+	content.WriteString("#   >> = dest flows to source (like >> redirection)\n")
+	content.WriteString("#   <> = bidirectional flow (like <-> but shorter)\n")
+	content.WriteString("#\n")
+	content.WriteString("# Format: <command> <item-type> <path> [size] [modified] [flags]\n")
+	content.WriteString("\n")
+	
+	// Filter changes based on include/exclude options
+	filteredChanges := r.filterChanges(report.Changes, opts)
+	
+	// Generate operations for each change
+	for _, change := range filteredChanges {
+		operation := r.determineOperation(change, opts.Mode)
+		content.WriteString(fmt.Sprintf("%s %s %-30s %8s  %s  %s\n",
+			operation,
+			r.getItemType(change),
+			change.Path,
+			r.formatSize(change.Size),
+			change.ModTime.Format("2006-01-02T15:04:05"),
+			r.getChangeFlags(change)))
+	}
+	
+	// Generate summary
+	content.WriteString("\n# Summary:\n")
+	summary := r.generateSummary(filteredChanges, len(report.Changes))
+	content.WriteString(summary)
+	
+	return content.String(), nil
+}
+
+// filterChanges applies include/exclude change type filtering
+func (r *Runner) filterChanges(changes []SyncChange, opts *Options) []SyncChange {
+	if len(opts.IncludeChanges) == 0 && len(opts.ExcludeChanges) == 0 {
+		return changes // No filtering
+	}
+	
+	var filtered []SyncChange
+	for _, change := range changes {
+		changeType := r.getChangeType(change)
+		
+		// If include list is specified, only include matching types
+		if len(opts.IncludeChanges) > 0 {
+			included := false
+			for _, include := range opts.IncludeChanges {
+				if changeType == include {
+					included = true
+					break
+				}
+			}
+			if !included {
+				continue
+			}
+		}
+		
+		// If exclude list is specified, exclude matching types
+		if len(opts.ExcludeChanges) > 0 {
+			excluded := false
+			for _, exclude := range opts.ExcludeChanges {
+				if changeType == exclude {
+					excluded = true
+					break
+				}
+			}
+			if excluded {
+				continue
+			}
+		}
+		
+		filtered = append(filtered, change)
+	}
+	
+	return filtered
+}
+
+// determineOperation determines the visual alias operation for a change
+func (r *Runner) determineOperation(change SyncChange, mode string) string {
+	// For now, use simple logic based on Action
+	// TODO: Implement conflict detection when we add proper file analysis
+	switch change.Action {
+	case "create":
+		return "<<" // New file from source to dest
+	case "update":
+		return "<<" // Update from source to dest
+	case "delete":
+		return ">>" // Remove from dest (shown as dest-only)
+	default:
+		return "<<" // Default to source to dest
+	}
+}
+
+// getItemType determines if the item is a file or directory
+func (r *Runner) getItemType(change SyncChange) string {
+	if change.IsDir {
+		return "dir "
+	}
+	return "file"
+}
+
+// getChangeType maps SyncChange to change type string
+func (r *Runner) getChangeType(change SyncChange) string {
+	// Map Action field to change types used in filtering
+	switch change.Action {
+	case "create":
+		return "new-in-source" // New file in source
+	case "update":
+		return "updates" // File updated
+	case "delete":
+		return "new-in-dest" // File only in dest (will be deleted)
+	default:
+		return "unchanged"
+	}
+}
+
+// getChangeFlags generates the flag description for a change
+func (r *Runner) getChangeFlags(change SyncChange) string {
+	return fmt.Sprintf("[%s]", change.Action)
+}
+
+// generateSummary creates the summary statistics
+func (r *Runner) generateSummary(filteredChanges []SyncChange, totalChanges int) string {
+	var summary strings.Builder
+	
+	summary.WriteString(fmt.Sprintf("# Files matching filter: %d\n", len(filteredChanges)))
+	
+	// Count by change type
+	counts := make(map[string]int)
+	for _, change := range filteredChanges {
+		changeType := r.getChangeType(change)
+		counts[changeType]++
+	}
+	
+	summary.WriteString(fmt.Sprintf("# New in source: %d\n", counts["new-in-source"]))
+	summary.WriteString(fmt.Sprintf("# New in dest: %d\n", counts["new-in-dest"]))
+	summary.WriteString(fmt.Sprintf("# Updates: %d\n", counts["updates"]))
+	summary.WriteString(fmt.Sprintf("# Conflicts: %d\n", counts["conflicts"]))
+	
+	if len(filteredChanges) != totalChanges {
+		summary.WriteString(fmt.Sprintf("# Filtered out: %d\n", totalChanges-len(filteredChanges)))
+	}
+	
+	return summary.String()
 }
