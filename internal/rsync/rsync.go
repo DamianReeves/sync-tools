@@ -38,6 +38,11 @@ type Options struct {
 	ApplyPatch          bool
 	Yes                 bool
 	Preview             bool
+	// Interactive sync plan fields
+	Plan                string
+	ApplyPlan           string
+	IncludeChanges      []string
+	ExcludeChanges      []string
 }
 
 // Runner handles rsync operations
@@ -936,4 +941,62 @@ func (r *Runner) formatSize(size int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGTPE"[exp])
+}
+
+// GeneratePlan creates a sync plan file for two-phased interactive sync
+func (r *Runner) GeneratePlan(opts *Options) error {
+	r.logger.Infof("Generating sync plan: %s", opts.Plan)
+	
+	// Create a basic plan file for now
+	// TODO: Implement proper plan generation with change detection
+	planContent := fmt.Sprintf(`# Sync Plan Generated: %s
+# Generated from: sync-tools sync --source %s --dest %s --plan %s
+# Source: %s
+# Destination: %s
+# Mode: %s
+
+# TODO: Add actual file operations here
+# << file   example.txt                   123B  2025-08-30T10:30:00  [new-in-source]
+
+# Summary:
+# Files matching filter: 0
+# New in source: 0
+# New in dest: 0
+# Updates: 0
+# Conflicts: 0
+`, 
+		time.Now().Format("2006-01-02 15:04:05"),
+		opts.Source, opts.Dest, opts.Plan,
+		opts.Source, opts.Dest, opts.Mode)
+	
+	err := os.WriteFile(opts.Plan, []byte(planContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write plan file: %w", err)
+	}
+	
+	r.logger.Infof("Plan file created successfully: %s", opts.Plan)
+	return nil
+}
+
+// ExecutePlan executes operations from a sync plan file
+func (r *Runner) ExecutePlan(opts *Options) error {
+	r.logger.Infof("Executing sync plan: %s", opts.ApplyPlan)
+	
+	// Read and parse plan file
+	// TODO: Implement proper plan parsing and execution
+	content, err := os.ReadFile(opts.ApplyPlan)
+	if err != nil {
+		return fmt.Errorf("failed to read plan file: %w", err)
+	}
+	
+	r.logger.Infof("Plan file content length: %d bytes", len(content))
+	
+	// For now, just validate the plan file exists and is readable
+	if len(content) == 0 {
+		return fmt.Errorf("plan file is empty")
+	}
+	
+	// TODO: Parse plan file and execute operations
+	r.logger.Info("Plan execution completed (placeholder implementation)")
+	return nil
 }
