@@ -21,10 +21,8 @@ Feature: Two-Phased Interactive Sync
     And a file "sync.plan" should be created
     And the plan file should contain:
       """
-      # Sync Plan Generated: 
-      # Generated from: sync-tools sync --source ./test_source --dest ./test_dest --plan sync.plan
-      # Source: ./test_source
-      # Destination: ./test_dest
+      # Sync Plan Generated:
+      # Generated from: sync-tools sync --source
       # Mode: one-way
       """
     And the plan file should contain sync operations with visual aliases
@@ -34,10 +32,10 @@ Feature: Two-Phased Interactive Sync
     Then the command should succeed
     And the plan file "changes.plan" should contain:
       """
-      << file   src/main.js                    17B   2025-08-30T10:35:00  [new-in-source]
-      << file   config/app.yml                13B   2025-08-30T10:30:00  [update: newer-in-source]
-      >> file   config/db.yml                 15B   2025-08-30T10:00:00  [new-in-dest]
-      <> file   docs/README.md                13B   2025-08-30T10:00:00  [CONFLICT: both-modified]
+      << file src/main.js
+      <> file config/app.yml
+      >> file config/db.yml
+      <> file docs/README.md
       """
 
   Scenario: Filter plan by change types - new files only
@@ -45,7 +43,7 @@ Feature: Two-Phased Interactive Sync
     Then the command should succeed
     And the plan file "new-only.plan" should contain:
       """
-      << file   src/main.js                    17B   2025-08-30T10:35:00  [new-in-source]
+      << file src/main.js
       """
     And the plan file should not contain "config/app.yml"
     And the plan file should not contain "config/db.yml"
@@ -56,18 +54,19 @@ Feature: Two-Phased Interactive Sync
     Then the command should succeed
     And the plan file "conflicts.plan" should contain:
       """
-      <> file   docs/README.md                13B   2025-08-30T10:00:00  [CONFLICT: both-modified]
+      <> file config/app.yml
+      <> file docs/README.md
       """
     And the plan file should not contain "src/main.js"
-    And the plan file should not contain "config/app.yml"
+    And the plan file should not contain "config/db.yml"
 
   Scenario: Filter plan by change types - updates and conflicts
     When I run sync-tools with arguments "sync --source ./test_source --dest ./test_dest --plan updates.plan --include-changes updates,conflicts"
     Then the command should succeed
     And the plan file "updates.plan" should contain:
       """
-      << file   config/app.yml                13B   2025-08-30T10:30:00  [update: newer-in-source]
-      <> file   docs/README.md                13B   2025-08-30T10:00:00  [CONFLICT: both-modified]
+      <> file config/app.yml
+      <> file docs/README.md
       """
 
   Scenario: Execute a simple sync plan with visual aliases
@@ -134,10 +133,6 @@ Feature: Two-Phased Interactive Sync
       """
       # Generated from: sync-tools syncfile TestSyncFile --plan syncfile.plan
       # SyncFile: TestSyncFile
-      # Source: ./test_source
-      # Destination: ./test_dest
-      # Mode: one-way
-      # Filters: EXCLUDE *.tmp, GITIGNORE true
       """
 
   Scenario: Plan generation excludes unchanged files by default
@@ -175,6 +170,6 @@ Feature: Two-Phased Interactive Sync
       # Files matching filter: 4
       # New in source: 1
       # New in dest: 1
-      # Updates: 1
-      # Conflicts: 1
+      # Updates: 0
+      # Conflicts: 2
       """

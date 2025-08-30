@@ -43,6 +43,11 @@ type Options struct {
 	ApplyPlan           string
 	IncludeChanges      []string
 	ExcludeChanges      []string
+	Editor              string // Custom editor for interactive plan editing
+	// Conflict resolution fields
+	ConflictStrategy        string // Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup
+	SkipConflicts          bool   // Skip conflicting files during plan execution  
+	GenerateConflictPlan   string // Generate a separate plan file containing only conflicts
 }
 
 // Runner handles rsync operations
@@ -201,34 +206,73 @@ func (r *Runner) buildDestFilter(opts *Options) (string, error) {
 
 // buildRsyncCommand constructs the rsync command
 func (r *Runner) buildRsyncCommand(opts *Options, sourceFilter, destFilter string) *exec.Cmd {
-	args := []string{
-		"--archive",          // -a
-		"--verbose",          // -v
-		"--human-readable",   // -h
-		"--delete",           // Remove files from dest that don't exist in source
-	}
-
-	if opts.DryRun {
-		args = append(args, "--dry-run")
-	}
-
-	// Add filter files
-	if sourceFilter != "" {
-		args = append(args, "--filter", fmt.Sprintf(". %s", sourceFilter))
-	}
-	if destFilter != "" {
-		args = append(args, "--filter", fmt.Sprintf(". %s", destFilter))
-	}
-
-	// Add source and destination
 	// Ensure source path ends with / for proper rsync behavior
 	source := opts.Source
 	if !strings.HasSuffix(source, "/") {
 		source += "/"
 	}
+	
+	// Build rsync command using unified builder
+	cmdOpts := &RsyncCommandOptions{
+		UseChecksum:      true, // Always use checksum for consistency
+		UseDelete:        true, // Remove files from dest that don't exist in source
+		UseVerbose:       true,
+		UseHumanReadable: true,
+		SourceFilter:     sourceFilter,
+		DestFilter:       destFilter,
+		Source:           source,
+		Dest:             opts.Dest,
+		DryRun:           opts.DryRun,
+	}
+	
+	args := r.buildRsyncArgs(cmdOpts)
 	args = append(args, source, opts.Dest)
 
 	return exec.Command("rsync", args...)
+}
+
+// RsyncCommandOptions configures rsync command building
+type RsyncCommandOptions struct {
+	UseChecksum    bool
+	UseDelete      bool 
+	UseVerbose     bool
+	UseHumanReadable bool
+	SourceFilter   string
+	DestFilter     string
+	Source         string
+	Dest           string
+	DryRun         bool
+}
+
+// buildRsyncArgs creates a unified rsync command args array
+func (r *Runner) buildRsyncArgs(opts *RsyncCommandOptions) []string {
+	args := []string{"--archive"} // Always use archive mode
+	
+	if opts.UseChecksum {
+		args = append(args, "--checksum")
+	}
+	if opts.UseVerbose {
+		args = append(args, "--verbose")
+	}
+	if opts.UseHumanReadable {
+		args = append(args, "--human-readable") 
+	}
+	if opts.UseDelete {
+		args = append(args, "--delete")
+	}
+	if opts.DryRun {
+		args = append(args, "--dry-run")
+	}
+	
+	// Add filter files
+	if opts.SourceFilter != "" {
+		args = append(args, "--filter", fmt.Sprintf(". %s", opts.SourceFilter))
+	}
+	if opts.DestFilter != "" {
+		args = append(args, "--filter", fmt.Sprintf(". %s", opts.DestFilter))
+	}
+	
+	return args
 }
 
 // executeRsync runs the rsync command
@@ -761,6 +805,211 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 	return report, nil
 }
 
+// FileInfo represents information about a file
+type FileInfo struct {
+	RelativePath string
+	AbsolutePath string
+	Size         int64
+	ModTime      time.Time
+	IsDir        bool
+}
+
+// collectSyncInfoComprehensive performs comprehensive bi-directional analysis
+func (r *Runner) collectSyncInfoComprehensive(opts *Options) (*SyncReport, error) {
+	report := &SyncReport{
+		Source:      opts.Source,
+		Destination: opts.Dest,
+		Mode:        opts.Mode,
+		DryRun:      opts.DryRun,
+		Timestamp:   time.Now(),
+		Changes:     []SyncChange{},
+	}
+	
+	// Get file listings from both directories
+	sourceFiles, err := r.getFileList(opts.Source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list source files: %w", err)
+	}
+	
+	destFiles, err := r.getFileList(opts.Dest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list dest files: %w", err)
+	}
+	
+	// Create maps for efficient lookup
+	sourceMap := make(map[string]FileInfo)
+	for _, file := range sourceFiles {
+		sourceMap[file.RelativePath] = file
+	}
+	
+	destMap := make(map[string]FileInfo)
+	for _, file := range destFiles {
+		destMap[file.RelativePath] = file
+	}
+	
+	// Find all unique paths
+	allPaths := make(map[string]bool)
+	for path := range sourceMap {
+		allPaths[path] = true
+	}
+	for path := range destMap {
+		allPaths[path] = true
+	}
+	
+	// Analyze each path
+	for path := range allPaths {
+		sourceFile, inSource := sourceMap[path]
+		destFile, inDest := destMap[path]
+		
+		change := r.analyzeFileChange(path, sourceFile, destFile, inSource, inDest)
+		if change != nil {
+			report.Changes = append(report.Changes, *change)
+		}
+	}
+	
+	// Update statistics
+	for _, change := range report.Changes {
+		switch change.Action {
+		case "create":
+			if change.IsDir {
+				report.Stats.DirsCreated++
+			} else {
+				report.Stats.FilesCreated++
+				report.Stats.TotalSize += change.Size
+			}
+		case "update":
+			report.Stats.FilesUpdated++
+			report.Stats.TotalSize += change.Size
+		case "delete":
+			if change.IsDir {
+				report.Stats.DirsDeleted++
+			} else {
+				report.Stats.FilesDeleted++
+			}
+		}
+	}
+	
+	return report, nil
+}
+
+// getFileList recursively lists all files in a directory
+func (r *Runner) getFileList(dirPath string) ([]FileInfo, error) {
+	var files []FileInfo
+	
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		
+		// Skip the root directory itself
+		if path == dirPath {
+			return nil
+		}
+		
+		// Get relative path
+		relPath, err := filepath.Rel(dirPath, path)
+		if err != nil {
+			return err
+		}
+		
+		files = append(files, FileInfo{
+			RelativePath: filepath.ToSlash(relPath), // Use forward slashes for consistency
+			AbsolutePath: path,
+			Size:         info.Size(),
+			ModTime:      info.ModTime(),
+			IsDir:        info.IsDir(),
+		})
+		
+		return nil
+	})
+	
+	return files, err
+}
+
+// analyzeFileChange determines what type of change a file represents
+func (r *Runner) analyzeFileChange(path string, sourceFile, destFile FileInfo, inSource, inDest bool) *SyncChange {
+	if !inSource && !inDest {
+		return nil // Shouldn't happen
+	}
+	
+	change := &SyncChange{
+		Path: path,
+	}
+	
+	if inSource && !inDest {
+		// File only exists in source
+		if sourceFile.IsDir {
+			return nil // Skip directories
+		}
+		change.Action = "create"
+		change.Size = sourceFile.Size
+		change.ModTime = sourceFile.ModTime
+		change.IsDir = sourceFile.IsDir
+	} else if !inSource && inDest {
+		// File only exists in dest
+		if destFile.IsDir {
+			return nil // Skip directories
+		}
+		change.Action = "delete"
+		change.Size = destFile.Size
+		change.ModTime = destFile.ModTime
+		change.IsDir = destFile.IsDir
+	} else {
+		// File exists in both - check for differences
+		change.IsDir = sourceFile.IsDir
+		
+		if sourceFile.IsDir && destFile.IsDir {
+			// Both are directories - generally no action needed
+			return nil // Skip directories for now
+		} else if !sourceFile.IsDir && !destFile.IsDir {
+			// Both are files - compare content and timestamps
+			if r.filesAreIdentical(sourceFile.AbsolutePath, destFile.AbsolutePath) {
+				// Files are identical - no change needed
+				return nil
+			}
+			
+			// Files differ - determine if it's an update or conflict
+			sourceMod := sourceFile.ModTime
+			destMod := destFile.ModTime
+			
+			// Use source file info for the change
+			change.Size = sourceFile.Size
+			change.ModTime = sourceMod
+			
+			if sourceMod.After(destMod) {
+				change.Action = "update"
+			} else if destMod.After(sourceMod) {
+				// Dest is newer - potential conflict
+				change.Action = "conflict"
+			} else {
+				// Same modification time but different content - conflict
+				change.Action = "conflict"
+			}
+		} else {
+			// One is file, one is directory - conflict
+			change.Action = "conflict"
+			change.Size = sourceFile.Size
+			change.ModTime = sourceFile.ModTime
+		}
+	}
+	
+	return change
+}
+
+// filesAreIdentical checks if two files have identical content
+func (r *Runner) filesAreIdentical(path1, path2 string) bool {
+	// Read and compare file content
+	content1, err1 := os.ReadFile(path1)
+	content2, err2 := os.ReadFile(path2)
+	
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	
+	// Compare actual content
+	return string(content1) == string(content2)
+}
+
 // parseRsyncChange parses a line from rsync's itemize-changes output
 func (r *Runner) parseRsyncChange(line string) *SyncChange {
 	// Parse rsync output format: flags filename size timestamp
@@ -972,8 +1221,8 @@ func (r *Runner) formatSize(size int64) string {
 func (r *Runner) GeneratePlan(opts *Options) error {
 	r.logger.Infof("Generating sync plan: %s", opts.Plan)
 	
-	// Collect sync information using dry-run analysis
-	syncInfo, err := r.collectSyncInfo(opts)
+	// Collect sync information using comprehensive analysis
+	syncInfo, err := r.collectSyncInfoComprehensive(opts)
 	if err != nil {
 		return fmt.Errorf("failed to analyze sync operations: %w", err)
 	}
@@ -991,6 +1240,12 @@ func (r *Runner) GeneratePlan(opts *Options) error {
 	}
 	
 	r.logger.Infof("Plan file created successfully: %s", opts.Plan)
+	
+	// If interactive mode is enabled, open in editor
+	if opts.Interactive {
+		return r.openPlanInEditor(opts)
+	}
+	
 	return nil
 }
 
@@ -1015,6 +1270,11 @@ type PlanOperation struct {
 // ExecutePlan executes operations from a sync plan file
 func (r *Runner) ExecutePlan(opts *Options) error {
 	r.logger.Infof("Executing sync plan: %s", opts.ApplyPlan)
+	
+	// Validate plan file first
+	if err := r.validatePlanFile(opts.ApplyPlan); err != nil {
+		return err // This will include "invalid plan syntax" errors
+	}
 	
 	// Read and parse plan file
 	content, err := os.ReadFile(opts.ApplyPlan)
@@ -1150,8 +1410,8 @@ func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
 		srcPath = filepath.Join(opts.Dest, op.Path)
 		destPath = filepath.Join(opts.Source, op.Path)
 	case "<>", "bid", "bidirectional":
-		// TODO: Implement bidirectional sync or conflict resolution
-		return fmt.Errorf("bidirectional operations not yet implemented for path: %s", op.Path)
+		// Bidirectional sync - handle conflicts by using newest-wins strategy by default
+		return r.syncBidirectional(op, opts)
 	default:
 		return fmt.Errorf("unknown operation alias: %s", op.Alias)
 	}
@@ -1172,9 +1432,6 @@ func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool) error {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 	
-	// Build rsync command for single file/directory
-	args := []string{"-a"}  // Archive mode
-	
 	if isDir {
 		// For directories, ensure source ends with / and create dest directory
 		if !strings.HasSuffix(srcPath, "/") {
@@ -1185,6 +1442,13 @@ func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool) error {
 		}
 	}
 	
+	// Build rsync command using unified builder
+	cmdOpts := &RsyncCommandOptions{
+		UseChecksum: true, // Always use checksum for plan execution 
+		Source:      srcPath,
+		Dest:        destPath,
+	}
+	args := r.buildRsyncArgs(cmdOpts)
 	args = append(args, srcPath, destPath)
 	cmd := exec.Command("rsync", args...)
 	
@@ -1197,6 +1461,174 @@ func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool) error {
 	}
 	
 	return nil
+}
+
+// syncBidirectional performs bidirectional sync with conflict resolution
+func (r *Runner) syncBidirectional(op PlanOperation, opts *Options) error {
+	r.logger.Infof("Executing bidirectional sync: %s %s", op.Type, op.Path)
+	
+	srcPath := filepath.Join(opts.Source, op.Path)
+	destPath := filepath.Join(opts.Dest, op.Path)
+	
+	// Check if both files exist
+	srcInfo, srcErr := os.Stat(srcPath)
+	destInfo, destErr := os.Stat(destPath)
+	
+	if srcErr != nil && destErr != nil {
+		// Neither file exists - nothing to sync
+		r.logger.Warnf("Neither source nor destination file exists: %s", op.Path)
+		return nil
+	}
+	
+	if srcErr != nil && destErr == nil {
+		// Only destination exists - sync from dest to source
+		r.logger.Infof("File only exists in destination, syncing to source: %s", op.Path)
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+	}
+	
+	if srcErr == nil && destErr != nil {
+		// Only source exists - sync from source to dest
+		r.logger.Infof("File only exists in source, syncing to destination: %s", op.Path)
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+	}
+	
+	// Both files exist - need conflict resolution
+	return r.resolveConflict(op, srcPath, destPath, srcInfo, destInfo, opts)
+}
+
+// ConflictStrategy defines how to resolve bidirectional conflicts
+type ConflictStrategy string
+
+const (
+	NewestWins ConflictStrategy = "newest-wins"
+	LargestWins ConflictStrategy = "largest-wins"
+	SourceWins ConflictStrategy = "source-wins"
+	DestWins ConflictStrategy = "dest-wins"
+	Merge ConflictStrategy = "merge"
+	Backup ConflictStrategy = "backup"
+)
+
+// resolveConflict handles conflict resolution for bidirectional sync
+func (r *Runner) resolveConflict(op PlanOperation, srcPath, destPath string, srcInfo, destInfo os.FileInfo, opts *Options) error {
+	r.logger.Infof("Resolving conflict for: %s", op.Path)
+	
+	// Check if files are identical
+	if !srcInfo.IsDir() && !destInfo.IsDir() {
+		if r.filesAreIdentical(srcPath, destPath) {
+			r.logger.Infof("Files are identical, no sync needed: %s", op.Path)
+			return nil
+		}
+	}
+	
+	// Default strategy: newest-wins
+	strategy := r.getConflictStrategy(op, opts)
+	
+	switch strategy {
+	case NewestWins:
+		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+	case LargestWins:
+		return r.resolveLargestWins(srcPath, destPath, srcInfo, destInfo)
+	case SourceWins:
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+	case DestWins:
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+	case Backup:
+		return r.resolveWithBackup(srcPath, destPath, srcInfo, destInfo)
+	default:
+		// Default to newest-wins
+		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+	}
+}
+
+// getConflictStrategy determines the conflict resolution strategy from flags or defaults
+func (r *Runner) getConflictStrategy(op PlanOperation, opts *Options) ConflictStrategy {
+	// Check if strategy is specified in the operation flags
+	if strings.Contains(op.Flags, "auto:newest") {
+		return NewestWins
+	}
+	if strings.Contains(op.Flags, "auto:largest") {
+		return LargestWins
+	}
+	if strings.Contains(op.Flags, "auto:source") {
+		return SourceWins
+	}
+	if strings.Contains(op.Flags, "auto:dest") {
+		return DestWins
+	}
+	if strings.Contains(op.Flags, "auto:backup") {
+		return Backup
+	}
+	
+	// TODO: Check opts for global conflict strategy setting
+	// For now, default to newest-wins
+	return NewestWins
+}
+
+// resolveNewestWins syncs the newer file to the older location
+func (r *Runner) resolveNewestWins(srcPath, destPath string, srcInfo, destInfo os.FileInfo) error {
+	if srcInfo.ModTime().After(destInfo.ModTime()) {
+		r.logger.Infof("Source is newer, syncing to destination: %s", srcPath)
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+	} else if destInfo.ModTime().After(srcInfo.ModTime()) {
+		r.logger.Infof("Destination is newer, syncing to source: %s", destPath)
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+	} else {
+		// Same modification time - use size as tiebreaker
+		if srcInfo.Size() > destInfo.Size() {
+			r.logger.Infof("Same modification time, source is larger: %s", srcPath)
+			return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+		} else {
+			r.logger.Infof("Same modification time, destination is larger or same size: %s", destPath)
+			return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+		}
+	}
+}
+
+// resolveLargestWins syncs the larger file to the smaller location
+func (r *Runner) resolveLargestWins(srcPath, destPath string, srcInfo, destInfo os.FileInfo) error {
+	if srcInfo.Size() > destInfo.Size() {
+		r.logger.Infof("Source is larger, syncing to destination: %s", srcPath)
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+	} else if destInfo.Size() > srcInfo.Size() {
+		r.logger.Infof("Destination is larger, syncing to source: %s", destPath)
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+	} else {
+		// Same size - use modification time as tiebreaker
+		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+	}
+}
+
+// resolveWithBackup creates backup copies before syncing
+func (r *Runner) resolveWithBackup(srcPath, destPath string, srcInfo, destInfo os.FileInfo) error {
+	timestamp := time.Now().Unix()
+	
+	// Create backup of destination file
+	destBackup := fmt.Sprintf("%s.conflict-%d", destPath, timestamp)
+	r.logger.Infof("Creating backup of destination: %s", destBackup)
+	if err := r.copyFile(destPath, destBackup); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+	
+	// Sync using newest-wins strategy
+	return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+}
+
+// copyFile creates a copy of a file
+func (r *Runner) copyFile(src, dest string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+	
+	destFile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+	
+	_, err = io.Copy(destFile, sourceFile)
+	return err
 }
 
 // generatePlanContent creates the plan file content from sync analysis
@@ -1303,15 +1735,16 @@ func (r *Runner) filterChanges(changes []SyncChange, opts *Options) []SyncChange
 
 // determineOperation determines the visual alias operation for a change
 func (r *Runner) determineOperation(change SyncChange, mode string) string {
-	// For now, use simple logic based on Action
-	// TODO: Implement conflict detection when we add proper file analysis
+	// Determine visual alias based on action and sync mode
 	switch change.Action {
 	case "create":
 		return "<<" // New file from source to dest
 	case "update":
-		return "<<" // Update from source to dest
+		return "<<" // Update from source to dest (source newer)
 	case "delete":
-		return ">>" // Remove from dest (shown as dest-only)
+		return ">>" // File only in dest (shown as dest-only file)
+	case "conflict":
+		return "<>" // Bidirectional conflict indicator
 	default:
 		return "<<" // Default to source to dest
 	}
@@ -1332,9 +1765,11 @@ func (r *Runner) getChangeType(change SyncChange) string {
 	case "create":
 		return "new-in-source" // New file in source
 	case "update":
-		return "updates" // File updated
+		return "updates" // File updated (source newer)
 	case "delete":
 		return "new-in-dest" // File only in dest (will be deleted)
+	case "conflict":
+		return "conflicts" // Both modified or dest newer
 	default:
 		return "unchanged"
 	}
@@ -1342,7 +1777,19 @@ func (r *Runner) getChangeType(change SyncChange) string {
 
 // getChangeFlags generates the flag description for a change
 func (r *Runner) getChangeFlags(change SyncChange) string {
-	return fmt.Sprintf("[%s]", change.Action)
+	// Generate descriptive flags matching BDD expectations
+	switch change.Action {
+	case "create":
+		return "[new-in-source]"
+	case "update":
+		return "[update: newer-in-source]"
+	case "delete":
+		return "[new-in-dest]"
+	case "conflict":
+		return "[CONFLICT: both-modified]"
+	default:
+		return fmt.Sprintf("[%s]", change.Action)
+	}
 }
 
 // generateSummary creates the summary statistics
@@ -1368,4 +1815,116 @@ func (r *Runner) generateSummary(filteredChanges []SyncChange, totalChanges int)
 	}
 	
 	return summary.String()
+}
+
+// openPlanInEditor opens the generated plan file in the user's editor
+func (r *Runner) openPlanInEditor(opts *Options) error {
+	// Determine which editor to use
+	editor := opts.Editor // Check if custom editor was specified
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		// Try common editors
+		for _, e := range []string{"vim", "vi", "nano", "emacs", "code"} {
+			if _, err := exec.LookPath(e); err == nil {
+				editor = e
+				break
+			}
+		}
+	}
+	if editor == "" {
+		return fmt.Errorf("no editor found; please set EDITOR environment variable or use --editor flag")
+	}
+	
+	r.logger.Infof("Opening plan file in editor: %s", editor)
+	
+	// Get absolute path of plan file
+	absPlanPath, err := filepath.Abs(opts.Plan)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path of plan file: %w", err)
+	}
+	
+	// Open editor
+	cmd := exec.Command(editor, absPlanPath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to open editor: %w", err)
+	}
+	
+	// After editing, validate the plan
+	r.logger.Info("Validating edited plan file...")
+	if err := r.validatePlanFile(absPlanPath); err != nil {
+		r.logger.Warnf("Plan validation warning: %v", err)
+	}
+	
+	// Ask if user wants to execute the plan immediately
+	if !opts.DryRun && !opts.Yes {
+		if r.confirmPlanExecution(absPlanPath) {
+			// Execute the plan
+			opts.ApplyPlan = absPlanPath
+			return r.ExecutePlan(opts)
+		}
+	}
+	
+	return nil
+}
+
+// validatePlanFile performs basic validation on a plan file
+func (r *Runner) validatePlanFile(planPath string) error {
+	content, err := os.ReadFile(planPath)
+	if err != nil {
+		return fmt.Errorf("failed to read plan file: %w", err)
+	}
+	
+	if len(content) == 0 {
+		return fmt.Errorf("plan file is empty")
+	}
+	
+	// Parse plan to check for basic validity
+	planData, err := r.parsePlan(string(content))
+	if err != nil {
+		return fmt.Errorf("invalid plan syntax: %w", err)
+	}
+	
+	if len(planData.Operations) == 0 {
+		return fmt.Errorf("no operations found in plan")
+	}
+	
+	// Check for invalid aliases
+	validAliases := map[string]bool{
+		"<<": true, ">>": true, "<>": true,
+		"s2d": true, "sync-to-dest": true,
+		"d2s": true, "dest-to-source": true,
+		"bid": true, "bidirectional": true,
+		"skip": true,
+	}
+	
+	for _, op := range planData.Operations {
+		if !validAliases[op.Alias] {
+			return fmt.Errorf("invalid operation alias: %s", op.Alias)
+		}
+	}
+	
+	r.logger.Info("Plan file is valid")
+	return nil
+}
+
+// confirmPlanExecution prompts the user to confirm plan execution
+func (r *Runner) confirmPlanExecution(planPath string) bool {
+	fmt.Printf("\nDo you want to execute the plan now? [y/N]: ")
+	
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		return false
+	}
+	
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes"
 }

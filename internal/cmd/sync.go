@@ -56,6 +56,11 @@ var (
 	flagApplyPlan         string
 	flagIncludeChanges    []string
 	flagExcludeChanges    []string
+	flagEditor            string
+	// Conflict resolution flags
+	flagConflictStrategy  string
+	flagSkipConflicts     bool
+	flagGenerateConflictPlan string
 )
 
 func init() {
@@ -95,6 +100,12 @@ func init() {
 	syncCmd.Flags().StringVar(&flagApplyPlan, "apply-plan", "", "Execute operations from a sync plan file")
 	syncCmd.Flags().StringSliceVar(&flagIncludeChanges, "include-changes", []string{}, "Include only these change types: new-in-source, new-in-dest, updates, conflicts, deletions, unchanged")
 	syncCmd.Flags().StringSliceVar(&flagExcludeChanges, "exclude-changes", []string{}, "Exclude these change types: new-in-source, new-in-dest, updates, conflicts, deletions, unchanged")
+	syncCmd.Flags().StringVar(&flagEditor, "editor", "", "Editor to use for interactive plan editing (overrides EDITOR env var)")
+	
+	// Conflict resolution flags
+	syncCmd.Flags().StringVar(&flagConflictStrategy, "conflict-strategy", "", "Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup")
+	syncCmd.Flags().BoolVar(&flagSkipConflicts, "skip-conflicts", false, "Skip conflicting files during plan execution")
+	syncCmd.Flags().StringVar(&flagGenerateConflictPlan, "generate-conflict-plan", "", "Generate a separate plan file containing only conflicts")
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
@@ -194,6 +205,11 @@ func mergeOptionsWithConfig(cfg *config.Config) *rsync.Options {
 		ApplyPlan:           flagApplyPlan,
 		IncludeChanges:      flagIncludeChanges,
 		ExcludeChanges:      flagExcludeChanges,
+		Editor:              flagEditor,
+		// Conflict resolution fields
+		ConflictStrategy:    flagConflictStrategy,
+		SkipConflicts:       flagSkipConflicts,
+		GenerateConflictPlan: flagGenerateConflictPlan,
 	}
 
 	// Merge with config values (config provides defaults)

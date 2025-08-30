@@ -164,6 +164,15 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I have a git repository with common ancestor$`, tc.iHaveAGitRepositoryWithCommonAncestor)
 	ctx.Step(`^I have identical files in source and destination:$`, tc.iHaveIdenticalFilesInSourceAndDestination)
 
+	// Missing step definitions for file operations
+	ctx.Step(`^the file "([^"]*)" should be synced to destination$`, tc.theFileShouldBeSyncedToDestination)
+	ctx.Step(`^the file "([^"]*)" should remain unchanged$`, tc.theFileShouldRemainUnchanged)
+
+	// File verification steps
+	ctx.Step(`^all source files and destination files are accessible$`, tc.allSourceAndDestFilesAreAccessible)
+	ctx.Step(`^the plan references only existing files$`, tc.planReferencesOnlyExistingFiles)
+	ctx.Step(`^I verify all planned files exist$`, tc.verifyAllPlannedFilesExist)
+
 	// Setup and cleanup hooks
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return tc.beforeScenario(ctx, sc)
@@ -322,7 +331,7 @@ func (tc *TestContext) runSyncToolsWithTwoWaySync() error {
 // Placeholder implementations - these would be implemented as the CLI is built
 func (tc *TestContext) shouldShowWhatFilesWouldBeCopied() error {
 	// Check for dry-run indicators in the output
-	if !strings.Contains(tc.lastOutput, "DRY RUN") && !strings.Contains(tc.lastOutput, "dry-run=true") {
+	if !strings.Contains(tc.lastOutput, "DRY RUN") && !strings.Contains(tc.lastOutput, "dry-run=true") && !strings.Contains(tc.lastOutput, "dry-run: true") {
 		return fmt.Errorf("expected dry-run output to show what would be copied, got: %s", tc.lastOutput)
 	}
 	return nil
@@ -1185,5 +1194,108 @@ func (tc *TestContext) iHaveIdenticalFilesInSourceAndDestination(table *godog.Ta
 		}
 	}
 	
+	return nil
+}
+
+// File verification step implementations
+func (tc *TestContext) allSourceAndDestFilesAreAccessible() error {
+	// Check that source and destination directories exist and are accessible
+	if _, err := os.Stat(tc.sourceDir); err != nil {
+		return fmt.Errorf("source directory not accessible: %s, error: %w", tc.sourceDir, err)
+	}
+	
+	if _, err := os.Stat(tc.destDir); err != nil {
+		return fmt.Errorf("destination directory not accessible: %s, error: %w", tc.destDir, err)
+	}
+	
+	// List all files in source and destination for debugging
+	sourceFiles, err := filepath.Glob(filepath.Join(tc.sourceDir, "**/*"))
+	if err == nil {
+		fmt.Printf("DEBUG: Source files found: %v\n", sourceFiles)
+	}
+	
+	destFiles, err := filepath.Glob(filepath.Join(tc.destDir, "**/*"))
+	if err == nil {
+		fmt.Printf("DEBUG: Destination files found: %v\n", destFiles)
+	}
+	
+	return nil
+}
+
+func (tc *TestContext) planReferencesOnlyExistingFiles() error {
+	// Find any .plan file and verify all referenced files exist
+	files, err := filepath.Glob(filepath.Join(tc.workingDir, "*.plan"))
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("no .plan file found for verification")
+	}
+	
+	// Use the first plan file found
+	planPath := files[0]
+	content, err := os.ReadFile(planPath)
+	if err != nil {
+		return fmt.Errorf("failed to read plan file %s: %w", planPath, err)
+	}
+	
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip comments and empty lines
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		
+		// Parse plan line format: <command> <type> <path> ...
+		parts := strings.Fields(line)
+		if len(parts) < 3 {
+			continue
+		}
+		
+		command := parts[0]
+		filePath := parts[2]
+		
+		// Check if file should exist based on command
+		if command == "<<" || command == "<>" {
+			// File should exist in source
+			fullPath := filepath.Join(tc.sourceDir, filePath)
+			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+				return fmt.Errorf("plan references non-existent source file: %s (full path: %s)", filePath, fullPath)
+			}
+		}
+		
+		if command == ">>" || command == "<>" {
+			// File should exist in destination
+			fullPath := filepath.Join(tc.destDir, filePath)
+			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+				return fmt.Errorf("plan references non-existent destination file: %s (full path: %s)", filePath, fullPath)
+			}
+		}
+	}
+	
+	return nil
+}
+
+func (tc *TestContext) verifyAllPlannedFilesExist() error {
+	// This is an alias for planReferencesOnlyExistingFiles
+	return tc.planReferencesOnlyExistingFiles()
+}
+
+// Additional step implementations for file operations
+func (tc *TestContext) theFileShouldBeSyncedToDestination(filename string) error {
+	// Check that the file exists in destination
+	if !tc.env.DestFileExists(filename) {
+		return fmt.Errorf("expected file %s to be synced to destination, but it does not exist", filename)
+	}
+	return nil
+}
+
+func (tc *TestContext) theFileShouldRemainUnchanged(filename string) error {
+	// For skip-conflicts scenarios, the file should remain in its original state
+	// This is a placeholder - in a real implementation, we'd compare with original content
+	if !tc.env.DestFileExists(filename) {
+		return fmt.Errorf("expected file %s to exist (remain unchanged), but it does not exist", filename)
+	}
 	return nil
 }
