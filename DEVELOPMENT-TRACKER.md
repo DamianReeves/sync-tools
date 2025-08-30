@@ -1,7 +1,7 @@
 # sync-tools Development Tracker
 
 **Last Updated**: 2025-08-29  
-**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete with Preview and Apply Support
+**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete, Markdown Report Generation Implemented
 
 ## TASKS
 
@@ -9,9 +9,9 @@
 *No active tasks - ready for next development cycle*
 
 ### Pending
-- **Report Generation Implementation** [Priority: P2 - Medium]
-  - Implement markdown report generation for sync operations
-  - Add structured output formats (JSON, YAML)
+- **Structured Output Formats** [Priority: P2 - Medium]
+  - Add JSON report format for programmatic parsing
+  - Add YAML report format for configuration workflows
   - Enable audit trail capabilities for compliance scenarios
 
 - **Two-Way Sync Enhancement** [Priority: P2 - Medium] 
@@ -42,6 +42,58 @@
   - Validate rsync integration on Windows
 
 ## Changelog
+
+### 2025-08-29: Sync From Subcommand and Markdown Report Generation Complete
+
+**Completed Work**:
+- ✅ **Sync From Subcommand** [Priority: P2 - Medium]
+  - Added `sync from SOURCE_DIR` convenience subcommand for syncing to current directory
+  - Automatically uses current working directory as destination
+  - Inherits all relevant flags from main sync command (filters, reports, preview, etc.)
+  - Prevents syncing directory to itself with validation
+  - Includes comprehensive BDD test scenarios for all use cases
+  - Simplifies common workflow of syncing into current working directory
+
+**Key Features**:
+- Quick syntax: `sync-tools sync from ~/backup` instead of `sync-tools sync --source ~/backup --dest .`
+- All filtering options available: --only, --ignore-src, --exclude-hidden-dirs, etc.
+- Full reporting support: markdown reports, patch generation, preview mode
+- Error handling for non-existent sources and self-sync attempts
+- Comprehensive help documentation with usage examples
+
+**Usage Examples**:
+```bash
+sync-tools sync from ~/projects/myapp            # Basic sync to current dir
+sync-tools sync from ~/data --dry-run           # Preview changes
+sync-tools sync from ~/source --report sync.md  # Generate markdown report
+sync-tools sync from ~/docs --only "*.md"       # Filter specific files
+sync-tools sync from ~/backup --preview         # Show colored diff
+```
+
+### 2025-08-29: Markdown Report Generation Complete
+**Completed Work**:
+- ✅ **Markdown Report Generation** [Priority: P2 - Medium]
+  - Added comprehensive markdown report generation for sync operations
+  - Implemented automatic format detection based on file extension (.md, .markdown)
+  - Created detailed report sections: Configuration, Summary Statistics, and Changes
+  - Categorized changes into Creates, Updates, and Deletes with visual indicators
+  - Added human-readable file size formatting and timestamps
+  - Integrated with existing dry-run and actual sync workflows
+  - Created BDD test scenarios for report generation validation
+
+**Key Features**:
+- Automatic markdown report generation with --report flag and .md/.markdown extension
+- Detailed sync statistics including file counts, directory operations, and total size
+- Visual categorization of changes with emoji indicators (📄 for files, 📁 for directories, 🔄 for updates, ❌ for deletes)
+- Report generation works in both dry-run and actual sync modes
+- When not in dry-run, performs actual sync after generating the report
+
+**Technical Implementation**:
+- Added SyncChange and SyncReport structs for structured data collection
+- Implemented collectSyncInfo method using rsync's --itemize-changes format
+- Created parseRsyncChange for interpreting rsync's output format
+- Added writeMarkdownReport for formatted markdown generation
+- Integrated with existing sync workflow in rsync.go
 
 ### 2025-08-29: Git Patch Generation Feature Complete with Preview and Apply Support
 **Completed Work**:

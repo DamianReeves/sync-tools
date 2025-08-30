@@ -46,3 +46,11 @@ test/bdd/test_dst/
 test/bdd/*.patch
 test/bdd/*.diff
 **/sync_test_*
+
+# Test artifacts that should be in temp directories
+/test-*/
+/test*.txt
+/test*.plan
+/*.plan
+/test_source/
+/test_dest/

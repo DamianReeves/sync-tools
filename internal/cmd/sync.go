@@ -51,6 +51,21 @@ var (
 	flagApplyPatch        bool
 	flagYes               bool
 	flagPreview           bool
+	// Interactive sync plan flags
+	flagPlan              string
+	flagApplyPlan         string
+	flagIncludeChanges    []string
+	flagExcludeChanges    []string
+	flagEditor            string
+	// Conflict resolution flags
+	flagConflictStrategy  string
+	flagSkipConflicts     bool
+	flagGenerateConflictPlan string
+	// Merge tool flags
+	flagInteractiveMerge  bool
+	flagMergeTool         string
+	flagMergeTimeout      int
+	flagUseGitBase        bool
 )
 
 func init() {
@@ -84,6 +99,24 @@ func init() {
 	syncCmd.Flags().BoolVar(&flagApplyPatch, "apply-patch", false, "Apply the generated patch after creation (with confirmation)")
 	syncCmd.Flags().BoolVarP(&flagYes, "yes", "y", false, "Automatically confirm patch application (skip confirmation prompt)")
 	syncCmd.Flags().BoolVar(&flagPreview, "preview", false, "Show a colored diff preview of changes (with paging)")
+
+	// Interactive sync plan flags
+	syncCmd.Flags().StringVar(&flagPlan, "plan", "", "Generate a sync plan file instead of executing")
+	syncCmd.Flags().StringVar(&flagApplyPlan, "apply-plan", "", "Execute operations from a sync plan file")
+	syncCmd.Flags().StringSliceVar(&flagIncludeChanges, "include-changes", []string{}, "Include only these change types: new-in-source, new-in-dest, updates, conflicts, deletions, unchanged")
+	syncCmd.Flags().StringSliceVar(&flagExcludeChanges, "exclude-changes", []string{}, "Exclude these change types: new-in-source, new-in-dest, updates, conflicts, deletions, unchanged")
+	syncCmd.Flags().StringVar(&flagEditor, "editor", "", "Editor to use for interactive plan editing (overrides EDITOR env var)")
+	
+	// Conflict resolution flags
+	syncCmd.Flags().StringVar(&flagConflictStrategy, "conflict-strategy", "", "Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup")
+	syncCmd.Flags().BoolVar(&flagSkipConflicts, "skip-conflicts", false, "Skip conflicting files during plan execution")
+	syncCmd.Flags().StringVar(&flagGenerateConflictPlan, "generate-conflict-plan", "", "Generate a separate plan file containing only conflicts")
+	
+	// Merge tool flags
+	syncCmd.Flags().BoolVar(&flagInteractiveMerge, "interactive-merge", false, "Enable interactive merge tool for conflict resolution")
+	syncCmd.Flags().StringVar(&flagMergeTool, "merge-tool", "", "Specify merge tool to use (overrides EDITOR env var)")
+	syncCmd.Flags().IntVar(&flagMergeTimeout, "merge-timeout", 300, "Timeout in seconds for merge tool operations")
+	syncCmd.Flags().BoolVar(&flagUseGitBase, "use-git-base", false, "Use git base commit for three-way merge")
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
@@ -108,28 +141,42 @@ func runSync(cmd *cobra.Command, args []string) error {
 	logger.Debugf("CLI options after merge: source=%s dest=%s mode=%s dry-run=%v", 
 		opts.Source, opts.Dest, opts.Mode, opts.DryRun)
 
-	// Validate required options
-	if opts.Source == "" || opts.Dest == "" {
+	// Validate required options (unless we're applying a plan file)
+	if opts.ApplyPlan == "" && (opts.Source == "" || opts.Dest == "") {
 		return fmt.Errorf("source and dest must be provided either via CLI or config file")
 	}
 
-	// Resolve paths
-	sourcePath, err := filepath.Abs(opts.Source)
-	if err != nil {
-		return fmt.Errorf("error resolving source path: %w", err)
+	// Resolve paths (if provided)
+	if opts.Source != "" {
+		sourcePath, err := filepath.Abs(opts.Source)
+		if err != nil {
+			return fmt.Errorf("error resolving source path: %w", err)
+		}
+		opts.Source = sourcePath
 	}
 
-	destPath, err := filepath.Abs(opts.Dest)
-	if err != nil {
-		return fmt.Errorf("error resolving dest path: %w", err)
+	if opts.Dest != "" {
+		destPath, err := filepath.Abs(opts.Dest)
+		if err != nil {
+			return fmt.Errorf("error resolving dest path: %w", err)
+		}
+		opts.Dest = destPath
 	}
 
-	opts.Source = sourcePath
-	opts.Dest = destPath
+	// Check if source exists (unless we're applying a plan file)
+	if opts.ApplyPlan == "" && opts.Source != "" {
+		if _, err := os.Stat(opts.Source); os.IsNotExist(err) {
+			return fmt.Errorf("source directory does not exist: %s", opts.Source)
+		}
+	}
 
-	// Check if source exists
-	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-		return fmt.Errorf("source directory does not exist: %s", sourcePath)
+	// Handle plan operations
+	if opts.Plan != "" {
+		return runPlanGeneration(opts, logger)
+	}
+	
+	if opts.ApplyPlan != "" {
+		return runPlanExecution(opts, logger)
 	}
 
 	// Check if using interactive mode
@@ -164,6 +211,16 @@ func mergeOptionsWithConfig(cfg *config.Config) *rsync.Options {
 		ApplyPatch:          flagApplyPatch,
 		Yes:                 flagYes,
 		Preview:             flagPreview,
+		// Interactive sync plan fields
+		Plan:                flagPlan,
+		ApplyPlan:           flagApplyPlan,
+		IncludeChanges:      flagIncludeChanges,
+		ExcludeChanges:      flagExcludeChanges,
+		Editor:              flagEditor,
+		// Conflict resolution fields
+		ConflictStrategy:    flagConflictStrategy,
+		SkipConflicts:       flagSkipConflicts,
+		GenerateConflictPlan: flagGenerateConflictPlan,
 	}
 
 	// Merge with config values (config provides defaults)
@@ -224,4 +281,20 @@ func runTraditionalSync(opts *rsync.Options, logger logging.Logger) error {
 
 	// Execute sync
 	return runner.Sync(opts)
+}
+
+func runPlanGeneration(opts *rsync.Options, logger logging.Logger) error {
+	// Create rsync runner
+	runner := rsync.NewRunner(logger)
+
+	// Generate plan file
+	return runner.GeneratePlan(opts)
+}
+
+func runPlanExecution(opts *rsync.Options, logger logging.Logger) error {
+	// Create rsync runner
+	runner := rsync.NewRunner(logger)
+
+	// Execute plan file
+	return runner.ExecutePlan(opts)
 }
