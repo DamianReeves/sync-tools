@@ -721,8 +721,16 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 			continue
 		}
 		
-		// Parse itemize-changes format
-		if len(line) > 11 && line[0] != ' ' {
+		// Skip rsync header and summary lines
+		if strings.HasPrefix(line, "sending incremental") ||
+			strings.HasPrefix(line, "sent ") ||
+			strings.HasPrefix(line, "total size") ||
+			strings.HasPrefix(line, "bytes/sec") {
+			continue
+		}
+		
+		// Parse itemize-changes format - lines starting with *, >, <, c, etc.
+		if r.isItemizedChange(line) {
 			change := r.parseRsyncChange(line)
 			if change != nil {
 				report.Changes = append(report.Changes, *change)
@@ -755,74 +763,91 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 
 // parseRsyncChange parses a line from rsync's itemize-changes output
 func (r *Runner) parseRsyncChange(line string) *SyncChange {
-	// Itemize format: YXcstpoguax
-	// Y: type of update
-	// X: file type
-	// c: checksum differs
-	// s: size differs
-	// t: mod time differs
-	// etc.
+	// Parse rsync output format: flags filename size timestamp
+	// Examples:
+	// >f+++++++++ main.js  18 2025/08/30 01:11:42
+	// *deleting   config.yml  0 2025/08/30 01:11:42
+	// cd+++++++++ dir/
 	
-	if len(line) < 11 {
+	parts := strings.Fields(line)
+	if len(parts) < 4 { // Need at least flags, filename, size, timestamp
 		return nil
 	}
 	
-	flags := line[:11]
-	rest := strings.TrimSpace(line[11:])
+	flags := parts[0]
+	filename := parts[1]
+	size := parts[2]
+	// Join remaining parts for timestamp (could be date and time)
+	timestamp := strings.Join(parts[3:], " ")
 	
-	if rest == "" {
-		return nil
+	// Parse the flags to determine action and type
+	change := &SyncChange{
+		Path:   filename,
+		ModTime: r.parseTimestamp(timestamp),
+		Size:    r.parseSize(size),
 	}
 	
-	// Parse the flags
-	change := &SyncChange{}
-	
-	// Determine action based on flags
-	if flags[0] == '>' || flags[0] == '<' {
+	// Determine action and type based on flags
+	if strings.HasPrefix(flags, "*deleting") {
+		change.Action = "delete"
+		// Check if it's a directory by file extension or other heuristics
+		change.IsDir = !strings.Contains(filename, ".")
+	} else if len(flags) >= 2 {
+		// Regular itemize format: YXcstpoguax
 		if flags[1] == 'f' {
-			if flags[2] == '+' {
+			change.IsDir = false
+			if strings.Contains(flags, "+") {
 				change.Action = "create"
 			} else {
 				change.Action = "update"
 			}
 		} else if flags[1] == 'd' {
 			change.IsDir = true
-			if flags[2] == '+' {
+			if strings.Contains(flags, "+") {
 				change.Action = "create"
 			} else {
 				change.Action = "update"
 			}
 		}
-	} else if flags[0] == '*' {
-		if flags[1] == 'd' {
-			change.Action = "delete"
-			change.IsDir = true
-		} else {
-			change.Action = "delete"
-		}
-	}
-	
-	// Extract path from the rest of the line
-	parts := strings.Fields(rest)
-	if len(parts) > 0 {
-		change.Path = parts[0]
-	}
-	
-	// Try to extract size if available
-	if len(parts) > 3 {
-		if size, err := strconv.ParseInt(parts[3], 10, 64); err == nil {
-			change.Size = size
-		}
-	}
-	
-	// Try to extract modification time if available
-	if len(parts) > 4 {
-		if modTime, err := time.Parse("2006/01/02-15:04:05", parts[4]); err == nil {
-			change.ModTime = modTime
-		}
+	} else {
+		// Fallback - assume file update
+		change.IsDir = false
+		change.Action = "update"
 	}
 	
 	return change
+}
+
+// isItemizedChange checks if a line looks like an itemized change from rsync
+func (r *Runner) isItemizedChange(line string) bool {
+	// Itemized changes start with specific characters
+	// Examples: >f+++++++++, *deleting, cd+++++++++, .f...t.....
+	if len(line) < 3 {
+		return false
+	}
+	
+	// Check for common itemized change patterns
+	firstChar := line[0]
+	return firstChar == '>' || firstChar == '<' || firstChar == '*' || 
+		   firstChar == 'c' || firstChar == '.' || 
+		   strings.HasPrefix(line, "*deleting")
+}
+
+// parseTimestamp converts rsync timestamp to time.Time
+func (r *Runner) parseTimestamp(timestamp string) time.Time {
+	// Format: "2025/08/30 01:11:42"
+	if t, err := time.Parse("2006/01/02 15:04:05", timestamp); err == nil {
+		return t
+	}
+	return time.Time{}
+}
+
+// parseSize converts size string to int64
+func (r *Runner) parseSize(sizeStr string) int64 {
+	if size, err := strconv.ParseInt(sizeStr, 10, 64); err == nil {
+		return size
+	}
+	return 0
 }
 
 // writeMarkdownReport writes the sync report in markdown format
