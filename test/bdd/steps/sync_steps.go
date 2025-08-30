@@ -495,7 +495,13 @@ func (tc *TestContext) runSyncToolsWithPatchGenerationAndOnly(patchFile, onlyPat
 }
 
 func (tc *TestContext) gitPatchFileShouldBeCreated(patchFile string) error {
-	// Check in current working directory first
+	// Check in the working directory where the command was run
+	workingDirPatch := filepath.Join(tc.workingDir, patchFile)
+	if _, err := os.Stat(workingDirPatch); err == nil {
+		return nil
+	}
+	
+	// Check in current directory as fallback
 	if _, err := os.Stat(patchFile); err == nil {
 		return nil
 	}
@@ -521,7 +527,7 @@ func (tc *TestContext) gitPatchFileShouldBeCreated(patchFile string) error {
 		}
 	}
 	
-	return fmt.Errorf("expected patch file %s to exist, but it doesn't (checked: %s, %s)", patchFile, patchFile, rootPatch)
+	return fmt.Errorf("expected patch file %s to exist, but it doesn't (checked: %s, %s, %s)", patchFile, workingDirPatch, patchFile, rootPatch)
 }
 
 func (tc *TestContext) patchFileShouldContainDifferences() error {
