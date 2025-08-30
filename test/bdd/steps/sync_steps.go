@@ -811,7 +811,16 @@ func (tc *TestContext) createDestinationDirectoryWithTable(table *godog.Table) e
 
 func (tc *TestContext) runSyncToolsWithArguments(args string) error {
 	// Use Test Environment for command execution with path replacement
-	return tc.env.ExecuteRawCommand(args)
+	err := tc.env.ExecuteRawCommand(args)
+	
+	// Update lastOutput from the test environment's last result
+	if tc.env.LastResult != nil {
+		tc.lastOutput = tc.env.LastResult.Output
+		tc.lastError = tc.env.LastResult.Error
+		tc.lastExitCode = tc.env.LastResult.ExitCode
+	}
+	
+	return err
 }
 
 func (tc *TestContext) commandShouldSucceed() error {

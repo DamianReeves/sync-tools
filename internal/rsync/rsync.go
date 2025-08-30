@@ -1269,7 +1269,12 @@ type PlanOperation struct {
 
 // ExecutePlan executes operations from a sync plan file
 func (r *Runner) ExecutePlan(opts *Options) error {
-	r.logger.Infof("Executing sync plan: %s", opts.ApplyPlan)
+	if opts.DryRun {
+		r.logger.Infof("[DRY RUN] Executing sync plan: %s", opts.ApplyPlan)
+		fmt.Println("DRY RUN MODE - No files will be modified")
+	} else {
+		r.logger.Infof("Executing sync plan: %s", opts.ApplyPlan)
+	}
 	
 	// Validate plan file first
 	if err := r.validatePlanFile(opts.ApplyPlan); err != nil {
@@ -1322,7 +1327,12 @@ func (r *Runner) ExecutePlan(opts *Options) error {
 		}
 	}
 	
-	r.logger.Infof("Plan execution completed successfully: %d operations", len(planData.Operations))
+	if opts.DryRun {
+		r.logger.Infof("[DRY RUN] Plan execution completed successfully: %d operations would be executed", len(planData.Operations))
+		fmt.Printf("DRY RUN COMPLETE - %d operations would be executed. No files were modified.\n", len(planData.Operations))
+	} else {
+		r.logger.Infof("Plan execution completed successfully: %d operations", len(planData.Operations))
+	}
 	return nil
 }
 
@@ -1396,7 +1406,11 @@ func (r *Runner) parsePlan(content string) (*PlanData, error) {
 
 // executePlanOperation executes a single plan operation
 func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
-	r.logger.Infof("Executing: %s %s %s", op.Alias, op.Type, op.Path)
+	if opts.DryRun {
+		r.logger.Infof("[DRY RUN] Would execute: %s %s %s", op.Alias, op.Type, op.Path)
+	} else {
+		r.logger.Infof("Executing: %s %s %s", op.Alias, op.Type, op.Path)
+	}
 	
 	// Determine sync direction based on alias
 	var srcPath, destPath string
@@ -1417,7 +1431,7 @@ func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
 	}
 	
 	// Execute the file operation using rsync or file operations
-	if err := r.syncSingleFile(srcPath, destPath, op.Type == "dir"); err != nil {
+	if err := r.syncSingleFile(srcPath, destPath, op.Type == "dir", opts.DryRun); err != nil {
 		return fmt.Errorf("failed to sync %s: %w", op.Path, err)
 	}
 	
@@ -1425,7 +1439,13 @@ func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
 }
 
 // syncSingleFile syncs a single file or directory using rsync
-func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool) error {
+func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool, dryRun bool) error {
+	if dryRun {
+		// In dry-run mode, just log what would be done
+		r.logger.Infof("[DRY RUN] Would sync: %s -> %s", srcPath, destPath)
+		return nil
+	}
+	
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
@@ -1465,6 +1485,11 @@ func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool) error {
 
 // syncBidirectional performs bidirectional sync with conflict resolution
 func (r *Runner) syncBidirectional(op PlanOperation, opts *Options) error {
+	if opts.DryRun {
+		r.logger.Infof("[DRY RUN] Would execute bidirectional sync: %s %s", op.Type, op.Path)
+		return nil
+	}
+	
 	r.logger.Infof("Executing bidirectional sync: %s %s", op.Type, op.Path)
 	
 	srcPath := filepath.Join(opts.Source, op.Path)
@@ -1483,13 +1508,13 @@ func (r *Runner) syncBidirectional(op PlanOperation, opts *Options) error {
 	if srcErr != nil && destErr == nil {
 		// Only destination exists - sync from dest to source
 		r.logger.Infof("File only exists in destination, syncing to source: %s", op.Path)
-		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir(), opts.DryRun)
 	}
 	
 	if srcErr == nil && destErr != nil {
 		// Only source exists - sync from source to dest
 		r.logger.Infof("File only exists in source, syncing to destination: %s", op.Path)
-		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir(), opts.DryRun)
 	}
 	
 	// Both files exist - need conflict resolution
@@ -1525,18 +1550,18 @@ func (r *Runner) resolveConflict(op PlanOperation, srcPath, destPath string, src
 	
 	switch strategy {
 	case NewestWins:
-		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo, opts)
 	case LargestWins:
-		return r.resolveLargestWins(srcPath, destPath, srcInfo, destInfo)
+		return r.resolveLargestWins(srcPath, destPath, srcInfo, destInfo, opts)
 	case SourceWins:
-		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir(), opts.DryRun)
 	case DestWins:
-		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir(), opts.DryRun)
 	case Backup:
-		return r.resolveWithBackup(srcPath, destPath, srcInfo, destInfo)
+		return r.resolveWithBackup(srcPath, destPath, srcInfo, destInfo, opts)
 	default:
 		// Default to newest-wins
-		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo, opts)
 	}
 }
 
@@ -1565,41 +1590,41 @@ func (r *Runner) getConflictStrategy(op PlanOperation, opts *Options) ConflictSt
 }
 
 // resolveNewestWins syncs the newer file to the older location
-func (r *Runner) resolveNewestWins(srcPath, destPath string, srcInfo, destInfo os.FileInfo) error {
+func (r *Runner) resolveNewestWins(srcPath, destPath string, srcInfo, destInfo os.FileInfo, opts *Options) error {
 	if srcInfo.ModTime().After(destInfo.ModTime()) {
 		r.logger.Infof("Source is newer, syncing to destination: %s", srcPath)
-		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir(), opts.DryRun)
 	} else if destInfo.ModTime().After(srcInfo.ModTime()) {
 		r.logger.Infof("Destination is newer, syncing to source: %s", destPath)
-		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir(), opts.DryRun)
 	} else {
 		// Same modification time - use size as tiebreaker
 		if srcInfo.Size() > destInfo.Size() {
 			r.logger.Infof("Same modification time, source is larger: %s", srcPath)
-			return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+			return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir(), opts.DryRun)
 		} else {
 			r.logger.Infof("Same modification time, destination is larger or same size: %s", destPath)
-			return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+			return r.syncSingleFile(destPath, srcPath, destInfo.IsDir(), opts.DryRun)
 		}
 	}
 }
 
 // resolveLargestWins syncs the larger file to the smaller location
-func (r *Runner) resolveLargestWins(srcPath, destPath string, srcInfo, destInfo os.FileInfo) error {
+func (r *Runner) resolveLargestWins(srcPath, destPath string, srcInfo, destInfo os.FileInfo, opts *Options) error {
 	if srcInfo.Size() > destInfo.Size() {
 		r.logger.Infof("Source is larger, syncing to destination: %s", srcPath)
-		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir())
+		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir(), opts.DryRun)
 	} else if destInfo.Size() > srcInfo.Size() {
 		r.logger.Infof("Destination is larger, syncing to source: %s", destPath)
-		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir())
+		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir(), opts.DryRun)
 	} else {
 		// Same size - use modification time as tiebreaker
-		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo, opts)
 	}
 }
 
 // resolveWithBackup creates backup copies before syncing
-func (r *Runner) resolveWithBackup(srcPath, destPath string, srcInfo, destInfo os.FileInfo) error {
+func (r *Runner) resolveWithBackup(srcPath, destPath string, srcInfo, destInfo os.FileInfo, opts *Options) error {
 	timestamp := time.Now().Unix()
 	
 	// Create backup of destination file
@@ -1610,7 +1635,7 @@ func (r *Runner) resolveWithBackup(srcPath, destPath string, srcInfo, destInfo o
 	}
 	
 	// Sync using newest-wins strategy
-	return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo)
+	return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo, opts)
 }
 
 // copyFile creates a copy of a file
