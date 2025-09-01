@@ -96,7 +96,7 @@ func runSyncFrom(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	configPath, _ := cmd.Flags().GetString("config")
 	verbosity, _ := cmd.Flags().GetCount("verbose")
-	
+
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)
@@ -104,7 +104,7 @@ func runSyncFrom(cmd *cobra.Command, args []string) error {
 
 	// Get the source directory (we know there's exactly one from Args validation)
 	sourceArg := args[0]
-	
+
 	// Resolve source path
 	sourcePath, err := filepath.Abs(sourceArg)
 	if err != nil {
@@ -123,25 +123,25 @@ func runSyncFrom(cmd *cobra.Command, args []string) error {
 
 	// Build options
 	opts := &rsync.Options{
-		Source:              sourcePath,
-		Dest:                currentDir,
-		Mode:                fromFlagMode,
-		DryRun:              fromFlagDryRun,
-		UseSourceGitignore:  fromFlagUseSourceGitignore,
-		ExcludeHiddenDirs:   fromFlagExcludeHiddenDirs,
-		OnlySyncignore:      fromFlagOnlySyncignore,
-		IgnoreSrc:           fromFlagIgnoreSrc,
-		Only:                fromFlagOnly,
-		LogLevel:            fromFlagLogLevel,
-		LogFile:             fromFlagLogFile,
-		LogFormat:           fromFlagLogFormat,
-		DumpCommands:        fromFlagDumpCommands,
-		Report:              fromFlagReport,
-		ListFiltered:        fromFlagListFiltered,
-		Patch:               fromFlagPatch,
-		ApplyPatch:          fromFlagApplyPatch,
-		Yes:                 fromFlagYes,
-		Preview:             fromFlagPreview,
+		Source:             sourcePath,
+		Dest:               currentDir,
+		Mode:               fromFlagMode,
+		DryRun:             fromFlagDryRun,
+		UseSourceGitignore: fromFlagUseSourceGitignore,
+		ExcludeHiddenDirs:  fromFlagExcludeHiddenDirs,
+		OnlySyncignore:     fromFlagOnlySyncignore,
+		IgnoreSrc:          fromFlagIgnoreSrc,
+		Only:               fromFlagOnly,
+		LogLevel:           fromFlagLogLevel,
+		LogFile:            fromFlagLogFile,
+		LogFormat:          fromFlagLogFormat,
+		DumpCommands:       fromFlagDumpCommands,
+		Report:             fromFlagReport,
+		ListFiltered:       fromFlagListFiltered,
+		Patch:              fromFlagPatch,
+		ApplyPatch:         fromFlagApplyPatch,
+		Yes:                fromFlagYes,
+		Preview:            fromFlagPreview,
 	}
 
 	// Merge with config values (config provides defaults)
@@ -176,7 +176,7 @@ func runSyncFrom(cmd *cobra.Command, args []string) error {
 	}
 
 	// Log the operation
-	logger.Infof("Syncing from: %s -> %s (current directory)", 
+	logger.Infof("Syncing from: %s -> %s (current directory)",
 		sourcePath, currentDir)
 
 	// Create rsync runner and execute sync

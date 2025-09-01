@@ -22,34 +22,34 @@ type InstructionType string
 
 const (
 	// Core sync instructions
-	InstSync        InstructionType = "SYNC"        // SYNC source dest [OPTIONS]
-	InstExclude     InstructionType = "EXCLUDE"     // EXCLUDE pattern
-	InstInclude     InstructionType = "INCLUDE"     // INCLUDE pattern (unignore)
-	InstOnly        InstructionType = "ONLY"        // ONLY pattern (whitelist mode)
-	
+	InstSync    InstructionType = "SYNC"    // SYNC source dest [OPTIONS]
+	InstExclude InstructionType = "EXCLUDE" // EXCLUDE pattern
+	InstInclude InstructionType = "INCLUDE" // INCLUDE pattern (unignore)
+	InstOnly    InstructionType = "ONLY"    // ONLY pattern (whitelist mode)
+
 	// Configuration instructions
-	InstMode        InstructionType = "MODE"        // MODE one-way|two-way
-	InstDryRun      InstructionType = "DRYRUN"      // DRYRUN true|false
+	InstMode         InstructionType = "MODE"       // MODE one-way|two-way
+	InstDryRun       InstructionType = "DRYRUN"     // DRYRUN true|false
 	InstUseGitignore InstructionType = "GITIGNORE"  // GITIGNORE true|false
-	InstHiddenDirs  InstructionType = "HIDDENDIRS"  // HIDDENDIRS exclude|include
-	
+	InstHiddenDirs   InstructionType = "HIDDENDIRS" // HIDDENDIRS exclude|include
+
 	// Patch instructions
 	InstPatch       InstructionType = "PATCH"       // PATCH filename
 	InstApplyPatch  InstructionType = "APPLYPATCH"  // APPLYPATCH true|false
 	InstPreview     InstructionType = "PREVIEW"     // PREVIEW true|false
 	InstAutoConfirm InstructionType = "AUTOCONFIRM" // AUTOCONFIRM true|false (like -y flag)
-	
+
 	// Post-sync action instructions
-	InstAppend      InstructionType = "APPEND"      // APPEND filename: content END APPEND
-	InstPrepend     InstructionType = "PREPEND"     // PREPEND filename: content END PREPEND
-	
+	InstAppend  InstructionType = "APPEND"  // APPEND filename: content END APPEND
+	InstPrepend InstructionType = "PREPEND" // PREPEND filename: content END PREPEND
+
 	// Variable and environment instructions
-	InstVar         InstructionType = "VAR"         // VAR name=value
-	InstEnv         InstructionType = "ENV"         // ENV name=value (exported to rsync)
-	
+	InstVar InstructionType = "VAR" // VAR name=value
+	InstEnv InstructionType = "ENV" // ENV name=value (exported to rsync)
+
 	// Advanced instructions
-	InstRun         InstructionType = "RUN"         // RUN command (pre/post sync hooks)
-	InstComment     InstructionType = "COMMENT"     // # Comment
+	InstRun     InstructionType = "RUN"     // RUN command (pre/post sync hooks)
+	InstComment InstructionType = "COMMENT" // # Comment
 )
 
 // Instruction represents a single SyncFile instruction
@@ -216,44 +216,44 @@ func parseInstruction(line string, lineNum int) (Instruction, error) {
 // parseAppendBlock parses an APPEND inline block with content until END APPEND
 func parseAppendBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (Instruction, error) {
 	startLineNum := *lineNum
-	
+
 	// Parse the APPEND line: "APPEND [flags] filename:"
 	line := strings.TrimSuffix(firstLine, ":")
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
 		return Instruction{}, fmt.Errorf("APPEND requires format: APPEND [flags] filename:")
 	}
-	
+
 	// Find the filename (last part) and collect flags
 	filename := parts[len(parts)-1]
 	flags := parts[1 : len(parts)-1] // Everything between APPEND and filename
-	
+
 	// Combine flags and filename for args
 	args := append(flags, filename)
 	var contentLines []string
-	
+
 	// Read lines until END APPEND
 	for scanner.Scan() {
 		*lineNum++
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		if strings.ToUpper(line) == "END APPEND" {
 			// Found the end marker
 			break
 		}
-		
+
 		// Add the raw line (preserving original spacing for content)
 		contentLines = append(contentLines, scanner.Text())
 	}
-	
+
 	if *lineNum == startLineNum {
 		return Instruction{}, fmt.Errorf("APPEND block not closed with END APPEND")
 	}
-	
+
 	// Join content with newlines and normalize indentation
 	content := strings.Join(contentLines, "\n")
 	content = normalizeIndentation(content)
-	
+
 	return Instruction{
 		Type:          InstAppend,
 		Args:          args,
@@ -265,44 +265,44 @@ func parseAppendBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (I
 // parsePrependBlock parses a PREPEND inline block with content until END PREPEND
 func parsePrependBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (Instruction, error) {
 	startLineNum := *lineNum
-	
+
 	// Parse the PREPEND line: "PREPEND [flags] filename:"
 	line := strings.TrimSuffix(firstLine, ":")
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
 		return Instruction{}, fmt.Errorf("PREPEND requires format: PREPEND [flags] filename:")
 	}
-	
+
 	// Find the filename (last part) and collect flags
 	filename := parts[len(parts)-1]
 	flags := parts[1 : len(parts)-1] // Everything between PREPEND and filename
-	
+
 	// Combine flags and filename for args
 	args := append(flags, filename)
 	var contentLines []string
-	
+
 	// Read lines until END PREPEND
 	for scanner.Scan() {
 		*lineNum++
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		if strings.ToUpper(line) == "END PREPEND" {
 			// Found the end marker
 			break
 		}
-		
+
 		// Add the raw line (preserving original spacing for content)
 		contentLines = append(contentLines, scanner.Text())
 	}
-	
+
 	if *lineNum == startLineNum {
 		return Instruction{}, fmt.Errorf("PREPEND block not closed with END PREPEND")
 	}
-	
+
 	// Join content with newlines and normalize indentation
 	content := strings.Join(contentLines, "\n")
 	content = normalizeIndentation(content)
-	
+
 	return Instruction{
 		Type:          InstPrepend,
 		Args:          args,
@@ -316,19 +316,19 @@ func normalizeIndentation(content string) string {
 	if content == "" {
 		return content
 	}
-	
+
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 {
 		return content
 	}
-	
+
 	// Find minimum indentation (ignoring empty lines)
 	minIndent := -1
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue // Skip empty lines
 		}
-		
+
 		indent := 0
 		for _, char := range line {
 			if char == ' ' || char == '\t' {
@@ -341,17 +341,17 @@ func normalizeIndentation(content string) string {
 				break
 			}
 		}
-		
+
 		if minIndent == -1 || indent < minIndent {
 			minIndent = indent
 		}
 	}
-	
+
 	// If no indentation found, return as-is
 	if minIndent <= 0 {
 		return content
 	}
-	
+
 	// Remove common indentation from all lines
 	var normalizedLines []string
 	for _, line := range lines {
@@ -364,7 +364,7 @@ func normalizeIndentation(content string) string {
 			normalizedLines = append(normalizedLines, dedented)
 		}
 	}
-	
+
 	return strings.Join(normalizedLines, "\n")
 }
 
@@ -375,7 +375,7 @@ func removeLeadingSpaces(line string, n int) string {
 		if removed >= n {
 			return line[i:]
 		}
-		
+
 		if char == ' ' {
 			removed++
 		} else if char == '\t' {
@@ -388,7 +388,7 @@ func removeLeadingSpaces(line string, n int) string {
 			break
 		}
 	}
-	
+
 	return line[len(line):] // Return empty string if all chars were whitespace
 }
 
@@ -409,20 +409,20 @@ func parseAppendAction(inst Instruction, variables map[string]string) rsync.Post
 		Flags:   make([]string, 0),
 		Content: inst.InlineContent,
 	}
-	
+
 	// Parse arguments: [flags...] filename
 	args := inst.Args
 	if len(args) == 0 {
 		return action
 	}
-	
+
 	// Last argument is always the target file
 	targetFile := expandVariables(args[len(args)-1], variables)
 	action.TargetFile = targetFile
-	
+
 	// Everything before the last argument are flags
 	flags := args[:len(args)-1]
-	
+
 	// Parse flags
 	for _, flag := range flags {
 		switch flag {
@@ -439,7 +439,7 @@ func parseAppendAction(inst Instruction, variables map[string]string) rsync.Post
 			action.Flags = append(action.Flags, flag)
 		}
 	}
-	
+
 	return action
 }
 
@@ -450,20 +450,20 @@ func parsePrependAction(inst Instruction, variables map[string]string) rsync.Pos
 		Flags:   make([]string, 0),
 		Content: inst.InlineContent,
 	}
-	
+
 	// Parse arguments: [flags...] filename
 	args := inst.Args
 	if len(args) == 0 {
 		return action
 	}
-	
+
 	// Last argument is always the target file
 	targetFile := expandVariables(args[len(args)-1], variables)
 	action.TargetFile = targetFile
-	
+
 	// Everything before the last argument are flags
 	flags := args[:len(args)-1]
-	
+
 	// Parse flags
 	for _, flag := range flags {
 		switch flag {
@@ -480,7 +480,7 @@ func parsePrependAction(inst Instruction, variables map[string]string) rsync.Pos
 			action.Flags = append(action.Flags, flag)
 		}
 	}
-	
+
 	return action
 }
 
@@ -569,38 +569,38 @@ func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 				pattern := expandVariables(inst.Args[0], sf.Variables)
 				currentOpts.Only = append(currentOpts.Only, pattern)
 			}
-		
+
 		case InstPatch:
 			if currentOpts != nil {
 				patchFile := expandVariables(inst.Args[0], sf.Variables)
 				currentOpts.Patch = patchFile
 			}
-		
+
 		case InstApplyPatch:
 			if currentOpts != nil {
 				applyPatch, _ := strconv.ParseBool(inst.Args[0])
 				currentOpts.ApplyPatch = applyPatch
 			}
-		
+
 		case InstPreview:
 			if currentOpts != nil {
 				preview, _ := strconv.ParseBool(inst.Args[0])
 				currentOpts.Preview = preview
 			}
-		
+
 		case InstAutoConfirm:
 			if currentOpts != nil {
 				autoConfirm, _ := strconv.ParseBool(inst.Args[0])
 				currentOpts.Yes = autoConfirm
 			}
-		
+
 		case InstAppend:
 			if currentOpts != nil {
 				// Parse APPEND instruction and add to post-sync actions
 				action := parseAppendAction(inst, sf.Variables)
 				currentOpts.PostSyncActions = append(currentOpts.PostSyncActions, action)
 			}
-		
+
 		case InstPrepend:
 			if currentOpts != nil {
 				// Parse PREPEND instruction and add to post-sync actions

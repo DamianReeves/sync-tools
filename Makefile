@@ -1,7 +1,7 @@
 # Go Makefile for sync-tools
 
 BINARY_NAME=sync-tools
-VERSION=0.2.0
+VERSION=0.4.0-M1
 BUILD_DIR=build
 MAIN_PATH=cmd/sync-tools/main.go
 
@@ -135,3 +135,52 @@ demo-syncfile: build ## Run SyncFile demo
 	@echo "SYNC \$${SOURCE} \$${DEST}" >> DemoSyncFile
 	@echo "DRYRUN true" >> DemoSyncFile
 	@./$(BINARY_NAME) syncfile DemoSyncFile -v
+
+# GoReleaser targets
+.PHONY: goreleaser-check
+goreleaser-check: ## Check GoReleaser configuration
+	@echo "Checking GoReleaser configuration..."
+	@which goreleaser > /dev/null || (echo "Installing GoReleaser..." && go install github.com/goreleaser/goreleaser@latest)
+	@goreleaser check
+
+.PHONY: release-dry
+release-dry: clean check ## Test release build without publishing
+	@echo "Running dry release with GoReleaser..."
+	@which goreleaser > /dev/null || (echo "Installing GoReleaser..." && go install github.com/goreleaser/goreleaser@latest)
+	@goreleaser release --snapshot --clean --skip=publish
+
+.PHONY: release-local
+release-local: clean check ## Build release artifacts locally
+	@echo "Building release artifacts locally..."
+	@which goreleaser > /dev/null || (echo "Installing GoReleaser..." && go install github.com/goreleaser/goreleaser@latest)
+	@goreleaser build --snapshot --clean
+
+.PHONY: release
+release: clean check ## Create and publish release (requires GITHUB_TOKEN and HOMEBREW_TAP_GITHUB_TOKEN)
+	@echo "Creating release with GoReleaser..."
+	@which goreleaser > /dev/null || (echo "Installing GoReleaser..." && go install github.com/goreleaser/goreleaser@latest)
+	@if [ -z "$$GITHUB_TOKEN" ]; then echo "Error: GITHUB_TOKEN not set"; exit 1; fi
+	@if [ -z "$$HOMEBREW_TAP_GITHUB_TOKEN" ]; then echo "Error: HOMEBREW_TAP_GITHUB_TOKEN not set"; exit 1; fi
+	@goreleaser release --clean
+
+.PHONY: tag-release
+tag-release: ## Create and push a new release tag (use: make tag-release VERSION=v0.4.0)
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION not specified. Use: make tag-release VERSION=v0.4.0"; exit 1; fi
+	@echo "Creating and pushing tag $(VERSION)..."
+	@git tag -a $(VERSION) -m "Release $(VERSION)"
+	@git push origin $(VERSION)
+	@echo "Tag $(VERSION) created and pushed. GitHub Actions will handle the release."
+
+# Homebrew testing targets
+.PHONY: homebrew-test-local
+homebrew-test-local: ## Test Homebrew formula locally (requires tap setup)
+	@echo "Testing Homebrew formula locally..."
+	@brew tap DamianReeves/tap || true
+	@brew install --HEAD DamianReeves/tap/sync-tools
+	@sync-tools --version
+
+.PHONY: homebrew-uninstall
+homebrew-uninstall: ## Uninstall from Homebrew
+	@echo "Uninstalling sync-tools from Homebrew..."
+	@brew uninstall sync-tools || true
+	@brew untap DamianReeves/tap || true

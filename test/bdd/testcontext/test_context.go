@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	
+
 	"github.com/DamianReeves/sync-tools/test/bdd/driver"
 	"github.com/DamianReeves/sync-tools/test/bdd/mother"
 )
@@ -17,10 +17,10 @@ type TestEnvironment struct {
 	SourceDir  string
 	DestDir    string
 	WorkingDir string
-	
+
 	// Driver for sync-tools interaction
 	Driver driver.SyncDriver
-	
+
 	// Last command result for assertions
 	LastResult *driver.SyncResult
 }
@@ -32,7 +32,7 @@ func NewTestEnvironment(binaryPath string) (*TestEnvironment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	
+
 	env := &TestEnvironment{
 		TempRoot:   tempRoot,
 		SourceDir:  filepath.Join(tempRoot, "source"),
@@ -40,15 +40,15 @@ func NewTestEnvironment(binaryPath string) (*TestEnvironment, error) {
 		WorkingDir: filepath.Join(tempRoot, "work"),
 		Driver:     driver.NewSyncDriver(binaryPath),
 	}
-	
+
 	env.Driver.SetWorkingDir(env.WorkingDir)
-	
+
 	// Create working directory
 	if err := os.MkdirAll(env.WorkingDir, 0755); err != nil {
 		env.Cleanup()
 		return nil, fmt.Errorf("failed to create working directory: %w", err)
 	}
-	
+
 	return env, nil
 }
 
@@ -64,11 +64,11 @@ func (env *TestEnvironment) SetupDirectories(sourceBuilder, destBuilder mother.D
 	if err := sourceBuilder.Build(env.SourceDir); err != nil {
 		return fmt.Errorf("failed to build source directory: %w", err)
 	}
-	
+
 	if err := destBuilder.Build(env.DestDir); err != nil {
 		return fmt.Errorf("failed to build dest directory: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -148,7 +148,7 @@ func (env *TestEnvironment) AssertLastCommandSucceeded() error {
 		return fmt.Errorf("no command has been executed")
 	}
 	if !env.LastResult.Success {
-		return fmt.Errorf("expected command to succeed (exit code 0), but got %d. Output: %s", 
+		return fmt.Errorf("expected command to succeed (exit code 0), but got %d. Output: %s",
 			env.LastResult.ExitCode, env.LastResult.Output)
 	}
 	return nil
@@ -169,12 +169,12 @@ func (env *TestEnvironment) AssertFileContains(relativePath, expectedContent str
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", relativePath, err)
 	}
-	
+
 	if content != expectedContent {
-		return fmt.Errorf("file %s content mismatch.\nExpected: %s\nActual: %s", 
+		return fmt.Errorf("file %s content mismatch.\nExpected: %s\nActual: %s",
 			relativePath, expectedContent, content)
 	}
-	
+
 	return nil
 }
 
@@ -182,12 +182,12 @@ func (env *TestEnvironment) AssertOutputContains(expectedText string) error {
 	if env.LastResult == nil {
 		return fmt.Errorf("no command has been executed")
 	}
-	
+
 	if !contains(env.LastResult.Output, expectedText) {
-		return fmt.Errorf("expected output to contain '%s', but got: %s", 
+		return fmt.Errorf("expected output to contain '%s', but got: %s",
 			expectedText, env.LastResult.Output)
 	}
-	
+
 	return nil
 }
 
@@ -195,20 +195,20 @@ func (env *TestEnvironment) AssertOutputDoesNotContain(unexpectedText string) er
 	if env.LastResult == nil {
 		return fmt.Errorf("no command has been executed")
 	}
-	
+
 	if contains(env.LastResult.Output, unexpectedText) {
-		return fmt.Errorf("expected output to not contain '%s', but it does. Output: %s", 
+		return fmt.Errorf("expected output to not contain '%s', but it does. Output: %s",
 			unexpectedText, env.LastResult.Output)
 	}
-	
+
 	return nil
 }
 
 // Helper function for substring checking
 func contains(s, substr string) bool {
-	return len(substr) == 0 || len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		containsAt(s, substr))))
+	return len(substr) == 0 || len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			containsAt(s, substr))))
 }
 
 func containsAt(s, substr string) bool {
@@ -228,12 +228,12 @@ func (env *TestEnvironment) ExecuteRawCommand(args string) error {
 	updatedArgs = strings.ReplaceAll(updatedArgs, "./test_dest", env.DestDir)
 	updatedArgs = strings.ReplaceAll(updatedArgs, "./source", env.SourceDir)
 	updatedArgs = strings.ReplaceAll(updatedArgs, "./dest", env.DestDir)
-	
+
 	// Execute command through driver
 	err := env.Driver.ExecuteCommand(updatedArgs)
-	
+
 	// Update LastResult
 	env.LastResult = env.Driver.LastResult()
-	
+
 	return err
 }

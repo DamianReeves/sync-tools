@@ -9,25 +9,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cucumber/godog"
 	"github.com/DamianReeves/sync-tools/test/bdd/mother"
 	"github.com/DamianReeves/sync-tools/test/bdd/testcontext"
+	"github.com/cucumber/godog"
 )
 
 // TestContext holds state between steps using the new Test Driver and Object Mother patterns
 type TestContext struct {
 	// New clean architecture
 	env *testcontext.TestEnvironment
-	
+
 	// Legacy fields for backward compatibility during transition
-	tempRoot       string // Root temp directory for this test scenario  
-	sourceDir      string
-	destDir        string
-	workingDir     string
-	lastExitCode   int
-	lastOutput     string
-	lastError      string
-	syncToolsPath  string
+	tempRoot      string // Root temp directory for this test scenario
+	sourceDir     string
+	destDir       string
+	workingDir    string
+	lastExitCode  int
+	lastOutput    string
+	lastError     string
+	syncToolsPath string
 }
 
 // Helper function to run a command and properly capture exit code and output
@@ -36,7 +36,7 @@ func (tc *TestContext) runCommand(args ...string) error {
 	cmd.Dir = tc.workingDir // Run from working directory
 	output, err := cmd.CombinedOutput()
 	tc.lastOutput = string(output)
-	
+
 	// Handle exit code properly
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
@@ -135,7 +135,7 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I have a SyncFile "([^"]*)" containing:$`, tc.createSyncFile)
 	ctx.Step(`^the destination file "([^"]*)" should contain "([^"]*)"$`, tc.destinationFileShouldContain)
 	ctx.Step(`^the error should contain "([^"]*)"$`, tc.errorShouldContain)
-	
+
 	// Table-driven data creation steps
 	ctx.Step(`^I have a source directory with files:$`, tc.createSourceDirectoryWithTable)
 	ctx.Step(`^I have a destination directory with files:$`, tc.createDestinationDirectoryWithTable)
@@ -247,21 +247,21 @@ func (tc *TestContext) beforeScenario(ctx context.Context, sc *godog.Scenario) (
 	} else {
 		binaryPath = "../../sync-tools"
 	}
-	
+
 	// Create new test environment using Test Driver and Object Mother patterns
 	var err error
 	tc.env, err = testcontext.NewTestEnvironment(binaryPath)
 	if err != nil {
 		return ctx, fmt.Errorf("failed to create test environment: %w", err)
 	}
-	
+
 	// Set legacy fields for backward compatibility during transition
 	tc.tempRoot = tc.env.TempRoot
 	tc.sourceDir = tc.env.SourceDir
 	tc.destDir = tc.env.DestDir
 	tc.workingDir = tc.env.WorkingDir
 	tc.syncToolsPath = binaryPath
-	
+
 	return ctx, nil
 }
 
@@ -270,7 +270,7 @@ func (tc *TestContext) afterScenario(ctx context.Context, sc *godog.Scenario, er
 	if tc.env != nil {
 		tc.env.Cleanup()
 	}
-	
+
 	// Note: sc and err parameters are required by godog interface
 	_ = sc
 	_ = err
@@ -312,7 +312,7 @@ func (tc *TestContext) createSourceDirectoryWithFiles() error {
 	if err := os.MkdirAll(tc.sourceDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Create some test files
 	files := []string{"file1.txt", "file2.txt", "subdir/file3.txt"}
 	for _, file := range files {
@@ -324,7 +324,7 @@ func (tc *TestContext) createSourceDirectoryWithFiles() error {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -336,7 +336,7 @@ func (tc *TestContext) createDestinationDirectoryWithDifferentFiles() error {
 	if err := os.MkdirAll(tc.destDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Create different files in destination
 	files := []string{"different_file.txt", "another_file.txt"}
 	for _, file := range files {
@@ -345,7 +345,7 @@ func (tc *TestContext) createDestinationDirectoryWithDifferentFiles() error {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -353,7 +353,7 @@ func (tc *TestContext) createDestinationDirectoryWithFiles() error {
 	if err := os.MkdirAll(tc.destDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Create some files in destination (for deletion patch testing)
 	files := []string{"dest_file1.txt", "dest_file2.txt", "dest_subdir/dest_file3.txt"}
 	for _, file := range files {
@@ -365,7 +365,7 @@ func (tc *TestContext) createDestinationDirectoryWithFiles() error {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -468,22 +468,22 @@ func (tc *TestContext) createDestinationDirectoryWithMixedFiles() error {
 	if err := os.MkdirAll(tc.destDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Create some matching files (same content)
 	if err := os.WriteFile(filepath.Join(tc.destDir, "file1.txt"), []byte("test content for file1.txt"), 0644); err != nil {
 		return err
 	}
-	
+
 	// Create some different files (different content)
 	if err := os.WriteFile(filepath.Join(tc.destDir, "file2.txt"), []byte("DIFFERENT content for file2.txt"), 0644); err != nil {
 		return err
 	}
-	
+
 	// Create files that only exist in destination
 	if err := os.WriteFile(filepath.Join(tc.destDir, "dest_only.txt"), []byte("only in destination"), 0644); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -505,12 +505,12 @@ func (tc *TestContext) gitPatchFileShouldBeCreated(patchFile string) error {
 	if _, err := os.Stat(workingDirPatch); err == nil {
 		return nil
 	}
-	
+
 	// Check in current directory as fallback
 	if _, err := os.Stat(patchFile); err == nil {
 		return nil
 	}
-	
+
 	// Check in the project root directory (where sync-tools would create it)
 	wd, _ := os.Getwd()
 	var projectRoot string
@@ -519,19 +519,19 @@ func (tc *TestContext) gitPatchFileShouldBeCreated(patchFile string) error {
 	} else {
 		projectRoot = wd
 	}
-	
+
 	rootPatch := filepath.Join(projectRoot, patchFile)
 	if _, err := os.Stat(rootPatch); err == nil {
 		return nil
 	}
-	
+
 	// Check absolute path
 	if filepath.IsAbs(patchFile) {
 		if _, err := os.Stat(patchFile); err == nil {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("expected patch file %s to exist, but it doesn't (checked: %s, %s, %s)", patchFile, workingDirPatch, patchFile, rootPatch)
 }
 
@@ -609,15 +609,15 @@ func (tc *TestContext) planFileShouldContain(expectedContent *godog.DocString) e
 		return fmt.Errorf("no .plan file found")
 	}
 	planFile = files[0] // Use first found plan file
-	
+
 	content, err := os.ReadFile(planFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plan file %s: %w", planFile, err)
 	}
-	
+
 	expectedLines := strings.Split(strings.TrimSpace(expectedContent.Content), "\n")
 	actualContent := string(content)
-	
+
 	for _, expectedLine := range expectedLines {
 		expectedLine = strings.TrimSpace(expectedLine)
 		if expectedLine == "" {
@@ -627,7 +627,7 @@ func (tc *TestContext) planFileShouldContain(expectedContent *godog.DocString) e
 			return fmt.Errorf("plan file does not contain expected line: %s", expectedLine)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -640,21 +640,21 @@ func (tc *TestContext) planFileShouldContainVisualAliases() error {
 	if len(files) == 0 {
 		return fmt.Errorf("no .plan file found")
 	}
-	
+
 	content, err := os.ReadFile(files[0])
 	if err != nil {
 		return err
 	}
-	
+
 	planContent := string(content)
-	hasVisualAlias := strings.Contains(planContent, "<<") || 
-					  strings.Contains(planContent, ">>") || 
-					  strings.Contains(planContent, "<>")
-	
+	hasVisualAlias := strings.Contains(planContent, "<<") ||
+		strings.Contains(planContent, ">>") ||
+		strings.Contains(planContent, "<>")
+
 	if !hasVisualAlias {
 		return fmt.Errorf("plan file should contain visual aliases (<<, >>, <>)")
 	}
-	
+
 	return nil
 }
 
@@ -664,10 +664,10 @@ func (tc *TestContext) namedPlanFileShouldContain(filename string, expectedConte
 	if err != nil {
 		return fmt.Errorf("failed to read plan file %s: %w", filename, err)
 	}
-	
+
 	expectedLines := strings.Split(strings.TrimSpace(expectedContent.Content), "\n")
 	actualContent := string(content)
-	
+
 	for _, expectedLine := range expectedLines {
 		expectedLine = strings.TrimSpace(expectedLine)
 		if expectedLine == "" {
@@ -677,7 +677,7 @@ func (tc *TestContext) namedPlanFileShouldContain(filename string, expectedConte
 			return fmt.Errorf("plan file %s does not contain expected line: %s", filename, expectedLine)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -689,29 +689,29 @@ func (tc *TestContext) planFileShouldNotContain(text string) error {
 	if len(files) == 0 {
 		return fmt.Errorf("no .plan file found")
 	}
-	
+
 	content, err := os.ReadFile(files[0])
 	if err != nil {
 		return err
 	}
-	
+
 	if strings.Contains(string(content), text) {
 		return fmt.Errorf("plan file should not contain: %s", text)
 	}
-	
+
 	return nil
 }
 
 func (tc *TestContext) createPlanFile(filename string, content *godog.DocString) error {
 	fullPath := filepath.Join(tc.workingDir, filename)
-	
+
 	// Replace test path placeholders with actual directory paths
 	updatedContent := content.Content
 	updatedContent = strings.ReplaceAll(updatedContent, "./test_source", tc.sourceDir)
 	updatedContent = strings.ReplaceAll(updatedContent, "./test_dest", tc.destDir)
 	updatedContent = strings.ReplaceAll(updatedContent, "./source", tc.sourceDir)
 	updatedContent = strings.ReplaceAll(updatedContent, "./dest", tc.destDir)
-	
+
 	return os.WriteFile(fullPath, []byte(updatedContent), 0644)
 }
 
@@ -726,12 +726,12 @@ func (tc *TestContext) destinationFileShouldContain(filename, expectedContent st
 	if err != nil {
 		return fmt.Errorf("failed to read destination file %s: %w", filename, err)
 	}
-	
+
 	if strings.TrimSpace(string(content)) != expectedContent {
-		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'", 
+		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'",
 			filename, expectedContent, strings.TrimSpace(string(content)))
 	}
-	
+
 	return nil
 }
 
@@ -748,20 +748,20 @@ func (tc *TestContext) errorShouldContain(expectedError string) error {
 func (tc *TestContext) createSourceDirectoryWithTable(table *godog.Table) error {
 	// Create directory builder using Object Mother pattern
 	builder := mother.NewDirectory()
-	
+
 	// Parse table rows and add files to builder
 	for i, row := range table.Rows {
 		if i == 0 { // Skip header row
 			continue
 		}
-		
+
 		if len(row.Cells) < 2 {
 			return fmt.Errorf("table row must have at least path and content columns")
 		}
-		
+
 		path := row.Cells[0].Value
 		content := row.Cells[1].Value
-		
+
 		// Handle timestamp if provided
 		if len(row.Cells) >= 3 {
 			timestamp := row.Cells[2].Value
@@ -778,7 +778,7 @@ func (tc *TestContext) createSourceDirectoryWithTable(table *godog.Table) error 
 			builder = builder.WithFile(path, content)
 		}
 	}
-	
+
 	// Build the directory using the Object Mother
 	return builder.Build(tc.sourceDir)
 }
@@ -786,20 +786,20 @@ func (tc *TestContext) createSourceDirectoryWithTable(table *godog.Table) error 
 func (tc *TestContext) createDestinationDirectoryWithTable(table *godog.Table) error {
 	// Create directory builder using Object Mother pattern
 	builder := mother.NewDirectory()
-	
+
 	// Parse table rows and add files to builder
 	for i, row := range table.Rows {
 		if i == 0 { // Skip header row
 			continue
 		}
-		
+
 		if len(row.Cells) < 2 {
 			return fmt.Errorf("table row must have at least path and content columns")
 		}
-		
+
 		path := row.Cells[0].Value
 		content := row.Cells[1].Value
-		
+
 		// Handle timestamp if provided
 		if len(row.Cells) >= 3 {
 			timestamp := row.Cells[2].Value
@@ -816,7 +816,7 @@ func (tc *TestContext) createDestinationDirectoryWithTable(table *godog.Table) e
 			builder = builder.WithFile(path, content)
 		}
 	}
-	
+
 	// Build the directory using the Object Mother
 	return builder.Build(tc.destDir)
 }
@@ -824,14 +824,14 @@ func (tc *TestContext) createDestinationDirectoryWithTable(table *godog.Table) e
 func (tc *TestContext) runSyncToolsWithArguments(args string) error {
 	// Use Test Environment for command execution with path replacement
 	err := tc.env.ExecuteRawCommand(args)
-	
+
 	// Update lastOutput from the test environment's last result
 	if tc.env.LastResult != nil {
 		tc.lastOutput = tc.env.LastResult.Output
 		tc.lastError = tc.env.LastResult.Error
 		tc.lastExitCode = tc.env.LastResult.ExitCode
 	}
-	
+
 	return err
 }
 
@@ -855,12 +855,12 @@ func (tc *TestContext) destinationDirectoryShouldContainWithContent(filename, ex
 	if err != nil {
 		return fmt.Errorf("failed to read destination file %s: %w", filename, err)
 	}
-	
+
 	if strings.TrimSpace(content) != expectedContent {
-		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'", 
+		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'",
 			filename, expectedContent, strings.TrimSpace(content))
 	}
-	
+
 	return nil
 }
 
@@ -869,12 +869,12 @@ func (tc *TestContext) sourceDirectoryShouldContainWithContent(filename, expecte
 	if err != nil {
 		return fmt.Errorf("failed to read source file %s: %w", filename, err)
 	}
-	
+
 	if strings.TrimSpace(content) != expectedContent {
-		return fmt.Errorf("expected source file %s to contain '%s', but got '%s'", 
+		return fmt.Errorf("expected source file %s to contain '%s', but got '%s'",
 			filename, expectedContent, strings.TrimSpace(content))
 	}
-	
+
 	return nil
 }
 
@@ -886,16 +886,16 @@ func (tc *TestContext) planFileShouldContainText(text string) error {
 	if len(files) == 0 {
 		return fmt.Errorf("no .plan file found")
 	}
-	
+
 	content, err := os.ReadFile(files[0])
 	if err != nil {
 		return err
 	}
-	
+
 	if !strings.Contains(string(content), text) {
 		return fmt.Errorf("plan file should contain: %s", text)
 	}
-	
+
 	return nil
 }
 
@@ -904,33 +904,33 @@ func (tc *TestContext) createSourceDirectoryWithFilesTable(table *godog.Table) e
 	if tc.sourceDir == "" {
 		return fmt.Errorf("source directory not initialized")
 	}
-	
+
 	for _, row := range table.Rows {
 		if row.Cells[0].Value == "path" {
 			continue // Skip header
 		}
-		
+
 		if len(row.Cells) < 2 {
 			return fmt.Errorf("table row must have at least path and content columns")
 		}
-		
+
 		path := row.Cells[0].Value
 		content := row.Cells[1].Value
-		
+
 		fullPath := filepath.Join(tc.sourceDir, path)
-		
+
 		// Create parent directories if needed
 		err := os.MkdirAll(filepath.Dir(fullPath), 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create directory for %s: %w", path, err)
 		}
-		
+
 		// Write file
 		err = os.WriteFile(fullPath, []byte(content), 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write file %s: %w", path, err)
 		}
-		
+
 		// Set file timestamp if provided
 		if len(row.Cells) >= 3 {
 			timestamp := row.Cells[2].Value
@@ -946,7 +946,7 @@ func (tc *TestContext) createSourceDirectoryWithFilesTable(table *godog.Table) e
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -954,34 +954,34 @@ func (tc *TestContext) createDestinationDirectoryWithFilesTable(table *godog.Tab
 	if tc.destDir == "" {
 		return fmt.Errorf("destination directory not initialized")
 	}
-	
+
 	for _, row := range table.Rows {
 		if row.Cells[0].Value == "path" {
 			continue // Skip header
 		}
-		
+
 		if len(row.Cells) < 2 {
 			return fmt.Errorf("table row must have at least path and content columns")
 		}
-		
+
 		path := row.Cells[0].Value
 		content := row.Cells[1].Value
-		
+
 		fullPath := filepath.Join(tc.destDir, path)
-		
+
 		// Create parent directories if needed
 		err := os.MkdirAll(filepath.Dir(fullPath), 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create directory for %s: %w", path, err)
 		}
-		
+
 		// Write file
 		err = os.WriteFile(fullPath, []byte(content), 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write file %s: %w", path, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -989,21 +989,21 @@ func (tc *TestContext) createPlanFileContaining(filename string, content *godog.
 	if tc.workingDir == "" {
 		return fmt.Errorf("working directory not initialized")
 	}
-	
+
 	fullPath := filepath.Join(tc.workingDir, filename)
-	
+
 	// Replace test path placeholders with actual directory paths
 	updatedContent := content.Content
 	updatedContent = strings.ReplaceAll(updatedContent, "./test_source", tc.sourceDir)
 	updatedContent = strings.ReplaceAll(updatedContent, "./test_dest", tc.destDir)
 	updatedContent = strings.ReplaceAll(updatedContent, "./source", tc.sourceDir)
 	updatedContent = strings.ReplaceAll(updatedContent, "./dest", tc.destDir)
-	
+
 	err := os.WriteFile(fullPath, []byte(updatedContent), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create plan file %s: %w", filename, err)
 	}
-	
+
 	return nil
 }
 
@@ -1012,12 +1012,12 @@ func (tc *TestContext) destDirShouldContainFileWithContent(filename, expectedCon
 	if err != nil {
 		return fmt.Errorf("failed to read destination file %s: %w", filename, err)
 	}
-	
+
 	if strings.TrimSpace(content) != expectedContent {
-		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'", 
+		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'",
 			filename, expectedContent, strings.TrimSpace(content))
 	}
-	
+
 	return nil
 }
 
@@ -1030,12 +1030,12 @@ func (tc *TestContext) sourceDirShouldContainFileWithContent(filename, expectedC
 	if err != nil {
 		return fmt.Errorf("failed to read source file %s: %w", filename, err)
 	}
-	
+
 	if strings.TrimSpace(content) != expectedContent {
-		return fmt.Errorf("expected source file %s to contain '%s', but got '%s'", 
+		return fmt.Errorf("expected source file %s to contain '%s', but got '%s'",
 			filename, expectedContent, strings.TrimSpace(content))
 	}
-	
+
 	return nil
 }
 
@@ -1043,16 +1043,15 @@ func (tc *TestContext) createSyncFileContaining(filename string, content *godog.
 	if tc.workingDir == "" {
 		return fmt.Errorf("working directory not initialized")
 	}
-	
+
 	fullPath := filepath.Join(tc.workingDir, filename)
 	err := os.WriteFile(fullPath, []byte(content.Content), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create SyncFile %s: %w", filename, err)
 	}
-	
+
 	return nil
 }
-
 
 func (tc *TestContext) planFileNamedShouldContain(filename string, expectedContent *godog.DocString) error {
 	fullPath := filepath.Join(tc.workingDir, filename)
@@ -1060,7 +1059,7 @@ func (tc *TestContext) planFileNamedShouldContain(filename string, expectedConte
 	if err != nil {
 		return fmt.Errorf("failed to read plan file %s: %w", filename, err)
 	}
-	
+
 	// Normalize expected content
 	expected := strings.TrimSpace(expectedContent.Content)
 	for _, line := range strings.Split(expected, "\n") {
@@ -1068,7 +1067,7 @@ func (tc *TestContext) planFileNamedShouldContain(filename string, expectedConte
 			return fmt.Errorf("plan file %s should contain line: %s\nActual content:\n%s", filename, line, string(content))
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1077,21 +1076,21 @@ func (tc *TestContext) createSourceFileWithTimestamp(filename, content, timestam
 	if tc.sourceDir == "" {
 		return fmt.Errorf("source directory not initialized")
 	}
-	
+
 	fullPath := filepath.Join(tc.sourceDir, filename)
-	
+
 	// Create parent directories if needed
 	err := os.MkdirAll(filepath.Dir(fullPath), 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create directory for %s: %w", filename, err)
 	}
-	
+
 	// Write file
 	err = os.WriteFile(fullPath, []byte(content), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
-	
+
 	// Set file timestamp if provided
 	if timestamp != "" {
 		// Parse the timestamp
@@ -1099,14 +1098,14 @@ func (tc *TestContext) createSourceFileWithTimestamp(filename, content, timestam
 		if err != nil {
 			return fmt.Errorf("failed to parse timestamp %s: %w", timestamp, err)
 		}
-		
+
 		// Set the modification time
 		err = os.Chtimes(fullPath, t, t)
 		if err != nil {
 			return fmt.Errorf("failed to set timestamp for %s: %w", filename, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1114,21 +1113,21 @@ func (tc *TestContext) createDestFileWithTimestamp(filename, content, timestamp 
 	if tc.destDir == "" {
 		return fmt.Errorf("destination directory not initialized")
 	}
-	
+
 	fullPath := filepath.Join(tc.destDir, filename)
-	
+
 	// Create parent directories if needed
 	err := os.MkdirAll(filepath.Dir(fullPath), 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create directory for %s: %w", filename, err)
 	}
-	
+
 	// Write file
 	err = os.WriteFile(fullPath, []byte(content), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
-	
+
 	// Set file timestamp if provided
 	if timestamp != "" {
 		// Parse the timestamp
@@ -1136,14 +1135,14 @@ func (tc *TestContext) createDestFileWithTimestamp(filename, content, timestamp 
 		if err != nil {
 			return fmt.Errorf("failed to parse timestamp %s: %w", timestamp, err)
 		}
-		
+
 		// Set the modification time
 		err = os.Chtimes(fullPath, t, t)
 		if err != nil {
 			return fmt.Errorf("failed to set timestamp for %s: %w", filename, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1161,23 +1160,23 @@ func (tc *TestContext) bothDirsShouldContainFileWithContent(filename, expectedCo
 	if err != nil {
 		return fmt.Errorf("failed to read source file %s: %w", filename, err)
 	}
-	
+
 	if strings.TrimSpace(sourceContent) != expectedContent {
-		return fmt.Errorf("expected source file %s to contain '%s', but got '%s'", 
+		return fmt.Errorf("expected source file %s to contain '%s', but got '%s'",
 			filename, expectedContent, strings.TrimSpace(sourceContent))
 	}
-	
+
 	// Check destination file
 	destContent, err := tc.env.DestFileContent(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read destination file %s: %w", filename, err)
 	}
-	
+
 	if strings.TrimSpace(destContent) != expectedContent {
-		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'", 
+		return fmt.Errorf("expected destination file %s to contain '%s', but got '%s'",
 			filename, expectedContent, strings.TrimSpace(destContent))
 	}
-	
+
 	return nil
 }
 
@@ -1207,17 +1206,17 @@ func (tc *TestContext) aNewPlanFileShouldBeCreatedContainingOnlyConflicts(filena
 	if !tc.env.FileExists(filename) {
 		return fmt.Errorf("expected conflict plan file %s to be created", filename)
 	}
-	
+
 	// Check that the file contains conflict-related content
 	content, err := tc.env.FileContent(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read conflict plan file %s: %w", filename, err)
 	}
-	
+
 	if !strings.Contains(content, "conflict") && !strings.Contains(content, "<>") {
 		return fmt.Errorf("conflict plan file %s does not appear to contain conflicts", filename)
 	}
-	
+
 	return nil
 }
 
@@ -1244,25 +1243,25 @@ func (tc *TestContext) iHaveIdenticalFilesInSourceAndDestination(table *godog.Ta
 		if i == 0 { // Skip header row
 			continue
 		}
-		
+
 		if len(row.Cells) < 2 {
 			return fmt.Errorf("table row must have at least path and content columns")
 		}
-		
+
 		path := row.Cells[0].Value
 		content := row.Cells[1].Value
-		
+
 		// Create file in source
 		if err := tc.createSourceFileWithContent(path, content); err != nil {
 			return fmt.Errorf("failed to create source file %s: %w", path, err)
 		}
-		
-		// Create identical file in destination  
+
+		// Create identical file in destination
 		if err := tc.createDestFileWithContent(path, content); err != nil {
 			return fmt.Errorf("failed to create destination file %s: %w", path, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1272,22 +1271,22 @@ func (tc *TestContext) allSourceAndDestFilesAreAccessible() error {
 	if _, err := os.Stat(tc.sourceDir); err != nil {
 		return fmt.Errorf("source directory not accessible: %s, error: %w", tc.sourceDir, err)
 	}
-	
+
 	if _, err := os.Stat(tc.destDir); err != nil {
 		return fmt.Errorf("destination directory not accessible: %s, error: %w", tc.destDir, err)
 	}
-	
+
 	// List all files in source and destination for debugging
 	sourceFiles, err := filepath.Glob(filepath.Join(tc.sourceDir, "**/*"))
 	if err == nil {
 		fmt.Printf("DEBUG: Source files found: %v\n", sourceFiles)
 	}
-	
+
 	destFiles, err := filepath.Glob(filepath.Join(tc.destDir, "**/*"))
 	if err == nil {
 		fmt.Printf("DEBUG: Destination files found: %v\n", destFiles)
 	}
-	
+
 	return nil
 }
 
@@ -1300,14 +1299,14 @@ func (tc *TestContext) planReferencesOnlyExistingFiles() error {
 	if len(files) == 0 {
 		return fmt.Errorf("no .plan file found for verification")
 	}
-	
+
 	// Use the first plan file found
 	planPath := files[0]
 	content, err := os.ReadFile(planPath)
 	if err != nil {
 		return fmt.Errorf("failed to read plan file %s: %w", planPath, err)
 	}
-	
+
 	lines := strings.Split(string(content), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -1315,16 +1314,16 @@ func (tc *TestContext) planReferencesOnlyExistingFiles() error {
 		if strings.HasPrefix(line, "#") || line == "" {
 			continue
 		}
-		
+
 		// Parse plan line format: <command> <type> <path> ...
 		parts := strings.Fields(line)
 		if len(parts) < 3 {
 			continue
 		}
-		
+
 		command := parts[0]
 		filePath := parts[2]
-		
+
 		// Check if file should exist based on command
 		if command == "<<" || command == "<>" {
 			// File should exist in source
@@ -1333,7 +1332,7 @@ func (tc *TestContext) planReferencesOnlyExistingFiles() error {
 				return fmt.Errorf("plan references non-existent source file: %s (full path: %s)", filePath, fullPath)
 			}
 		}
-		
+
 		if command == ">>" || command == "<>" {
 			// File should exist in destination
 			fullPath := filepath.Join(tc.destDir, filePath)
@@ -1342,7 +1341,7 @@ func (tc *TestContext) planReferencesOnlyExistingFiles() error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1377,19 +1376,19 @@ func (tc *TestContext) iHaveADestinationFileWithContent(filename, key, value str
 	content := fmt.Sprintf(`{"%s": "%s"}`, key, value)
 	// Create destination file manually using filesystem operations
 	fullPath := filepath.Join(tc.env.DestDir, filename)
-	
+
 	// Ensure destination directory exists
 	if err := os.MkdirAll(tc.env.DestDir, 0755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
-	
+
 	// Create parent directories if needed
 	if dir := filepath.Dir(fullPath); dir != tc.env.DestDir {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create parent directories for %s: %w", filename, err)
 		}
 	}
-	
+
 	return os.WriteFile(fullPath, []byte(content), 0644)
 }
 
@@ -1397,19 +1396,19 @@ func (tc *TestContext) iHaveASourceFileWithContent(filename, key, value string) 
 	content := fmt.Sprintf(`{"%s": "%s"}`, key, value)
 	// Create source file manually using filesystem operations
 	fullPath := filepath.Join(tc.env.SourceDir, filename)
-	
+
 	// Ensure source directory exists
 	if err := os.MkdirAll(tc.env.SourceDir, 0755); err != nil {
 		return fmt.Errorf("failed to create source directory: %w", err)
 	}
-	
+
 	// Create parent directories if needed
 	if dir := filepath.Dir(fullPath); dir != tc.env.SourceDir {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create parent directories for %s: %w", filename, err)
 		}
 	}
-	
+
 	return os.WriteFile(fullPath, []byte(content), 0644)
 }
 
@@ -1417,12 +1416,12 @@ func (tc *TestContext) theSourceFileShouldContain(filename, key, value string) e
 	if !tc.env.SourceFileExists(filename) {
 		return fmt.Errorf("source file %s does not exist", filename)
 	}
-	
+
 	content, err := tc.env.SourceFileContent(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read source file %s: %w", filename, err)
 	}
-	
+
 	expectedContent := fmt.Sprintf(`"%s": "%s"`, key, value)
 	if !strings.Contains(content, expectedContent) {
 		return fmt.Errorf("source file %s should contain %s, but got: %s", filename, expectedContent, content)
@@ -1506,13 +1505,13 @@ func (tc *TestContext) theConflictShouldBeResolved() error {
 	if strings.Contains(tc.lastOutput, "conflict resolution failed") {
 		return fmt.Errorf("conflicts should be resolved, but conflict resolution failed in: %s", tc.lastOutput)
 	}
-	
+
 	// Success indicators - if we see these, conflicts were resolved
-	if strings.Contains(tc.lastOutput, "Plan execution completed successfully") || 
-	   strings.Contains(tc.lastOutput, "Creating backup") {
+	if strings.Contains(tc.lastOutput, "Plan execution completed successfully") ||
+		strings.Contains(tc.lastOutput, "Creating backup") {
 		return nil
 	}
-	
+
 	return nil
 }
 
@@ -1588,7 +1587,7 @@ func (tc *TestContext) theMergedFileShouldContainBothKeys() error {
 	if err != nil {
 		return fmt.Errorf("failed to read merged file: %w", err)
 	}
-	
+
 	// Check for both keys in the merged content
 	if !strings.Contains(destContent, "key1") || !strings.Contains(destContent, "key2") {
 		return fmt.Errorf("merged file should contain both keys, but content is: %s", destContent)
@@ -1602,12 +1601,12 @@ func (tc *TestContext) bothSourceAndDestShouldContainMergedContent() error {
 	if err != nil {
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
-	
+
 	destContent, err := tc.env.DestFileContent("config.json")
 	if err != nil {
 		return fmt.Errorf("failed to read dest file: %w", err)
 	}
-	
+
 	if sourceContent != destContent {
 		return fmt.Errorf("source and destination should have identical merged content, but source: %s, dest: %s", sourceContent, destContent)
 	}
@@ -1648,7 +1647,7 @@ func (tc *TestContext) aBackupFileShouldBeCreatedForConflictedFile() error {
 	if err != nil {
 		return fmt.Errorf("failed to read destination directory: %w", err)
 	}
-	
+
 	for _, file := range files {
 		if strings.Contains(file.Name(), ".backup") || strings.Contains(file.Name(), ".bak") {
 			return nil
@@ -1691,7 +1690,7 @@ func (tc *TestContext) theFinalFileShouldContainResultFromConflictStrategy() err
 	if err != nil {
 		return fmt.Errorf("failed to read final file: %w", err)
 	}
-	
+
 	// Check that content exists (basic validation)
 	if destContent == "" {
 		return fmt.Errorf("final file should contain content from conflict strategy, but file is empty")
@@ -1732,42 +1731,42 @@ func (tc *TestContext) validationShouldPassSuccessfully() error {
 
 func (tc *TestContext) iHaveAFileContaining(filename string, content *godog.DocString) error {
 	filePath := filepath.Join(tc.workingDir, filename)
-	
+
 	// Create directory if needed
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return fmt.Errorf("failed to create directory for %s: %w", filename, err)
 	}
-	
+
 	// Write file content
 	if err := os.WriteFile(filePath, []byte(content.Content), 0644); err != nil {
 		return fmt.Errorf("failed to create file %s: %w", filename, err)
 	}
-	
+
 	return nil
 }
 
 func (tc *TestContext) theDestinationDirectoryShouldContainWithContent(filename string, expectedContent *godog.DocString) error {
 	filePath := filepath.Join(tc.destDir, filename)
-	
+
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return fmt.Errorf("expected file %s to exist in destination directory, but it doesn't", filename)
 	}
-	
+
 	// Read file content
 	actualBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filename, err)
 	}
-	
+
 	actualContent := string(actualBytes)
 	expectedContentStr := expectedContent.Content
-	
+
 	// Compare content
 	if actualContent != expectedContentStr {
 		return fmt.Errorf("expected file %s to contain:\n%s\n\nbut got:\n%s", filename, expectedContentStr, actualContent)
 	}
-	
+
 	return nil
 }
 
@@ -1777,4 +1776,3 @@ func (tc *TestContext) theOutputShouldContain(expectedText string) error {
 	}
 	return nil
 }
-

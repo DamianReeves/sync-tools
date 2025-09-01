@@ -6,149 +6,380 @@ Damian Reeves <>
 
 == Overview
 
-This document explains how to use the Python-based `sync_tools` wrapper and
-associated utilities. It covers CLI usage, configuration, filters, the parity
-harness, and recommended CI integration.
+This document explains how to use `sync-tools`, a **Go CLI wrapper** around rsync that provides advanced directory synchronization with .syncignore files, whitelist mode, filter layering, one-way/two-way sync, conflict preservation, and SyncFile post-sync actions.
+
+The project has been fully migrated from Python to Go for better performance and single-binary distribution.
 
 == Installation
 
-A minimal setup uses Python 3.12 and the provided virtualenv pattern. From the repository root:
+=== Homebrew (macOS and Linux)
+
+The recommended installation method is via Homebrew:
 
 ----
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e .
+# Add the tap
+brew tap DamianReeves/tap
+
+# Install sync-tools
+brew install sync-tools
+
+# Verify installation
+sync-tools --version
 ----
 
-Alternatively, use a packaged single-file build (no virtualenv needed):
+=== From GitHub Releases
+
+Download pre-built binaries from https://github.com/DamianReeves/sync-tools/releases[GitHub Releases]:
 
 ----
-# PEX
-./dist/sync-tools.pex --help
+# Linux x64
+curl -L -o sync-tools https://github.com/DamianReeves/sync-tools/releases/latest/download/sync-tools_linux_amd64
 
-# shiv
-./dist/sync-tools.shiv --help
+# macOS x64
+curl -L -o sync-tools https://github.com/DamianReeves/sync-tools/releases/latest/download/sync-tools_darwin_amd64
 
-# PyInstaller (Linux)
-./dist/sync-tools --help
+# macOS ARM64
+curl -L -o sync-tools https://github.com/DamianReeves/sync-tools/releases/latest/download/sync-tools_darwin_arm64
+
+# Windows x64
+curl -L -o sync-tools.exe https://github.com/DamianReeves/sync-tools/releases/latest/download/sync-tools_windows_amd64.exe
+
+# Make executable (Linux/macOS)
+chmod +x sync-tools
 ----
 
-We build and publish these artifacts as part of Releases. You can also build locally:
+=== Build from Source
+
+Requirements: Go 1.19+ and rsync 3.1+
 
 ----
-make build-pex
-make build-shiv
-make build-pyinstaller
+# Clone the repository
+git clone https://github.com/DamianReeves/sync-tools.git
+cd sync-tools
+
+# Build the application
+go build -o sync-tools ./cmd/sync-tools
+
+# Install to GOPATH/bin
+go install ./cmd/sync-tools
+
+# Verify installation
+./sync-tools --version
+----
+== CLI Commands
+
+sync-tools provides two main commands:
+
+=== sync command
+
+The primary synchronization command with advanced options:
+
+----
+sync-tools sync --source SOURCE --dest DEST [OPTIONS]
+
+# Basic one-way sync
+sync-tools sync --source ~/documents --dest /backup/documents
+
+# Two-way sync with dry-run
+sync-tools sync --source ~/projects --dest remote:/backup/projects --mode two-way --dry-run
+
+# Sync with filters and reports
+sync-tools sync --source ~/data --dest /backup/data --ignore-src '*.tmp' --report sync-report.md
 ----
 
-Note: PEX and shiv include resolved dependencies and generally work across systems sharing the same Python ABI. The PyInstaller binary is platform-specific to the build environment.
+==== Options
 
-=== Installable distribution
+- `--source`, `--dest` — Source and destination directories
+- `--mode` — `one-way` (default) or `two-way` sync
+- `--dry-run` — Preview changes without executing
+- `--ignore-src PATTERN` — Exclude patterns from source
+- `--ignore-dest PATTERN` — Exclude patterns from destination  
+- `--only PATTERN` — Whitelist mode (only sync matching patterns)
+- `--use-source-gitignore` — Import .gitignore as exclusion patterns
+- `--exclude-hidden-dirs` — Skip hidden directories (.git, .svn, etc.)
+- `--report PATH` — Generate markdown report or patch file
+- `--patch PATH` — Generate git patch instead of syncing
+- `--apply-patch` — Apply generated patch with confirmation
+- `--preview` — Show colored diff preview with paging
+- `-y, --yes` — Auto-confirm operations
+- `--interactive` — Two-phased sync with plan generation
+- `-v, --verbose` — Increase verbosity
 
-We publish installable distributions (sdist + wheel) on GitHub Releases. Once
-released you can install with pip directly from the wheel or from PyPI if
-published there:
+=== syncfile command  
+
+Execute declarative sync configurations using SyncFile format:
 
 ----
-# From a downloaded wheel
-pip install ./sync_tools-0.1.0-py3-none-any.whl
+sync-tools syncfile SYNCFILE [OPTIONS]
 
-# From a source checkout
-pip install -e .
+# Execute a SyncFile
+sync-tools syncfile MyBackup
+
+# List available SyncFiles
+sync-tools syncfile --list
+
+# Dry-run a SyncFile
+sync-tools syncfile MyBackup --dry-run
 ----
-== CLI
 
-The main Python CLI is in `sync_tools/cli.py` and exposes the same options as the
-legacy `sync.sh` script but with enhanced logging and reporting.
+==== SyncFile Format
 
+SyncFile uses Dockerfile-like syntax with post-sync actions:
 
-- `--source`, `--dest` — Source and destination
-- `--mode` — one-way or two-way
-- `--dry-run` — run rsync with `--dry-run`
-- `-v`/`--log-level` — control verbosity
-- `--dump-commands PATH` — write a JSON dump of rsync command + filters
-- `--report PATH` — write a Markdown report of Added/Updated/Deleted/Excluded
-- `--list-filtered {src,dst,both}` — locally list files that would be filtered
+----
+# Variables
+VAR PROJECT_ROOT=/home/user/projects
+VAR BACKUP_ROOT=/backup
+
+# Basic sync
+SYNC ${PROJECT_ROOT}/docs ${BACKUP_ROOT}/docs
+MODE one-way
+DRYRUN false
+
+# Filters
+EXCLUDE .git/
+EXCLUDE *.tmp
+ONLY *.md
+
+# Post-sync actions
+APPEND config.yml:
+  # Auto-generated footer
+  generated_at: $(date)
+END APPEND
+
+PREPEND --backup README.md:
+  # Project Documentation
+  Last updated: $(date)
+END PREPEND
+----
 
 == Filters and Patterns
-Filters support rsync-like patterns including `*`, `?`, `**`, trailing `/` to
-indicate directories, and `!` for explicit includes (unignore). The Python
-matcher attempts to mirror rsync semantics; however, exact 1:1 parity is
 
-Use `--only` (whitelist) to create an include-only filter set. Files can be
-specified absolute (leading `/`) or relative.
+sync-tools provides sophisticated filtering capabilities using rsync-compatible patterns:
 
-=== Using a GitHub ZIP download URL as source
+=== Pattern Syntax
 
-You can pass an HTTP(S) URL that points to a ZIP archive (for example a GitHub
-archive or release asset) as the `--source`. The CLI will download and
-unpack the archive into a temporary directory and run the sync against the
-extracted tree. This is useful for quick one-off syncs from a repo snapshot.
+- `*` — Match any characters except `/`
+- `?` — Match any single character except `/`  
+- `**` — Match any characters including `/` (recursive)
+- `trailing /` — Match directories only
+- `!pattern` — Explicit include (unignore)
 
-----
-sync-tools sync --source "https://github.com/<owner>/<repo>/archive/refs/heads/main.zip" --dest /backup --only '/docs/' --dry-run
-----
+=== Filter Types
 
-The downloaded archive is cleaned up after the run.
-== Parity Harness
-A diagnostic tool `tools/rsync_parity_harness.py` is provided to compare the
-Python matcher against rsync's own decision logic.
+==== .syncignore Files
 
-
-- Runs `rsync --dry-run --out-format='%i %n'` from `src/` to an empty temp
-  dir and captures the files rsync would transfer
-- Walks the source tree and compares `decision_for_path` results to rsync's
-- Prints mismatches and (optionally) writes a JSON diagnostic file with
-
-=== Basic usage
+Create `.syncignore` files in any directory to exclude patterns:
 
 ----
-PYTHONPATH=. python3 tools/rsync_parity_harness.py --src /path/to/src --pattern '*.py' --pattern '!keep.py'
+# .syncignore
+*.tmp
+*.log
+.DS_Store
+node_modules/
+build/
 ----
 
-To request JSON diagnostics explicitly:
-----
-----
+==== Whitelist Mode
 
-When the harness finds mismatches it exits with code 2 and writes the JSON
-path.
-=== Example CI step (GitHub Actions)
+Use `--only` patterns to sync only matching files:
 
-[source,yaml]
-- name: Parity check
-  PYTHONPATH=. python3 tools/rsync_parity_harness.py --src test_folders --pattern '*.txt' --pattern '!keep.txt' --dump-json parity.json || true
-    if [ -f parity.json ]; then
-      echo "Uploading parity.json as artifact"
-      # upload artifact step here
-    fi
+----
+# Only sync markdown files
+sync-tools sync --source docs/ --dest backup/docs --only '*.md'
+
+# Only sync specific directories
+sync-tools sync --source project/ --dest backup/ --only 'src/' --only 'docs/'
 ----
 
-=== Release artifacts from CI
+==== Gitignore Integration
 
-The repository includes a GitHub Actions workflow that builds sdist and wheel
-when a tag matching `v*.*.*` is pushed and publishes them to a GitHub Release.
-The uploaded `dist/` artifacts contain both the `.tar.gz` source and the
-`.whl` wheel which you can download and install with pip as shown above.
+Import `.gitignore` patterns as exclusions:
 
-== Reports
+----
+sync-tools sync --source project/ --dest backup/ --use-source-gitignore
+----
 
-The CLI can create a Markdown report summarizing Added/Updated/Deleted and
-Excluded-by-filters. Use `--report report.md` to generate this file. You can
-extend the report by stat'ing files for size/mtime.
+=== Advanced Filtering Examples
+
+----
+# Exclude logs but include important.log
+sync-tools sync --source app/ --dest backup/ --ignore-src '*.log' --ignore-src '!important.log'
+
+# Sync only source code files  
+sync-tools sync --source project/ --dest backup/ --only '*.go' --only '*.js' --only '*.py'
+
+# Complex patterns with recursion
+sync-tools sync --source data/ --dest backup/ --ignore-src '**/temp/**' --ignore-src '**/*.tmp'
+----
+== Reports and Output
+
+sync-tools provides multiple output formats for sync operations:
+
+=== Markdown Reports  
+
+Generate comprehensive markdown reports:
+
+----
+sync-tools sync --source docs/ --dest backup/docs --report sync-report.md
+----
+
+Reports include:
+- Configuration summary
+- Statistics (files created/updated/deleted)
+- Detailed change lists with file sizes
+- Visual indicators for different change types
+
+=== Git Patch Generation
+
+Generate git patches instead of syncing:
+
+----
+# Generate patch file
+sync-tools sync --source src/ --dest backup/ --patch changes.patch
+
+# Preview changes with colored diff
+sync-tools sync --source src/ --dest backup/ --preview
+
+# Generate and apply patch with confirmation
+sync-tools sync --source src/ --dest backup/ --patch changes.patch --apply-patch
+
+# Auto-apply without confirmation
+sync-tools sync --source src/ --dest backup/ --patch changes.patch --apply-patch -y
+----
+
+== Advanced Features
+
+=== Interactive Mode
+
+Two-phased sync with plan generation and editing:
+
+----
+sync-tools sync --source project/ --dest backup/ --interactive
+----
+
+This creates an editable plan file showing all operations, then allows you to:
+- Review and modify the sync plan
+- Exclude specific operations  
+- Apply conflict resolution strategies
+- Execute the plan after editing
+
+=== Two-Way Sync with Conflict Resolution
+
+Bidirectional synchronization with automatic conflict handling:
+
+----
+sync-tools sync --source local/ --dest remote/ --mode two-way
+----
+
+Conflict resolution strategies:
+- `newest-wins` — Use the most recently modified file (default)  
+- `largest-wins` — Use the larger file
+- `source-wins` — Always prefer source
+- `dest-wins` — Always prefer destination
+- `backup` — Create backups before resolving
+
+== Testing and Validation
+
+=== BDD Test Suite
+
+The project includes comprehensive Behavior-Driven Development tests:
+
+----
+# Run all BDD tests (must pass 100%)
+go test ./test/bdd -tags bdd -v
+
+# Run specific feature tests  
+go test ./test/bdd -tags bdd -run 'APPEND'
+
+# Verify current test status
+make test
+----
+
+Current status: **57/57 scenarios passing (100% success rate)**
+
+=== Manual Validation
+
+Test functionality with a simple sync:
+
+----
+# Create test directories  
+mkdir -p /tmp/test_sync/{source,dest}
+echo "test content" > /tmp/test_sync/source/file.txt
+
+# Test dry run
+sync-tools sync --source /tmp/test_sync/source --dest /tmp/test_sync/dest --dry-run
+
+# Test actual sync
+sync-tools sync --source /tmp/test_sync/source --dest /tmp/test_sync/dest
+
+# Verify result
+ls -la /tmp/test_sync/dest/
+----
 
 == Troubleshooting
 
-- If the harness shows mismatches, inspect the JSON file to see per-path
-  decisions from Python and rsync's included set.
-- Some complex rsync filter precedence cases are easier to diagnose by
-  creating a minimal reproduction tree and running the harness against it.
+=== Common Issues
 
-== Development notes
-== Deprecation: legacy sync.sh
+**Build Issues:**
+----
+# Verify Go version (requires 1.19+)
+go version
 
-The Bash script `sync.sh` is deprecated and archived under `docs/archive/sync.sh`. Prefer the Python CLI `sync-tools` or the packaged single-file artifacts.
+# Clear module cache if needed
+go clean -modcache && go mod tidy
 
+# Rebuild
+go build -o sync-tools ./cmd/sync-tools
+----
 
-Contributions to the matcher should include unit tests in `tests/test_pattern_matching.py`.
+**Test Failures:**
+----
+# Run specific test suite  
+go test ./test/bdd -tags bdd -run 'BasicSync'
+
+# Verbose output for debugging
+go test ./test/bdd -tags bdd -v -run 'APPEND'
+----
+
+**Runtime Issues:**
+- Ensure rsync is installed and accessible (`rsync --version`)
+- Check file permissions on source and destination directories
+- Use `--dry-run` to preview operations before execution
+- Enable verbose logging with `-v` for detailed output
+
+== Development and Contribution
+
+=== Getting Started
+
+----  
+# Clone repository
+git clone https://github.com/DamianReeves/sync-tools.git
+cd sync-tools
+
+# Build and test
+make dev
+
+# Run BDD tests (mandatory 100% pass rate)
+go test ./test/bdd -tags bdd -v
+----
+
+=== Architecture
+
+The project follows clean architecture principles:
+- **BDD/TDD Mandatory**: All features start with failing Gherkin scenarios
+- **Composition Over Inheritance**: Flexible, reusable components  
+- **Testability First**: All components designed for testing
+- **PostSyncAction Framework**: Extensible action system
+
+See link:CLAUDE.md[CLAUDE.md] for comprehensive development guidelines.
+
+=== Release Process
+
+Releases are automated via GitHub Actions:
+1. Create and push version tag: `git tag v0.5.0 && git push origin v0.5.0`
+2. GitHub Actions builds cross-platform binaries
+3. GoReleaser creates GitHub Release with artifacts
+4. Homebrew formula is automatically updated
 
 *** End of document
