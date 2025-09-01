@@ -41,6 +41,7 @@ const (
 	
 	// Post-sync action instructions
 	InstAppend      InstructionType = "APPEND"      // APPEND filename: content END APPEND
+	InstPrepend     InstructionType = "PREPEND"     // PREPEND filename: content END PREPEND
 	
 	// Variable and environment instructions
 	InstVar         InstructionType = "VAR"         // VAR name=value
@@ -98,6 +99,16 @@ func ParseSyncFile(path string) (*SyncFile, error) {
 		// Check for APPEND inline block
 		if strings.HasPrefix(strings.ToUpper(line), "APPEND ") && strings.HasSuffix(line, ":") {
 			instruction, err := parseAppendBlock(scanner, line, &lineNum)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNum, err)
+			}
+			sf.Instructions = append(sf.Instructions, instruction)
+			continue
+		}
+
+		// Check for PREPEND inline block
+		if strings.HasPrefix(strings.ToUpper(line), "PREPEND ") && strings.HasSuffix(line, ":") {
+			instruction, err := parsePrependBlock(scanner, line, &lineNum)
 			if err != nil {
 				return nil, fmt.Errorf("line %d: %w", lineNum, err)
 			}
@@ -183,6 +194,14 @@ func parseInstruction(line string, lineNum int) (Instruction, error) {
 		if len(args) >= 1 && args[0] == "--file" && len(args) != 3 {
 			return Instruction{}, fmt.Errorf("APPEND --file requires format: APPEND --file source.txt target.txt")
 		}
+	case InstPrepend:
+		if len(args) < 1 {
+			return Instruction{}, fmt.Errorf("PREPEND requires at least 1 argument")
+		}
+		// Validate --file flag format: PREPEND --file source.txt target.txt
+		if len(args) >= 1 && args[0] == "--file" && len(args) != 3 {
+			return Instruction{}, fmt.Errorf("PREPEND --file requires format: PREPEND --file source.txt target.txt")
+		}
 	default:
 		return Instruction{}, fmt.Errorf("unknown instruction: %s", instType)
 	}
@@ -237,6 +256,55 @@ func parseAppendBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (I
 	
 	return Instruction{
 		Type:          InstAppend,
+		Args:          args,
+		LineNum:       startLineNum,
+		InlineContent: content,
+	}, nil
+}
+
+// parsePrependBlock parses a PREPEND inline block with content until END PREPEND
+func parsePrependBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (Instruction, error) {
+	startLineNum := *lineNum
+	
+	// Parse the PREPEND line: "PREPEND [flags] filename:"
+	line := strings.TrimSuffix(firstLine, ":")
+	parts := strings.Fields(line)
+	if len(parts) < 2 {
+		return Instruction{}, fmt.Errorf("PREPEND requires format: PREPEND [flags] filename:")
+	}
+	
+	// Find the filename (last part) and collect flags
+	filename := parts[len(parts)-1]
+	flags := parts[1 : len(parts)-1] // Everything between PREPEND and filename
+	
+	// Combine flags and filename for args
+	args := append(flags, filename)
+	var contentLines []string
+	
+	// Read lines until END PREPEND
+	for scanner.Scan() {
+		*lineNum++
+		line := strings.TrimSpace(scanner.Text())
+		
+		if strings.ToUpper(line) == "END PREPEND" {
+			// Found the end marker
+			break
+		}
+		
+		// Add the raw line (preserving original spacing for content)
+		contentLines = append(contentLines, scanner.Text())
+	}
+	
+	if *lineNum == startLineNum {
+		return Instruction{}, fmt.Errorf("PREPEND block not closed with END PREPEND")
+	}
+	
+	// Join content with newlines and normalize indentation
+	content := strings.Join(contentLines, "\n")
+	content = normalizeIndentation(content)
+	
+	return Instruction{
+		Type:          InstPrepend,
 		Args:          args,
 		LineNum:       startLineNum,
 		InlineContent: content,
@@ -375,6 +443,47 @@ func parseAppendAction(inst Instruction, variables map[string]string) rsync.Post
 	return action
 }
 
+// parsePrependAction converts a PREPEND instruction to a PostSyncAction
+func parsePrependAction(inst Instruction, variables map[string]string) rsync.PostSyncAction {
+	action := rsync.PostSyncAction{
+		Type:    rsync.PostSyncPrepend,
+		Flags:   make([]string, 0),
+		Content: inst.InlineContent,
+	}
+	
+	// Parse arguments: [flags...] filename
+	args := inst.Args
+	if len(args) == 0 {
+		return action
+	}
+	
+	// Last argument is always the target file
+	targetFile := expandVariables(args[len(args)-1], variables)
+	action.TargetFile = targetFile
+	
+	// Everything before the last argument are flags
+	flags := args[:len(args)-1]
+	
+	// Parse flags
+	for _, flag := range flags {
+		switch flag {
+		case "--file":
+			// For --file flag, we need the source file from the next argument
+			// This should have been validated during parsing
+			if len(args) >= 3 && args[0] == "--file" {
+				action.SourceFile = expandVariables(args[1], variables)
+				action.TargetFile = expandVariables(args[2], variables)
+				action.Content = "" // No inline content for file-based prepend
+			}
+		default:
+			// Add other flags as-is
+			action.Flags = append(action.Flags, flag)
+		}
+	}
+	
+	return action
+}
+
 // ToRsyncOptions converts a SyncFile to rsync.Options
 func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 	var optsList []*rsync.Options
@@ -489,6 +598,13 @@ func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 			if currentOpts != nil {
 				// Parse APPEND instruction and add to post-sync actions
 				action := parseAppendAction(inst, sf.Variables)
+				currentOpts.PostSyncActions = append(currentOpts.PostSyncActions, action)
+			}
+		
+		case InstPrepend:
+			if currentOpts != nil {
+				// Parse PREPEND instruction and add to post-sync actions
+				action := parsePrependAction(inst, sf.Variables)
 				currentOpts.PostSyncActions = append(currentOpts.PostSyncActions, action)
 			}
 		}

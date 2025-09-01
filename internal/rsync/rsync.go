@@ -19,7 +19,8 @@ import (
 type PostSyncActionType string
 
 const (
-	PostSyncAppend PostSyncActionType = "APPEND"
+	PostSyncAppend  PostSyncActionType = "APPEND"
+	PostSyncPrepend PostSyncActionType = "PREPEND"
 )
 
 // PostSyncAction represents an action to execute after sync completes
@@ -2026,6 +2027,10 @@ func (r *Runner) executePostSyncActions(opts *Options) error {
 			if err := r.executeAppendAction(action, opts); err != nil {
 				return fmt.Errorf("failed to execute APPEND action: %w", err)
 			}
+		case PostSyncPrepend:
+			if err := r.executePrependAction(action, opts); err != nil {
+				return fmt.Errorf("failed to execute PREPEND action: %w", err)
+			}
 		default:
 			r.logger.Warnf("Unknown post-sync action type: %s", action.Type)
 		}
@@ -2117,6 +2122,93 @@ func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error
 	}
 	
 	r.logger.Infof("Successfully appended content to %s", targetPath)
+	return nil
+}
+
+// executePrependAction executes a PREPEND post-sync action
+func (r *Runner) executePrependAction(action PostSyncAction, opts *Options) error {
+	targetPath := action.TargetFile
+	
+	// If target path is not absolute, make it relative to destination directory
+	if !filepath.IsAbs(targetPath) {
+		targetPath = filepath.Join(opts.Dest, targetPath)
+	}
+	
+	// Check flags for special behaviors
+	isDryRun := opts.DryRun
+	hasBackupFlag := false
+	hasNewlineFlag := true // default
+	
+	for _, flag := range action.Flags {
+		switch flag {
+		case "--dry-run":
+			isDryRun = true
+		case "--backup":
+			hasBackupFlag = true
+		case "--newline=false":
+			hasNewlineFlag = false
+		}
+	}
+	
+	// Handle dry-run mode
+	if isDryRun {
+		r.logger.Infof("Would prepend to %s", targetPath)
+		if action.SourceFile != "" {
+			r.logger.Infof("  Content source: %s", action.SourceFile)
+		} else {
+			r.logger.Infof("  Inline content: %s", strings.TrimSpace(action.Content))
+		}
+		return nil
+	}
+	
+	// Check if target file exists
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		return fmt.Errorf("target file not found: %s", action.TargetFile)
+	}
+	
+	// Read existing file content
+	existingContent, err := os.ReadFile(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to read target file %s: %w", targetPath, err)
+	}
+	
+	// Create backup if requested
+	if hasBackupFlag {
+		backupPath := fmt.Sprintf("%s.backup.%d", targetPath, time.Now().Unix())
+		if err := r.copyFile(targetPath, backupPath); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
+		r.logger.Infof("Created backup: %s", backupPath)
+	}
+	
+	// Get content to prepend
+	var contentToPrepend string
+	if action.SourceFile != "" {
+		// Read content from source file
+		sourceData, err := os.ReadFile(action.SourceFile)
+		if err != nil {
+			return fmt.Errorf("failed to read source file %s: %w", action.SourceFile, err)
+		}
+		contentToPrepend = string(sourceData)
+	} else {
+		// Use inline content
+		contentToPrepend = action.Content
+	}
+	
+	// Add newline after content if needed
+	if hasNewlineFlag {
+		contentToPrepend = contentToPrepend + "\n"
+	}
+	
+	// Combine prepended content with existing content
+	newContent := contentToPrepend + string(existingContent)
+	
+	// Write new content back to file
+	if err := os.WriteFile(targetPath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write prepended content to file: %w", err)
+	}
+	
+	r.logger.Infof("Successfully prepended content to %s", targetPath)
 	return nil
 }
 
