@@ -19,18 +19,18 @@ type SyncDriver interface {
 	Sync(source, dest string, options ...SyncOption) *SyncResult
 	GeneratePlan(source, dest, planFile string, options ...PlanOption) *SyncResult
 	ApplyPlan(planFile string, options ...ApplyOption) *SyncResult
-	
+
 	// Git patch operations
 	GeneratePatch(source, dest, patchFile string, options ...PatchOption) *SyncResult
-	
+
 	// Utility operations
 	Help() *SyncResult
 	Version() *SyncResult
-	
+
 	// Generic command execution
 	ExecuteCommand(args string) error
 	LastResult() *SyncResult
-	
+
 	// Configuration
 	SetWorkingDir(dir string)
 	SetBinaryPath(path string)
@@ -64,12 +64,12 @@ func (d *syncDriver) executeCommand(args ...string) *SyncResult {
 	if d.workingDir != "" {
 		cmd.Dir = d.workingDir
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	result := &SyncResult{
 		Output: string(output),
 	}
-	
+
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			result.ExitCode = exitError.ExitCode()
@@ -81,52 +81,52 @@ func (d *syncDriver) executeCommand(args ...string) *SyncResult {
 		result.ExitCode = 0
 		result.Success = true
 	}
-	
+
 	return result
 }
 
 // Core sync operations
 func (d *syncDriver) Sync(source, dest string, options ...SyncOption) *SyncResult {
 	args := []string{"sync", "--source", source, "--dest", dest}
-	
+
 	// Apply options
 	for _, opt := range options {
 		args = opt.apply(args)
 	}
-	
+
 	return d.executeCommand(args...)
 }
 
 func (d *syncDriver) GeneratePlan(source, dest, planFile string, options ...PlanOption) *SyncResult {
 	args := []string{"sync", "--source", source, "--dest", dest, "--plan", planFile}
-	
+
 	// Apply options
 	for _, opt := range options {
 		args = opt.apply(args)
 	}
-	
+
 	return d.executeCommand(args...)
 }
 
 func (d *syncDriver) ApplyPlan(planFile string, options ...ApplyOption) *SyncResult {
 	args := []string{"sync", "--apply-plan", planFile}
-	
+
 	// Apply options
 	for _, opt := range options {
 		args = opt.apply(args)
 	}
-	
+
 	return d.executeCommand(args...)
 }
 
 func (d *syncDriver) GeneratePatch(source, dest, patchFile string, options ...PatchOption) *SyncResult {
 	args := []string{"sync", "--source", source, "--dest", dest, "--patch", patchFile}
-	
-	// Apply options  
+
+	// Apply options
 	for _, opt := range options {
 		args = opt.apply(args)
 	}
-	
+
 	return d.executeCommand(args...)
 }
 

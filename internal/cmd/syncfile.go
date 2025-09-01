@@ -116,12 +116,12 @@ func runSyncfile(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("error getting current directory: %w", err)
 	}
-	
+
 	err = os.Chdir(syncfileDir)
 	if err != nil {
 		return fmt.Errorf("error changing to SyncFile directory: %w", err)
 	}
-	
+
 	// Ensure we return to original directory
 	defer func() {
 		_ = os.Chdir(originalDir)
@@ -185,7 +185,7 @@ func runSyncfile(cmd *cobra.Command, args []string) error {
 
 	// Execute sync operations
 	runner := rsync.NewRunner(logger)
-	
+
 	for i, opts := range optsList {
 		logger.Infof("Executing sync operation %d/%d", i+1, len(optsList))
 		logger.Infof("  %s -> %s", opts.Source, opts.Dest)
@@ -211,36 +211,36 @@ func runSyncfile(cmd *cobra.Command, args []string) error {
 // generateSyncfilePlan generates a plan file from SyncFile operations
 func generateSyncfilePlan(optsList []*rsync.Options, planFile string, syncfilePath string, logger logging.Logger) error {
 	runner := rsync.NewRunner(logger)
-	
+
 	// For SyncFile plans, we need to generate combined plan content from all operations
 	var planContent strings.Builder
-	
+
 	// Generate header
 	planContent.WriteString(fmt.Sprintf("# Sync Plan Generated: %s\n", time.Now().Format("2006-01-02 15:04:05")))
 	planContent.WriteString(fmt.Sprintf("# Generated from: sync-tools syncfile %s --plan %s\n", syncfilePath, planFile))
 	planContent.WriteString(fmt.Sprintf("# SyncFile: %s\n", syncfilePath))
-	
+
 	// Process each sync operation
 	for i, opts := range optsList {
 		logger.Infof("Analyzing sync operation %d/%d", i+1, len(optsList))
-		
+
 		// Set plan file for this operation
 		tempPlan := fmt.Sprintf("%s.temp.%d", planFile, i)
 		opts.Plan = tempPlan
-		
+
 		// Generate plan for this operation
 		if err := runner.GeneratePlan(opts); err != nil {
 			logger.Warnf("Failed to generate plan for operation %d: %v", i+1, err)
 			continue
 		}
-		
+
 		// Read the temporary plan file
 		tempContent, err := os.ReadFile(tempPlan)
 		if err != nil {
 			logger.Warnf("Failed to read temporary plan for operation %d: %v", i+1, err)
 			continue
 		}
-		
+
 		// Add operation header
 		if i > 0 {
 			planContent.WriteString("\n")
@@ -249,7 +249,7 @@ func generateSyncfilePlan(optsList []*rsync.Options, planFile string, syncfilePa
 		planContent.WriteString(fmt.Sprintf("# Source: %s\n", opts.Source))
 		planContent.WriteString(fmt.Sprintf("# Destination: %s\n", opts.Dest))
 		planContent.WriteString(fmt.Sprintf("# Mode: %s\n", opts.Mode))
-		
+
 		// Add filters info if any
 		if len(opts.IgnoreSrc) > 0 || len(opts.Only) > 0 {
 			filters := []string{}
@@ -265,7 +265,7 @@ func generateSyncfilePlan(optsList []*rsync.Options, planFile string, syncfilePa
 			planContent.WriteString(fmt.Sprintf("# Filters: %s\n", strings.Join(filters, ", ")))
 		}
 		planContent.WriteString("#\n")
-		
+
 		// Extract operation lines from temp plan (skip headers and comments)
 		tempLines := strings.Split(string(tempContent), "\n")
 		for _, line := range tempLines {
@@ -274,17 +274,17 @@ func generateSyncfilePlan(optsList []*rsync.Options, planFile string, syncfilePa
 				planContent.WriteString(line + "\n")
 			}
 		}
-		
+
 		// Clean up temporary file
 		os.Remove(tempPlan)
 	}
-	
+
 	// Write the combined plan file
 	err := os.WriteFile(planFile, []byte(planContent.String()), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write plan file: %w", err)
 	}
-	
+
 	logger.Infof("SyncFile plan generated successfully: %s", planFile)
 	return nil
 }

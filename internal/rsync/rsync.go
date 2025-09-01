@@ -25,49 +25,49 @@ const (
 
 // PostSyncAction represents an action to execute after sync completes
 type PostSyncAction struct {
-	Type         PostSyncActionType
-	TargetFile   string   // File to operate on
-	Flags        []string // Action-specific flags (e.g., --backup, --dry-run)
-	Content      string   // For inline content (APPEND)
-	SourceFile   string   // For file-based operations (APPEND --file)
+	Type       PostSyncActionType
+	TargetFile string   // File to operate on
+	Flags      []string // Action-specific flags (e.g., --backup, --dry-run)
+	Content    string   // For inline content (APPEND)
+	SourceFile string   // For file-based operations (APPEND --file)
 }
 
 // Options holds all the options for running rsync
 type Options struct {
-	Source              string
-	Dest                string
-	Mode                string
-	DryRun              bool
-	UseSourceGitignore  bool
-	ExcludeHiddenDirs   bool
-	OnlySyncignore      bool
-	IgnoreSrc           []string
-	IgnoreDest          []string
-	Only                []string
-	LogLevel            string
-	LogFile             string
-	LogFormat           string
-	DumpCommands        string
-	Report              string
-	ListFiltered        string
-	Interactive         bool
-	Patch               string
-	ApplyPatch          bool
-	Yes                 bool
-	Preview             bool
+	Source             string
+	Dest               string
+	Mode               string
+	DryRun             bool
+	UseSourceGitignore bool
+	ExcludeHiddenDirs  bool
+	OnlySyncignore     bool
+	IgnoreSrc          []string
+	IgnoreDest         []string
+	Only               []string
+	LogLevel           string
+	LogFile            string
+	LogFormat          string
+	DumpCommands       string
+	Report             string
+	ListFiltered       string
+	Interactive        bool
+	Patch              string
+	ApplyPatch         bool
+	Yes                bool
+	Preview            bool
 	// Interactive sync plan fields
-	Plan                string
-	ApplyPlan           string
-	IncludeChanges      []string
-	ExcludeChanges      []string
-	Editor              string // Custom editor for interactive plan editing
+	Plan           string
+	ApplyPlan      string
+	IncludeChanges []string
+	ExcludeChanges []string
+	Editor         string // Custom editor for interactive plan editing
 	// Conflict resolution fields
-	ConflictStrategy        string // Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup
-	SkipConflicts          bool   // Skip conflicting files during plan execution  
-	GenerateConflictPlan   string // Generate a separate plan file containing only conflicts
-	
+	ConflictStrategy     string // Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup
+	SkipConflicts        bool   // Skip conflicting files during plan execution
+	GenerateConflictPlan string // Generate a separate plan file containing only conflicts
+
 	// Post-sync actions
-	PostSyncActions        []PostSyncAction // Actions to execute after sync completes
+	PostSyncActions []PostSyncAction // Actions to execute after sync completes
 }
 
 // Runner handles rsync operations
@@ -88,14 +88,14 @@ func (r *Runner) Sync(opts *Options) error {
 	if opts.Preview {
 		return r.showPreview(opts)
 	}
-	
+
 	// Check if patch mode is requested (either via --patch flag or --report with .patch extension)
 	if opts.Patch != "" {
 		r.logger.Infof("Starting patch generation: %s -> %s (output: %s, dry-run: %v)",
 			opts.Source, opts.Dest, opts.Patch, opts.DryRun)
 		return r.generatePatch(opts)
 	}
-	
+
 	// Check if report with patch format is requested (based on file extension)
 	if opts.Report != "" && (strings.HasSuffix(strings.ToLower(opts.Report), ".patch") || strings.HasSuffix(strings.ToLower(opts.Report), ".diff")) {
 		r.logger.Infof("Starting patch report generation: %s -> %s (output: %s, dry-run: %v)",
@@ -105,7 +105,7 @@ func (r *Runner) Sync(opts *Options) error {
 		patchOpts.Patch = opts.Report
 		return r.generatePatch(&patchOpts)
 	}
-	
+
 	// Check if markdown report is requested
 	if opts.Report != "" && (strings.HasSuffix(strings.ToLower(opts.Report), ".md") || strings.HasSuffix(strings.ToLower(opts.Report), ".markdown")) {
 		r.logger.Infof("Starting markdown report generation: %s -> %s (output: %s, dry-run: %v)",
@@ -237,7 +237,7 @@ func (r *Runner) buildRsyncCommand(opts *Options, sourceFilter, destFilter strin
 	if !strings.HasSuffix(source, "/") {
 		source += "/"
 	}
-	
+
 	// Build rsync command using unified builder
 	cmdOpts := &RsyncCommandOptions{
 		UseChecksum:      true, // Always use checksum for consistency
@@ -250,7 +250,7 @@ func (r *Runner) buildRsyncCommand(opts *Options, sourceFilter, destFilter strin
 		Dest:             opts.Dest,
 		DryRun:           opts.DryRun,
 	}
-	
+
 	args := r.buildRsyncArgs(cmdOpts)
 	args = append(args, source, opts.Dest)
 
@@ -259,21 +259,21 @@ func (r *Runner) buildRsyncCommand(opts *Options, sourceFilter, destFilter strin
 
 // RsyncCommandOptions configures rsync command building
 type RsyncCommandOptions struct {
-	UseChecksum    bool
-	UseDelete      bool 
-	UseVerbose     bool
+	UseChecksum      bool
+	UseDelete        bool
+	UseVerbose       bool
 	UseHumanReadable bool
-	SourceFilter   string
-	DestFilter     string
-	Source         string
-	Dest           string
-	DryRun         bool
+	SourceFilter     string
+	DestFilter       string
+	Source           string
+	Dest             string
+	DryRun           bool
 }
 
 // buildRsyncArgs creates a unified rsync command args array
 func (r *Runner) buildRsyncArgs(opts *RsyncCommandOptions) []string {
 	args := []string{"--archive"} // Always use archive mode
-	
+
 	if opts.UseChecksum {
 		args = append(args, "--checksum")
 	}
@@ -281,7 +281,7 @@ func (r *Runner) buildRsyncArgs(opts *RsyncCommandOptions) []string {
 		args = append(args, "--verbose")
 	}
 	if opts.UseHumanReadable {
-		args = append(args, "--human-readable") 
+		args = append(args, "--human-readable")
 	}
 	if opts.UseDelete {
 		args = append(args, "--delete")
@@ -289,7 +289,7 @@ func (r *Runner) buildRsyncArgs(opts *RsyncCommandOptions) []string {
 	if opts.DryRun {
 		args = append(args, "--dry-run")
 	}
-	
+
 	// Add filter files
 	if opts.SourceFilter != "" {
 		args = append(args, "--filter", fmt.Sprintf(". %s", opts.SourceFilter))
@@ -297,7 +297,7 @@ func (r *Runner) buildRsyncArgs(opts *RsyncCommandOptions) []string {
 	if opts.DestFilter != "" {
 		args = append(args, "--filter", fmt.Sprintf(". %s", opts.DestFilter))
 	}
-	
+
 	return args
 }
 
@@ -428,7 +428,7 @@ func (r *Runner) generatePatch(opts *Options) error {
 	// Use git diff to generate the patch
 	cmd := exec.Command("git", "diff", "--no-index", "--no-prefix", opts.Dest, opts.Source)
 	cmd.Dir = filepath.Dir(opts.Source)
-	
+
 	output, err := cmd.CombinedOutput()
 	// git diff returns exit code 1 when there are differences, which is expected
 	if err != nil {
@@ -447,12 +447,12 @@ func (r *Runner) generatePatch(opts *Options) error {
 	}
 
 	r.logger.Infof("Patch file generated: %s", opts.Patch)
-	
+
 	// Apply patch if requested
 	if opts.ApplyPatch {
 		return r.applyPatchWithConfirmation(opts)
 	}
-	
+
 	return nil
 }
 
@@ -460,7 +460,7 @@ func (r *Runner) generatePatch(opts *Options) error {
 func (r *Runner) generateSimplePatch(opts *Options, patchFile *os.File) error {
 	fmt.Fprintf(patchFile, "# Simple patch (git not available)\n")
 	fmt.Fprintf(patchFile, "# Files would be synchronized from %s to %s\n", opts.Source, opts.Dest)
-	
+
 	// Just create a basic listing of files that would be synced
 	err := filepath.Walk(opts.Source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -475,7 +475,7 @@ func (r *Runner) generateSimplePatch(opts *Options, patchFile *os.File) error {
 		}
 		return nil
 	})
-	
+
 	return err
 }
 
@@ -486,12 +486,12 @@ func (r *Runner) applyPatchWithConfirmation(opts *Options) error {
 		// When using --report with patch format, the patch path is in Report field
 		patchPath = opts.Report
 	}
-	
+
 	// Check if patch file exists
 	if _, err := os.Stat(patchPath); os.IsNotExist(err) {
 		return fmt.Errorf("patch file does not exist: %s", patchPath)
 	}
-	
+
 	// Show patch preview
 	r.logger.Info("Patch contents:")
 	previewCmd := exec.Command("git", "apply", "--stat", patchPath)
@@ -511,7 +511,7 @@ func (r *Runner) applyPatchWithConfirmation(opts *Options) error {
 	} else {
 		r.logger.Info(string(previewOutput))
 	}
-	
+
 	// Get confirmation unless --yes flag is used
 	if !opts.Yes {
 		if !r.confirmPatchApplication(patchPath) {
@@ -521,25 +521,25 @@ func (r *Runner) applyPatchWithConfirmation(opts *Options) error {
 	} else {
 		r.logger.Info("Auto-confirming patch application (--yes flag)")
 	}
-	
+
 	// Apply the patch
 	r.logger.Infof("Applying patch: %s", patchPath)
-	
+
 	// Convert to absolute path if needed
 	absPatchPath, err := filepath.Abs(patchPath)
 	if err != nil {
 		return fmt.Errorf("error getting absolute path for patch: %w", err)
 	}
-	
+
 	applyCmd := exec.Command("git", "apply", absPatchPath)
 	applyCmd.Dir = opts.Dest
-	
+
 	if output, err := applyCmd.CombinedOutput(); err != nil {
 		r.logger.Errorf("Failed to apply patch: %v", err)
 		r.logger.Errorf("Git apply output: %s", string(output))
 		return fmt.Errorf("failed to apply patch: %w", err)
 	}
-	
+
 	r.logger.Info("Patch applied successfully!")
 	return nil
 }
@@ -547,12 +547,12 @@ func (r *Runner) applyPatchWithConfirmation(opts *Options) error {
 // confirmPatchApplication prompts the user for confirmation
 func (r *Runner) confirmPatchApplication(patchPath string) bool {
 	fmt.Printf("\nDo you want to apply the patch '%s'? [y/N]: ", patchPath)
-	
+
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
 		return false
 	}
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }
@@ -561,11 +561,11 @@ func (r *Runner) confirmPatchApplication(patchPath string) bool {
 func (r *Runner) showPreview(opts *Options) error {
 	r.logger.Infof("Generating preview: %s -> %s",
 		opts.Source, opts.Dest)
-	
+
 	// Generate diff using git diff with color
 	cmd := exec.Command("git", "diff", "--no-index", "--no-prefix", "--color=always", opts.Dest, opts.Source)
 	cmd.Dir = filepath.Dir(opts.Source)
-	
+
 	output, err := cmd.CombinedOutput()
 	// git diff returns exit code 1 when there are differences, which is expected
 	if err != nil {
@@ -577,13 +577,13 @@ func (r *Runner) showPreview(opts *Options) error {
 			return r.showSimplePreview(opts)
 		}
 	}
-	
+
 	// If there's no output, there are no differences
 	if len(output) == 0 {
 		r.logger.Info("No differences found between source and destination")
 		return nil
 	}
-	
+
 	// Check if less is available for paging
 	if _, err := exec.LookPath("less"); err == nil {
 		// Use less with options similar to git diff
@@ -591,7 +591,7 @@ func (r *Runner) showPreview(opts *Options) error {
 		lessCmd.Stdin = strings.NewReader(string(output))
 		lessCmd.Stdout = os.Stdout
 		lessCmd.Stderr = os.Stderr
-		
+
 		r.logger.Debug("Displaying preview with pager (press 'q' to quit)")
 		return lessCmd.Run()
 	} else {
@@ -606,14 +606,14 @@ func (r *Runner) showPreview(opts *Options) error {
 func (r *Runner) showSimplePreview(opts *Options) error {
 	// Use rsync's dry-run to show what would be changed
 	r.logger.Info("Git not available, showing rsync dry-run preview:")
-	
+
 	// Build filter files
 	sourceFilter, err := r.buildSourceFilter(opts)
 	if err != nil {
 		return fmt.Errorf("error building source filter: %w", err)
 	}
 	defer r.cleanupTempFile(sourceFilter)
-	
+
 	var destFilter string
 	if len(opts.IgnoreDest) > 0 {
 		destFilter, err = r.buildDestFilter(opts)
@@ -622,7 +622,7 @@ func (r *Runner) showSimplePreview(opts *Options) error {
 		}
 		defer r.cleanupTempFile(destFilter)
 	}
-	
+
 	// Build rsync command with dry-run and itemize changes
 	args := []string{
 		"--archive",
@@ -632,7 +632,7 @@ func (r *Runner) showSimplePreview(opts *Options) error {
 		"--dry-run",
 		"--itemize-changes",
 	}
-	
+
 	// Add filter files
 	if sourceFilter != "" {
 		args = append(args, "--filter", fmt.Sprintf(". %s", sourceFilter))
@@ -640,32 +640,32 @@ func (r *Runner) showSimplePreview(opts *Options) error {
 	if destFilter != "" {
 		args = append(args, "--filter", fmt.Sprintf(". %s", destFilter))
 	}
-	
+
 	// Add source and destination
 	source := opts.Source
 	if !strings.HasSuffix(source, "/") {
 		source += "/"
 	}
 	args = append(args, source, opts.Dest)
-	
+
 	cmd := exec.Command("rsync", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil && !strings.Contains(err.Error(), "exit status 23") {
 		// Exit status 23 is partial transfer due to error, often from dry-run
 		return fmt.Errorf("rsync preview failed: %w", err)
 	}
-	
+
 	fmt.Print(string(output))
 	return nil
 }
 
 // SyncChange represents a single file change in the sync operation
 type SyncChange struct {
-	Action   string // "create", "update", "delete"
-	Path     string
-	Size     int64
-	ModTime  time.Time
-	IsDir    bool
+	Action  string // "create", "update", "delete"
+	Path    string
+	Size    int64
+	ModTime time.Time
+	IsDir   bool
 }
 
 // SyncReport contains the report data for a sync operation
@@ -681,32 +681,32 @@ type SyncReport struct {
 
 // SyncStats contains statistics about the sync operation
 type SyncStats struct {
-	FilesCreated   int
-	FilesUpdated   int
-	FilesDeleted   int
-	DirsCreated    int
-	DirsDeleted    int
-	TotalSize      int64
-	FilteredCount  int
+	FilesCreated  int
+	FilesUpdated  int
+	FilesDeleted  int
+	DirsCreated   int
+	DirsDeleted   int
+	TotalSize     int64
+	FilteredCount int
 }
 
 // generateMarkdownReport creates a markdown report of the sync operation
 func (r *Runner) generateMarkdownReport(opts *Options) error {
 	r.logger.Debug("Generating markdown report")
-	
+
 	// Collect sync information using dry-run
 	report, err := r.collectSyncInfo(opts)
 	if err != nil {
 		return fmt.Errorf("error collecting sync information: %w", err)
 	}
-	
+
 	// Write the markdown report
 	if err := r.writeMarkdownReport(report, opts.Report); err != nil {
 		return fmt.Errorf("error writing markdown report: %w", err)
 	}
-	
+
 	r.logger.Infof("Markdown report generated: %s", opts.Report)
-	
+
 	// If not in dry-run mode, also perform the actual sync
 	if !opts.DryRun {
 		r.logger.Info("Performing actual sync after report generation")
@@ -719,7 +719,7 @@ func (r *Runner) generateMarkdownReport(opts *Options) error {
 			return fmt.Errorf("unsupported mode: %s", opts.Mode)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -733,14 +733,14 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 		Timestamp:   time.Now(),
 		Changes:     []SyncChange{},
 	}
-	
+
 	// Build filter files
 	sourceFilter, err := r.buildSourceFilter(opts)
 	if err != nil {
 		return nil, fmt.Errorf("error building source filter: %w", err)
 	}
 	defer r.cleanupTempFile(sourceFilter)
-	
+
 	var destFilter string
 	if len(opts.IgnoreDest) > 0 {
 		destFilter, err = r.buildDestFilter(opts)
@@ -749,7 +749,7 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 		}
 		defer r.cleanupTempFile(destFilter)
 	}
-	
+
 	// Build rsync command with dry-run and itemize changes
 	args := []string{
 		"--archive",
@@ -760,7 +760,7 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 		"--itemize-changes",
 		"--out-format=%i %n %L %l %t",
 	}
-	
+
 	// Add filter files
 	if sourceFilter != "" {
 		args = append(args, "--filter", fmt.Sprintf(". %s", sourceFilter))
@@ -768,21 +768,21 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 	if destFilter != "" {
 		args = append(args, "--filter", fmt.Sprintf(". %s", destFilter))
 	}
-	
+
 	// Add source and destination
 	source := opts.Source
 	if !strings.HasSuffix(source, "/") {
 		source += "/"
 	}
 	args = append(args, source, opts.Dest)
-	
+
 	cmd := exec.Command("rsync", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil && !strings.Contains(err.Error(), "exit status 23") {
 		// Exit status 23 is partial transfer due to error, often from dry-run
 		return nil, fmt.Errorf("rsync dry-run failed: %w", err)
 	}
-	
+
 	// Parse rsync output to extract changes
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
@@ -790,7 +790,7 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 		if line == "" {
 			continue
 		}
-		
+
 		// Skip rsync header and summary lines
 		if strings.HasPrefix(line, "sending incremental") ||
 			strings.HasPrefix(line, "sent ") ||
@@ -798,13 +798,13 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 			strings.HasPrefix(line, "bytes/sec") {
 			continue
 		}
-		
+
 		// Parse itemize-changes format - lines starting with *, >, <, c, etc.
 		if r.isItemizedChange(line) {
 			change := r.parseRsyncChange(line)
 			if change != nil {
 				report.Changes = append(report.Changes, *change)
-				
+
 				// Update statistics
 				switch change.Action {
 				case "create":
@@ -827,7 +827,7 @@ func (r *Runner) collectSyncInfo(opts *Options) (*SyncReport, error) {
 			}
 		}
 	}
-	
+
 	return report, nil
 }
 
@@ -850,29 +850,29 @@ func (r *Runner) collectSyncInfoComprehensive(opts *Options) (*SyncReport, error
 		Timestamp:   time.Now(),
 		Changes:     []SyncChange{},
 	}
-	
+
 	// Get file listings from both directories
 	sourceFiles, err := r.getFileList(opts.Source)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list source files: %w", err)
 	}
-	
+
 	destFiles, err := r.getFileList(opts.Dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list dest files: %w", err)
 	}
-	
+
 	// Create maps for efficient lookup
 	sourceMap := make(map[string]FileInfo)
 	for _, file := range sourceFiles {
 		sourceMap[file.RelativePath] = file
 	}
-	
+
 	destMap := make(map[string]FileInfo)
 	for _, file := range destFiles {
 		destMap[file.RelativePath] = file
 	}
-	
+
 	// Find all unique paths
 	allPaths := make(map[string]bool)
 	for path := range sourceMap {
@@ -881,18 +881,18 @@ func (r *Runner) collectSyncInfoComprehensive(opts *Options) (*SyncReport, error
 	for path := range destMap {
 		allPaths[path] = true
 	}
-	
+
 	// Analyze each path
 	for path := range allPaths {
 		sourceFile, inSource := sourceMap[path]
 		destFile, inDest := destMap[path]
-		
+
 		change := r.analyzeFileChange(path, sourceFile, destFile, inSource, inDest)
 		if change != nil {
 			report.Changes = append(report.Changes, *change)
 		}
 	}
-	
+
 	// Update statistics
 	for _, change := range report.Changes {
 		switch change.Action {
@@ -914,30 +914,30 @@ func (r *Runner) collectSyncInfoComprehensive(opts *Options) (*SyncReport, error
 			}
 		}
 	}
-	
+
 	return report, nil
 }
 
 // getFileList recursively lists all files in a directory
 func (r *Runner) getFileList(dirPath string) ([]FileInfo, error) {
 	var files []FileInfo
-	
+
 	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip the root directory itself
 		if path == dirPath {
 			return nil
 		}
-		
+
 		// Get relative path
 		relPath, err := filepath.Rel(dirPath, path)
 		if err != nil {
 			return err
 		}
-		
+
 		files = append(files, FileInfo{
 			RelativePath: filepath.ToSlash(relPath), // Use forward slashes for consistency
 			AbsolutePath: path,
@@ -945,10 +945,10 @@ func (r *Runner) getFileList(dirPath string) ([]FileInfo, error) {
 			ModTime:      info.ModTime(),
 			IsDir:        info.IsDir(),
 		})
-		
+
 		return nil
 	})
-	
+
 	return files, err
 }
 
@@ -957,11 +957,11 @@ func (r *Runner) analyzeFileChange(path string, sourceFile, destFile FileInfo, i
 	if !inSource && !inDest {
 		return nil // Shouldn't happen
 	}
-	
+
 	change := &SyncChange{
 		Path: path,
 	}
-	
+
 	if inSource && !inDest {
 		// File only exists in source
 		if sourceFile.IsDir {
@@ -983,7 +983,7 @@ func (r *Runner) analyzeFileChange(path string, sourceFile, destFile FileInfo, i
 	} else {
 		// File exists in both - check for differences
 		change.IsDir = sourceFile.IsDir
-		
+
 		if sourceFile.IsDir && destFile.IsDir {
 			// Both are directories - generally no action needed
 			return nil // Skip directories for now
@@ -993,15 +993,15 @@ func (r *Runner) analyzeFileChange(path string, sourceFile, destFile FileInfo, i
 				// Files are identical - no change needed
 				return nil
 			}
-			
+
 			// Files differ - determine if it's an update or conflict
 			sourceMod := sourceFile.ModTime
 			destMod := destFile.ModTime
-			
+
 			// Use source file info for the change
 			change.Size = sourceFile.Size
 			change.ModTime = sourceMod
-			
+
 			if sourceMod.After(destMod) {
 				change.Action = "update"
 			} else if destMod.After(sourceMod) {
@@ -1018,7 +1018,7 @@ func (r *Runner) analyzeFileChange(path string, sourceFile, destFile FileInfo, i
 			change.ModTime = sourceFile.ModTime
 		}
 	}
-	
+
 	return change
 }
 
@@ -1027,11 +1027,11 @@ func (r *Runner) filesAreIdentical(path1, path2 string) bool {
 	// Read and compare file content
 	content1, err1 := os.ReadFile(path1)
 	content2, err2 := os.ReadFile(path2)
-	
+
 	if err1 != nil || err2 != nil {
 		return false
 	}
-	
+
 	// Compare actual content
 	return string(content1) == string(content2)
 }
@@ -1043,21 +1043,21 @@ func (r *Runner) isBinaryFile(path string) bool {
 		return false // If we can't read it, assume text
 	}
 	defer file.Close()
-	
+
 	// Read first 512 bytes to detect binary content
 	buf := make([]byte, 512)
 	n, err := file.Read(buf)
 	if err != nil && n == 0 {
 		return false
 	}
-	
+
 	// Check for null bytes which indicate binary content
 	for i := 0; i < n; i++ {
 		if buf[i] == 0 {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -1068,25 +1068,25 @@ func (r *Runner) parseRsyncChange(line string) *SyncChange {
 	// >f+++++++++ main.js  18 2025/08/30 01:11:42
 	// *deleting   config.yml  0 2025/08/30 01:11:42
 	// cd+++++++++ dir/
-	
+
 	parts := strings.Fields(line)
 	if len(parts) < 4 { // Need at least flags, filename, size, timestamp
 		return nil
 	}
-	
+
 	flags := parts[0]
 	filename := parts[1]
 	size := parts[2]
 	// Join remaining parts for timestamp (could be date and time)
 	timestamp := strings.Join(parts[3:], " ")
-	
+
 	// Parse the flags to determine action and type
 	change := &SyncChange{
-		Path:   filename,
+		Path:    filename,
 		ModTime: r.parseTimestamp(timestamp),
 		Size:    r.parseSize(size),
 	}
-	
+
 	// Determine action and type based on flags
 	if strings.HasPrefix(flags, "*deleting") {
 		change.Action = "delete"
@@ -1114,7 +1114,7 @@ func (r *Runner) parseRsyncChange(line string) *SyncChange {
 		change.IsDir = false
 		change.Action = "update"
 	}
-	
+
 	return change
 }
 
@@ -1125,12 +1125,12 @@ func (r *Runner) isItemizedChange(line string) bool {
 	if len(line) < 3 {
 		return false
 	}
-	
+
 	// Check for common itemized change patterns
 	firstChar := line[0]
-	return firstChar == '>' || firstChar == '<' || firstChar == '*' || 
-		   firstChar == 'c' || firstChar == '.' || 
-		   strings.HasPrefix(line, "*deleting")
+	return firstChar == '>' || firstChar == '<' || firstChar == '*' ||
+		firstChar == 'c' || firstChar == '.' ||
+		strings.HasPrefix(line, "*deleting")
 }
 
 // parseTimestamp converts rsync timestamp to time.Time
@@ -1157,14 +1157,14 @@ func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) erro
 		return err
 	}
 	defer file.Close()
-	
+
 	w := bufio.NewWriter(file)
 	defer w.Flush()
-	
+
 	// Write header
 	fmt.Fprintf(w, "# Sync Report\n\n")
 	fmt.Fprintf(w, "Generated by sync-tools on %s\n\n", report.Timestamp.Format("2006-01-02 15:04:05"))
-	
+
 	// Write configuration section
 	fmt.Fprintf(w, "## Configuration\n\n")
 	fmt.Fprintf(w, "| Setting | Value |\n")
@@ -1174,7 +1174,7 @@ func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) erro
 	fmt.Fprintf(w, "| Mode | %s |\n", report.Mode)
 	fmt.Fprintf(w, "| Dry Run | %v |\n", report.DryRun)
 	fmt.Fprintf(w, "\n")
-	
+
 	// Write statistics section
 	fmt.Fprintf(w, "## Summary Statistics\n\n")
 	fmt.Fprintf(w, "| Metric | Count |\n")
@@ -1187,16 +1187,16 @@ func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) erro
 	fmt.Fprintf(w, "| Total Size | %s |\n", r.formatSize(report.Stats.TotalSize))
 	fmt.Fprintf(w, "| Total Changes | %d |\n", len(report.Changes))
 	fmt.Fprintf(w, "\n")
-	
+
 	// Write changes section
 	if len(report.Changes) > 0 {
 		fmt.Fprintf(w, "## Changes\n\n")
-		
+
 		// Group changes by action
 		creates := []SyncChange{}
 		updates := []SyncChange{}
 		deletes := []SyncChange{}
-		
+
 		for _, change := range report.Changes {
 			switch change.Action {
 			case "create":
@@ -1207,7 +1207,7 @@ func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) erro
 				deletes = append(deletes, change)
 			}
 		}
-		
+
 		// Write creates
 		if len(creates) > 0 {
 			fmt.Fprintf(w, "### Files/Directories to Create (%d)\n\n", len(creates))
@@ -1220,7 +1220,7 @@ func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) erro
 			}
 			fmt.Fprintf(w, "\n")
 		}
-		
+
 		// Write updates
 		if len(updates) > 0 {
 			fmt.Fprintf(w, "### Files to Update (%d)\n\n", len(updates))
@@ -1229,7 +1229,7 @@ func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) erro
 			}
 			fmt.Fprintf(w, "\n")
 		}
-		
+
 		// Write deletes
 		if len(deletes) > 0 {
 			fmt.Fprintf(w, "### Files/Directories to Delete (%d)\n\n", len(deletes))
@@ -1246,11 +1246,11 @@ func (r *Runner) writeMarkdownReport(report *SyncReport, outputPath string) erro
 		fmt.Fprintf(w, "## Changes\n\n")
 		fmt.Fprintf(w, "No changes detected.\n\n")
 	}
-	
+
 	// Write footer
 	fmt.Fprintf(w, "---\n")
 	fmt.Fprintf(w, "*Report generated by [sync-tools](https://github.com/DamianReeves/sync-tools)*\n")
-	
+
 	return nil
 }
 
@@ -1271,32 +1271,32 @@ func (r *Runner) formatSize(size int64) string {
 // GeneratePlan creates a sync plan file for two-phased interactive sync
 func (r *Runner) GeneratePlan(opts *Options) error {
 	r.logger.Infof("Generating sync plan: %s", opts.Plan)
-	
+
 	// Collect sync information using comprehensive analysis
 	syncInfo, err := r.collectSyncInfoComprehensive(opts)
 	if err != nil {
 		return fmt.Errorf("failed to analyze sync operations: %w", err)
 	}
-	
+
 	// Generate plan content from analysis
 	planContent, err := r.generatePlanContent(opts, syncInfo)
 	if err != nil {
 		return fmt.Errorf("failed to generate plan content: %w", err)
 	}
-	
+
 	// Write plan file
 	err = os.WriteFile(opts.Plan, []byte(planContent), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write plan file: %w", err)
 	}
-	
+
 	r.logger.Infof("Plan file created successfully: %s", opts.Plan)
-	
+
 	// If interactive mode is enabled, open in editor
 	if opts.Interactive {
 		return r.openPlanInEditor(opts)
 	}
-	
+
 	return nil
 }
 
@@ -1326,28 +1326,28 @@ func (r *Runner) ExecutePlan(opts *Options) error {
 	} else {
 		r.logger.Infof("Executing sync plan: %s", opts.ApplyPlan)
 	}
-	
+
 	// Validate plan file first
 	if err := r.validatePlanFile(opts.ApplyPlan); err != nil {
 		return err // This will include "invalid plan syntax" errors
 	}
-	
+
 	// Read and parse plan file
 	content, err := os.ReadFile(opts.ApplyPlan)
 	if err != nil {
 		return fmt.Errorf("failed to read plan file: %w", err)
 	}
-	
+
 	if len(content) == 0 {
 		return fmt.Errorf("plan file is empty")
 	}
-	
+
 	// Parse plan file to extract metadata and operations
 	planData, err := r.parsePlan(string(content))
 	if err != nil {
 		return fmt.Errorf("failed to parse plan file: %w", err)
 	}
-	
+
 	// Override source/dest with values from plan file if not provided
 	if opts.Source == "" {
 		opts.Source = planData.Source
@@ -1358,7 +1358,7 @@ func (r *Runner) ExecutePlan(opts *Options) error {
 	if opts.Mode == "" {
 		opts.Mode = planData.Mode
 	}
-	
+
 	// Resolve relative paths to absolute paths
 	if opts.Source != "" {
 		if absSource, err := filepath.Abs(opts.Source); err == nil {
@@ -1370,14 +1370,14 @@ func (r *Runner) ExecutePlan(opts *Options) error {
 			opts.Dest = absDest
 		}
 	}
-	
+
 	// Execute each operation in the plan
 	for _, op := range planData.Operations {
 		if err := r.executePlanOperation(op, opts); err != nil {
 			return fmt.Errorf("failed to execute operation %s %s: %w", op.Alias, op.Path, err)
 		}
 	}
-	
+
 	if opts.DryRun {
 		r.logger.Infof("[DRY RUN] Plan execution completed successfully: %d operations would be executed", len(planData.Operations))
 		fmt.Printf("DRY RUN COMPLETE - %d operations would be executed. No files were modified.\n", len(planData.Operations))
@@ -1393,16 +1393,16 @@ func (r *Runner) parsePlan(content string) (*PlanData, error) {
 	planData := &PlanData{
 		Operations: []PlanOperation{},
 	}
-	
+
 	// Parse metadata from comments
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		
+
 		// Skip empty lines
 		if line == "" {
 			continue
 		}
-		
+
 		// Parse metadata comments
 		if strings.HasPrefix(line, "# Source:") {
 			planData.Source = strings.TrimSpace(strings.TrimPrefix(line, "# Source:"))
@@ -1416,12 +1416,12 @@ func (r *Runner) parsePlan(content string) (*PlanData, error) {
 			planData.Mode = strings.TrimSpace(strings.TrimPrefix(line, "# Mode:"))
 			continue
 		}
-		
+
 		// Skip other comment lines
 		if strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		// Parse operation lines (format: alias type path size time flags)
 		fields := strings.Fields(line)
 		if len(fields) < 3 {
@@ -1431,13 +1431,13 @@ func (r *Runner) parsePlan(content string) (*PlanData, error) {
 			}
 			continue // Skip other malformed lines
 		}
-		
+
 		op := PlanOperation{
 			Alias: fields[0],
 			Type:  fields[1],
 			Path:  fields[2],
 		}
-		
+
 		// Parse optional fields
 		if len(fields) > 3 {
 			op.Size = fields[3]
@@ -1448,10 +1448,10 @@ func (r *Runner) parsePlan(content string) (*PlanData, error) {
 		if len(fields) > 5 {
 			op.Flags = strings.Join(fields[5:], " ")
 		}
-		
+
 		planData.Operations = append(planData.Operations, op)
 	}
-	
+
 	return planData, nil
 }
 
@@ -1462,7 +1462,7 @@ func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
 	} else {
 		r.logger.Infof("Executing: %s %s %s", op.Alias, op.Type, op.Path)
 	}
-	
+
 	// Determine sync direction based on alias
 	var srcPath, destPath string
 	switch op.Alias {
@@ -1471,7 +1471,7 @@ func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
 		srcPath = filepath.Join(opts.Source, op.Path)
 		destPath = filepath.Join(opts.Dest, op.Path)
 	case ">>", "d2s", "dest-to-source":
-		// Destination to source  
+		// Destination to source
 		srcPath = filepath.Join(opts.Dest, op.Path)
 		destPath = filepath.Join(opts.Source, op.Path)
 	case "<>", "bid", "bidirectional":
@@ -1480,12 +1480,12 @@ func (r *Runner) executePlanOperation(op PlanOperation, opts *Options) error {
 	default:
 		return fmt.Errorf("unknown operation alias: %s", op.Alias)
 	}
-	
+
 	// Execute the file operation using rsync or file operations
 	if err := r.syncSingleFile(srcPath, destPath, op.Type == "dir", opts.DryRun); err != nil {
 		return fmt.Errorf("failed to sync %s: %w", op.Path, err)
 	}
-	
+
 	return nil
 }
 
@@ -1496,13 +1496,13 @@ func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool, dryRun boo
 		r.logger.Infof("[DRY RUN] Would sync: %s -> %s", srcPath, destPath)
 		return nil
 	}
-	
+
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
-	
+
 	if isDir {
 		// For directories, ensure source ends with / and create dest directory
 		if !strings.HasSuffix(srcPath, "/") {
@@ -1512,25 +1512,25 @@ func (r *Runner) syncSingleFile(srcPath, destPath string, isDir bool, dryRun boo
 			return fmt.Errorf("failed to create destination directory: %w", err)
 		}
 	}
-	
+
 	// Build rsync command using unified builder
 	cmdOpts := &RsyncCommandOptions{
-		UseChecksum: true, // Always use checksum for plan execution 
+		UseChecksum: true, // Always use checksum for plan execution
 		Source:      srcPath,
 		Dest:        destPath,
 	}
 	args := r.buildRsyncArgs(cmdOpts)
 	args = append(args, srcPath, destPath)
 	cmd := exec.Command("rsync", args...)
-	
+
 	r.logger.Debugf("Executing rsync command: %s", strings.Join(cmd.Args, " "))
-	
+
 	// Execute the command
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("rsync failed: %w, output: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -1540,34 +1540,34 @@ func (r *Runner) syncBidirectional(op PlanOperation, opts *Options) error {
 		r.logger.Infof("[DRY RUN] Would execute bidirectional sync: %s %s", op.Type, op.Path)
 		return nil
 	}
-	
+
 	r.logger.Infof("Executing bidirectional sync: %s %s", op.Type, op.Path)
-	
+
 	srcPath := filepath.Join(opts.Source, op.Path)
 	destPath := filepath.Join(opts.Dest, op.Path)
-	
+
 	// Check if both files exist
 	srcInfo, srcErr := os.Stat(srcPath)
 	destInfo, destErr := os.Stat(destPath)
-	
+
 	if srcErr != nil && destErr != nil {
 		// Neither file exists - nothing to sync
 		r.logger.Warnf("Neither source nor destination file exists: %s", op.Path)
 		return nil
 	}
-	
+
 	if srcErr != nil && destErr == nil {
 		// Only destination exists - sync from dest to source
 		r.logger.Infof("File only exists in destination, syncing to source: %s", op.Path)
 		return r.syncSingleFile(destPath, srcPath, destInfo.IsDir(), opts.DryRun)
 	}
-	
+
 	if srcErr == nil && destErr != nil {
 		// Only source exists - sync from source to dest
 		r.logger.Infof("File only exists in source, syncing to destination: %s", op.Path)
 		return r.syncSingleFile(srcPath, destPath, srcInfo.IsDir(), opts.DryRun)
 	}
-	
+
 	// Both files exist - need conflict resolution
 	return r.resolveConflict(op, srcPath, destPath, srcInfo, destInfo, opts)
 }
@@ -1576,18 +1576,18 @@ func (r *Runner) syncBidirectional(op PlanOperation, opts *Options) error {
 type ConflictStrategy string
 
 const (
-	NewestWins ConflictStrategy = "newest-wins"
+	NewestWins  ConflictStrategy = "newest-wins"
 	LargestWins ConflictStrategy = "largest-wins"
-	SourceWins ConflictStrategy = "source-wins"
-	DestWins ConflictStrategy = "dest-wins"
-	Merge ConflictStrategy = "merge"
-	Backup ConflictStrategy = "backup"
+	SourceWins  ConflictStrategy = "source-wins"
+	DestWins    ConflictStrategy = "dest-wins"
+	Merge       ConflictStrategy = "merge"
+	Backup      ConflictStrategy = "backup"
 )
 
 // resolveConflict handles conflict resolution for bidirectional sync
 func (r *Runner) resolveConflict(op PlanOperation, srcPath, destPath string, srcInfo, destInfo os.FileInfo, opts *Options) error {
 	r.logger.Infof("Resolving conflict for: %s", op.Path)
-	
+
 	// Check if files are identical
 	if !srcInfo.IsDir() && !destInfo.IsDir() {
 		if r.filesAreIdentical(srcPath, destPath) {
@@ -1595,15 +1595,15 @@ func (r *Runner) resolveConflict(op PlanOperation, srcPath, destPath string, src
 			return nil
 		}
 	}
-	
+
 	// Check if this is a binary file
 	if !srcInfo.IsDir() && !destInfo.IsDir() && r.isBinaryFile(srcPath) {
 		r.logger.Infof("Binary file conflict detected, using binary conflict resolution strategy (newest-wins by default)")
 	}
-	
+
 	// Default strategy: newest-wins
 	strategy := r.getConflictStrategy(op, opts)
-	
+
 	switch strategy {
 	case NewestWins:
 		return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo, opts)
@@ -1639,7 +1639,7 @@ func (r *Runner) getConflictStrategy(op PlanOperation, opts *Options) ConflictSt
 	if strings.Contains(op.Flags, "auto:backup") {
 		return Backup
 	}
-	
+
 	// TODO: Check opts for global conflict strategy setting
 	// For now, default to newest-wins
 	return NewestWins
@@ -1683,14 +1683,14 @@ func (r *Runner) resolveLargestWins(srcPath, destPath string, srcInfo, destInfo 
 // resolveWithBackup creates backup copies before syncing
 func (r *Runner) resolveWithBackup(srcPath, destPath string, srcInfo, destInfo os.FileInfo, opts *Options) error {
 	timestamp := time.Now().Unix()
-	
+
 	// Create backup of destination file
 	destBackup := fmt.Sprintf("%s.conflict-%d", destPath, timestamp)
 	r.logger.Infof("Creating backup of destination: %s", destBackup)
 	if err := r.copyFile(destPath, destBackup); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
-	
+
 	// Sync using newest-wins strategy
 	return r.resolveNewestWins(srcPath, destPath, srcInfo, destInfo, opts)
 }
@@ -1702,13 +1702,13 @@ func (r *Runner) copyFile(src, dest string) error {
 		return err
 	}
 	defer sourceFile.Close()
-	
+
 	destFile, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
 	defer destFile.Close()
-	
+
 	_, err = io.Copy(destFile, sourceFile)
 	return err
 }
@@ -1716,15 +1716,15 @@ func (r *Runner) copyFile(src, dest string) error {
 // generatePlanContent creates the plan file content from sync analysis
 func (r *Runner) generatePlanContent(opts *Options, report *SyncReport) (string, error) {
 	var content strings.Builder
-	
+
 	// Generate header with metadata
 	content.WriteString(fmt.Sprintf("# Sync Plan Generated: %s\n", time.Now().Format("2006-01-02 15:04:05")))
-	content.WriteString(fmt.Sprintf("# Generated from: sync-tools sync --source %s --dest %s --plan %s\n", 
+	content.WriteString(fmt.Sprintf("# Generated from: sync-tools sync --source %s --dest %s --plan %s\n",
 		opts.Source, opts.Dest, opts.Plan))
 	content.WriteString(fmt.Sprintf("# Source: %s\n", opts.Source))
 	content.WriteString(fmt.Sprintf("# Destination: %s\n", opts.Dest))
 	content.WriteString(fmt.Sprintf("# Mode: %s\n", opts.Mode))
-	
+
 	// Add change filter info if specified
 	if len(opts.IncludeChanges) > 0 {
 		content.WriteString(fmt.Sprintf("# Include changes: %s\n", strings.Join(opts.IncludeChanges, ", ")))
@@ -1732,7 +1732,7 @@ func (r *Runner) generatePlanContent(opts *Options, report *SyncReport) (string,
 	if len(opts.ExcludeChanges) > 0 {
 		content.WriteString(fmt.Sprintf("# Exclude changes: %s\n", strings.Join(opts.ExcludeChanges, ", ")))
 	}
-	
+
 	content.WriteString("#\n")
 	content.WriteString("# Commands:\n")
 	content.WriteString("#   s2d, sync-to-dest, <<    - Sync from source to destination (source >> dest)\n")
@@ -1741,16 +1741,16 @@ func (r *Runner) generatePlanContent(opts *Options, report *SyncReport) (string,
 	content.WriteString("#   skip                     - Skip this item (commented out)\n")
 	content.WriteString("#\n")
 	content.WriteString("# Visual aliases make direction intuitive:\n")
-	content.WriteString("#   << = source flows to dest (like << redirection)\n")  
+	content.WriteString("#   << = source flows to dest (like << redirection)\n")
 	content.WriteString("#   >> = dest flows to source (like >> redirection)\n")
 	content.WriteString("#   <> = bidirectional flow (like <-> but shorter)\n")
 	content.WriteString("#\n")
 	content.WriteString("# Format: <command> <item-type> <path> [size] [modified] [flags]\n")
 	content.WriteString("\n")
-	
+
 	// Filter changes based on include/exclude options
 	filteredChanges := r.filterChanges(report.Changes, opts)
-	
+
 	// Generate operations for each change
 	for _, change := range filteredChanges {
 		operation := r.determineOperation(change, opts.Mode)
@@ -1762,12 +1762,12 @@ func (r *Runner) generatePlanContent(opts *Options, report *SyncReport) (string,
 			change.ModTime.Format("2006-01-02T15:04:05"),
 			r.getChangeFlags(change)))
 	}
-	
+
 	// Generate summary
 	content.WriteString("\n# Summary:\n")
 	summary := r.generateSummary(filteredChanges, len(report.Changes))
 	content.WriteString(summary)
-	
+
 	return content.String(), nil
 }
 
@@ -1776,11 +1776,11 @@ func (r *Runner) filterChanges(changes []SyncChange, opts *Options) []SyncChange
 	if len(opts.IncludeChanges) == 0 && len(opts.ExcludeChanges) == 0 {
 		return changes // No filtering
 	}
-	
+
 	var filtered []SyncChange
 	for _, change := range changes {
 		changeType := r.getChangeType(change)
-		
+
 		// If include list is specified, only include matching types
 		if len(opts.IncludeChanges) > 0 {
 			included := false
@@ -1794,7 +1794,7 @@ func (r *Runner) filterChanges(changes []SyncChange, opts *Options) []SyncChange
 				continue
 			}
 		}
-		
+
 		// If exclude list is specified, exclude matching types
 		if len(opts.ExcludeChanges) > 0 {
 			excluded := false
@@ -1808,10 +1808,10 @@ func (r *Runner) filterChanges(changes []SyncChange, opts *Options) []SyncChange
 				continue
 			}
 		}
-		
+
 		filtered = append(filtered, change)
 	}
-	
+
 	return filtered
 }
 
@@ -1877,25 +1877,25 @@ func (r *Runner) getChangeFlags(change SyncChange) string {
 // generateSummary creates the summary statistics
 func (r *Runner) generateSummary(filteredChanges []SyncChange, totalChanges int) string {
 	var summary strings.Builder
-	
+
 	summary.WriteString(fmt.Sprintf("# Files matching filter: %d\n", len(filteredChanges)))
-	
+
 	// Count by change type
 	counts := make(map[string]int)
 	for _, change := range filteredChanges {
 		changeType := r.getChangeType(change)
 		counts[changeType]++
 	}
-	
+
 	summary.WriteString(fmt.Sprintf("# New in source: %d\n", counts["new-in-source"]))
 	summary.WriteString(fmt.Sprintf("# New in dest: %d\n", counts["new-in-dest"]))
 	summary.WriteString(fmt.Sprintf("# Updates: %d\n", counts["updates"]))
 	summary.WriteString(fmt.Sprintf("# Conflicts: %d\n", counts["conflicts"]))
-	
+
 	if len(filteredChanges) != totalChanges {
 		summary.WriteString(fmt.Sprintf("# Filtered out: %d\n", totalChanges-len(filteredChanges)))
 	}
-	
+
 	return summary.String()
 }
 
@@ -1921,31 +1921,31 @@ func (r *Runner) openPlanInEditor(opts *Options) error {
 	if editor == "" {
 		return fmt.Errorf("no editor found; please set EDITOR environment variable or use --editor flag")
 	}
-	
+
 	r.logger.Infof("Opening plan file in editor: %s", editor)
-	
+
 	// Get absolute path of plan file
 	absPlanPath, err := filepath.Abs(opts.Plan)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path of plan file: %w", err)
 	}
-	
+
 	// Open editor
 	cmd := exec.Command(editor, absPlanPath)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to open editor: %w", err)
 	}
-	
+
 	// After editing, validate the plan
 	r.logger.Info("Validating edited plan file...")
 	if err := r.validatePlanFile(absPlanPath); err != nil {
 		r.logger.Warnf("Plan validation warning: %v", err)
 	}
-	
+
 	// Ask if user wants to execute the plan immediately
 	if !opts.DryRun && !opts.Yes {
 		if r.confirmPlanExecution(absPlanPath) {
@@ -1954,7 +1954,7 @@ func (r *Runner) openPlanInEditor(opts *Options) error {
 			return r.ExecutePlan(opts)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1964,21 +1964,21 @@ func (r *Runner) validatePlanFile(planPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read plan file: %w", err)
 	}
-	
+
 	if len(content) == 0 {
 		return fmt.Errorf("plan file is empty")
 	}
-	
+
 	// Parse plan to check for basic validity
 	planData, err := r.parsePlan(string(content))
 	if err != nil {
 		return fmt.Errorf("invalid plan syntax: %w", err)
 	}
-	
+
 	if len(planData.Operations) == 0 {
 		return fmt.Errorf("no operations found in plan")
 	}
-	
+
 	// Check for invalid aliases
 	validAliases := map[string]bool{
 		"<<": true, ">>": true, "<>": true,
@@ -1987,13 +1987,13 @@ func (r *Runner) validatePlanFile(planPath string) error {
 		"bid": true, "bidirectional": true,
 		"skip": true,
 	}
-	
+
 	for _, op := range planData.Operations {
 		if !validAliases[op.Alias] {
 			return fmt.Errorf("invalid operation alias: %s", op.Alias)
 		}
 	}
-	
+
 	r.logger.Info("Plan file is valid")
 	return nil
 }
@@ -2001,12 +2001,12 @@ func (r *Runner) validatePlanFile(planPath string) error {
 // confirmPlanExecution prompts the user to confirm plan execution
 func (r *Runner) confirmPlanExecution(planPath string) bool {
 	fmt.Printf("\nDo you want to execute the plan now? [y/N]: ")
-	
+
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
 		return false
 	}
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }
@@ -2021,7 +2021,7 @@ func (r *Runner) executePostSyncActions(opts *Options) error {
 
 	for i, action := range opts.PostSyncActions {
 		r.logger.Infof("Executing post-sync action %d/%d: %s", i+1, len(opts.PostSyncActions), action.Type)
-		
+
 		switch action.Type {
 		case PostSyncAppend:
 			if err := r.executeAppendAction(action, opts); err != nil {
@@ -2043,17 +2043,17 @@ func (r *Runner) executePostSyncActions(opts *Options) error {
 // executeAppendAction executes an APPEND post-sync action
 func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error {
 	targetPath := action.TargetFile
-	
+
 	// If target path is not absolute, make it relative to destination directory
 	if !filepath.IsAbs(targetPath) {
 		targetPath = filepath.Join(opts.Dest, targetPath)
 	}
-	
+
 	// Check flags for special behaviors
 	isDryRun := opts.DryRun
 	hasBackupFlag := false
 	hasNewlineFlag := true // default
-	
+
 	for _, flag := range action.Flags {
 		switch flag {
 		case "--dry-run":
@@ -2064,7 +2064,7 @@ func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error
 			hasNewlineFlag = false
 		}
 	}
-	
+
 	// Handle dry-run mode
 	if isDryRun {
 		r.logger.Infof("Would append to %s", targetPath)
@@ -2075,12 +2075,12 @@ func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error
 		}
 		return nil
 	}
-	
+
 	// Check if target file exists
 	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 		return fmt.Errorf("target file not found: %s", action.TargetFile)
 	}
-	
+
 	// Create backup if requested
 	if hasBackupFlag {
 		backupPath := fmt.Sprintf("%s.backup.%d", targetPath, time.Now().Unix())
@@ -2089,7 +2089,7 @@ func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error
 		}
 		r.logger.Infof("Created backup: %s", backupPath)
 	}
-	
+
 	// Get content to append
 	var contentToAppend string
 	if action.SourceFile != "" {
@@ -2103,24 +2103,24 @@ func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error
 		// Use inline content
 		contentToAppend = action.Content
 	}
-	
+
 	// Open target file for appending
 	file, err := os.OpenFile(targetPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open target file for appending: %w", err)
 	}
 	defer file.Close()
-	
+
 	// Add newline before content if needed
 	if hasNewlineFlag {
 		contentToAppend = "\n" + contentToAppend
 	}
-	
+
 	// Append content
 	if _, err := file.WriteString(contentToAppend); err != nil {
 		return fmt.Errorf("failed to append content to file: %w", err)
 	}
-	
+
 	r.logger.Infof("Successfully appended content to %s", targetPath)
 	return nil
 }
@@ -2128,17 +2128,17 @@ func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error
 // executePrependAction executes a PREPEND post-sync action
 func (r *Runner) executePrependAction(action PostSyncAction, opts *Options) error {
 	targetPath := action.TargetFile
-	
+
 	// If target path is not absolute, make it relative to destination directory
 	if !filepath.IsAbs(targetPath) {
 		targetPath = filepath.Join(opts.Dest, targetPath)
 	}
-	
+
 	// Check flags for special behaviors
 	isDryRun := opts.DryRun
 	hasBackupFlag := false
 	hasNewlineFlag := true // default
-	
+
 	for _, flag := range action.Flags {
 		switch flag {
 		case "--dry-run":
@@ -2149,7 +2149,7 @@ func (r *Runner) executePrependAction(action PostSyncAction, opts *Options) erro
 			hasNewlineFlag = false
 		}
 	}
-	
+
 	// Handle dry-run mode
 	if isDryRun {
 		r.logger.Infof("Would prepend to %s", targetPath)
@@ -2160,18 +2160,18 @@ func (r *Runner) executePrependAction(action PostSyncAction, opts *Options) erro
 		}
 		return nil
 	}
-	
+
 	// Check if target file exists
 	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 		return fmt.Errorf("target file not found: %s", action.TargetFile)
 	}
-	
+
 	// Read existing file content
 	existingContent, err := os.ReadFile(targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to read target file %s: %w", targetPath, err)
 	}
-	
+
 	// Create backup if requested
 	if hasBackupFlag {
 		backupPath := fmt.Sprintf("%s.backup.%d", targetPath, time.Now().Unix())
@@ -2180,7 +2180,7 @@ func (r *Runner) executePrependAction(action PostSyncAction, opts *Options) erro
 		}
 		r.logger.Infof("Created backup: %s", backupPath)
 	}
-	
+
 	// Get content to prepend
 	var contentToPrepend string
 	if action.SourceFile != "" {
@@ -2194,21 +2194,20 @@ func (r *Runner) executePrependAction(action PostSyncAction, opts *Options) erro
 		// Use inline content
 		contentToPrepend = action.Content
 	}
-	
+
 	// Add newline after content if needed
 	if hasNewlineFlag {
 		contentToPrepend = contentToPrepend + "\n"
 	}
-	
+
 	// Combine prepended content with existing content
 	newContent := contentToPrepend + string(existingContent)
-	
+
 	// Write new content back to file
 	if err := os.WriteFile(targetPath, []byte(newContent), 0644); err != nil {
 		return fmt.Errorf("failed to write prepended content to file: %w", err)
 	}
-	
+
 	r.logger.Infof("Successfully prepended content to %s", targetPath)
 	return nil
 }
-

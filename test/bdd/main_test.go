@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cucumber/godog"
 	"github.com/DamianReeves/sync-tools/test/bdd/steps"
+	"github.com/cucumber/godog"
 )
 
 func TestFeatures(t *testing.T) {
@@ -39,9 +39,9 @@ func TestMain(m *testing.M) {
 	}
 
 	suite := godog.TestSuite{
-		Name:                 "sync-tools",
-		ScenarioInitializer:  InitializeScenario,
-		Options:              &opts,
+		Name:                "sync-tools",
+		ScenarioInitializer: InitializeScenario,
+		Options:             &opts,
 	}
 
 	if suite.Run() != 0 {

@@ -1,0 +1,138 @@
+# GoReleaser configuration for sync-tools
+version: 2
+
+project_name: sync-tools
+
+before:
+  hooks:
+    # Run tests before building
+    - go mod tidy
+    - go test ./...
+    - go test ./test/bdd -tags bdd -v
+
+builds:
+  - id: sync-tools
+    main: ./cmd/sync-tools
+    binary: sync-tools
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Exclude invalid combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+
+archives:
+  - id: sync-tools-archive
+    name_template: "sync-tools_{{.Version}}_{{.Os}}_{{.Arch}}"
+    files:
+      - README.md
+      - LICENSE*
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "^style:"
+      - "^refactor:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: DamianReeves
+    name: sync-tools
+  prerelease: auto
+  draft: false
+
+brews:
+  - name: sync-tools
+    description: "Go CLI wrapper around rsync with advanced filtering and SyncFile post-sync actions"
+    homepage: "https://github.com/DamianReeves/sync-tools"
+    license: "Apache-2.0"
+    
+    repository:
+      owner: DamianReeves
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    
+    commit_author:
+      name: "Damian Reeves"
+      email: "damian@reevescodes.me"
+    
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    
+    directory: Formula
+    
+    # Dependencies
+    dependencies:
+      - name: rsync
+        type: runtime
+    
+    # Install configuration
+    install: |
+      bin.install "sync-tools"
+      
+      # Generate and install shell completions if available
+      if File.exist?(buildpath/"completions")
+        bash_completion.install "completions/sync-tools.bash" => "sync-tools"
+        zsh_completion.install "completions/_sync-tools"
+        fish_completion.install "completions/sync-tools.fish"
+      end
+    
+    # Test the installation
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/sync-tools --version 2>&1")
+      
+      # Test basic help functionality
+      assert_match "Advanced directory synchronization", shell_output("#{bin}/sync-tools --help")
+      
+      # Test subcommands exist
+      assert_match "sync", shell_output("#{bin}/sync-tools --help")
+      assert_match "syncfile", shell_output("#{bin}/sync-tools --help")
+
+# macOS app bundle (future consideration)
+# universal_binaries:
+#   - replace: true
+
+# Signing configuration (future consideration)
+# signs:
+#   - artifacts: checksum
+
+# Docker images (future consideration)
+# dockers:
+#   - image_templates:
+#     - "ghcr.io/damianreeves/sync-tools:{{ .Tag }}"
+#     - "ghcr.io/damianreeves/sync-tools:latest"
+
+# Snapcraft (Linux) distribution (future consideration)
+# snapcrafts:
+#   - name: sync-tools
+#     summary: Advanced directory synchronization tool
+#     description: |
+#       Go CLI wrapper around rsync that provides advanced directory synchronization 
+#       with .syncignore files, whitelist mode, filter layering, one-way/two-way sync, 
+#       conflict preservation, and SyncFile post-sync actions.

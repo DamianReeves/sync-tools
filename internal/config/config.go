@@ -10,20 +10,20 @@ import (
 
 // Config represents the TOML configuration structure
 type Config struct {
-	Source              string   `toml:"source"`
-	Dest                string   `toml:"dest"`
-	Mode                string   `toml:"mode"`
-	DryRun              bool     `toml:"dry_run"`
-	UseSourceGitignore  bool     `toml:"use_source_gitignore"`
-	ExcludeHiddenDirs   bool     `toml:"exclude_hidden_dirs"`
-	OnlySyncignore      bool     `toml:"only_syncignore"`
-	IgnoreSrc           []string `toml:"ignore_src"`
-	IgnoreDest          []string `toml:"ignore_dest"`
-	Only                []string `toml:"only"`
-	LogLevel            string   `toml:"log_level"`
-	LogFile             string   `toml:"log_file"`
-	LogFormat           string   `toml:"log_format"`
-	Report              string   `toml:"report"`
+	Source             string   `toml:"source"`
+	Dest               string   `toml:"dest"`
+	Mode               string   `toml:"mode"`
+	DryRun             bool     `toml:"dry_run"`
+	UseSourceGitignore bool     `toml:"use_source_gitignore"`
+	ExcludeHiddenDirs  bool     `toml:"exclude_hidden_dirs"`
+	OnlySyncignore     bool     `toml:"only_syncignore"`
+	IgnoreSrc          []string `toml:"ignore_src"`
+	IgnoreDest         []string `toml:"ignore_dest"`
+	Only               []string `toml:"only"`
+	LogLevel           string   `toml:"log_level"`
+	LogFile            string   `toml:"log_file"`
+	LogFormat          string   `toml:"log_format"`
+	Report             string   `toml:"report"`
 }
 
 // LoadConfig loads configuration from a TOML file

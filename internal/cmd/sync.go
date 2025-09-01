@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/DamianReeves/sync-tools/internal/config"
 	"github.com/DamianReeves/sync-tools/internal/logging"
 	"github.com/DamianReeves/sync-tools/internal/rsync"
 	"github.com/DamianReeves/sync-tools/pkg/tui"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -30,42 +30,42 @@ Examples:
 
 // Sync command flags
 var (
-	flagSource           string
-	flagDest             string
-	flagMode             string
-	flagDryRun           bool
+	flagSource             string
+	flagDest               string
+	flagMode               string
+	flagDryRun             bool
 	flagUseSourceGitignore bool
-	flagExcludeHiddenDirs bool
-	flagOnlySyncignore    bool
-	flagIgnoreSrc         []string
-	flagIgnoreDest        []string
-	flagOnly              []string
-	flagLogLevel          string
-	flagLogFile           string
-	flagLogFormat         string
-	flagDumpCommands      string
-	flagReport            string
-	flagListFiltered      string
-	flagInteractive       bool
-	flagPatch             string
-	flagApplyPatch        bool
-	flagYes               bool
-	flagPreview           bool
+	flagExcludeHiddenDirs  bool
+	flagOnlySyncignore     bool
+	flagIgnoreSrc          []string
+	flagIgnoreDest         []string
+	flagOnly               []string
+	flagLogLevel           string
+	flagLogFile            string
+	flagLogFormat          string
+	flagDumpCommands       string
+	flagReport             string
+	flagListFiltered       string
+	flagInteractive        bool
+	flagPatch              string
+	flagApplyPatch         bool
+	flagYes                bool
+	flagPreview            bool
 	// Interactive sync plan flags
-	flagPlan              string
-	flagApplyPlan         string
-	flagIncludeChanges    []string
-	flagExcludeChanges    []string
-	flagEditor            string
+	flagPlan           string
+	flagApplyPlan      string
+	flagIncludeChanges []string
+	flagExcludeChanges []string
+	flagEditor         string
 	// Conflict resolution flags
-	flagConflictStrategy  string
-	flagSkipConflicts     bool
+	flagConflictStrategy     string
+	flagSkipConflicts        bool
 	flagGenerateConflictPlan string
 	// Merge tool flags
-	flagInteractiveMerge  bool
-	flagMergeTool         string
-	flagMergeTimeout      int
-	flagUseGitBase        bool
+	flagInteractiveMerge bool
+	flagMergeTool        string
+	flagMergeTimeout     int
+	flagUseGitBase       bool
 )
 
 func init() {
@@ -106,12 +106,12 @@ func init() {
 	syncCmd.Flags().StringSliceVar(&flagIncludeChanges, "include-changes", []string{}, "Include only these change types: new-in-source, new-in-dest, updates, conflicts, deletions, unchanged")
 	syncCmd.Flags().StringSliceVar(&flagExcludeChanges, "exclude-changes", []string{}, "Exclude these change types: new-in-source, new-in-dest, updates, conflicts, deletions, unchanged")
 	syncCmd.Flags().StringVar(&flagEditor, "editor", "", "Editor to use for interactive plan editing (overrides EDITOR env var)")
-	
+
 	// Conflict resolution flags
 	syncCmd.Flags().StringVar(&flagConflictStrategy, "conflict-strategy", "", "Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup")
 	syncCmd.Flags().BoolVar(&flagSkipConflicts, "skip-conflicts", false, "Skip conflicting files during plan execution")
 	syncCmd.Flags().StringVar(&flagGenerateConflictPlan, "generate-conflict-plan", "", "Generate a separate plan file containing only conflicts")
-	
+
 	// Merge tool flags
 	syncCmd.Flags().BoolVar(&flagInteractiveMerge, "interactive-merge", false, "Enable interactive merge tool for conflict resolution")
 	syncCmd.Flags().StringVar(&flagMergeTool, "merge-tool", "", "Specify merge tool to use (overrides EDITOR env var)")
@@ -123,7 +123,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	configPath, _ := cmd.Flags().GetString("config")
 	verbosity, _ := cmd.Flags().GetCount("verbose")
-	
+
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)
@@ -138,7 +138,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error setting up logging: %w", err)
 	}
 
-	logger.Debugf("CLI options after merge: source=%s dest=%s mode=%s dry-run=%v", 
+	logger.Debugf("CLI options after merge: source=%s dest=%s mode=%s dry-run=%v",
 		opts.Source, opts.Dest, opts.Mode, opts.DryRun)
 
 	// Validate required options (unless we're applying a plan file)
@@ -174,7 +174,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	if opts.Plan != "" {
 		return runPlanGeneration(opts, logger)
 	}
-	
+
 	if opts.ApplyPlan != "" {
 		return runPlanExecution(opts, logger)
 	}
@@ -190,36 +190,36 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 func mergeOptionsWithConfig(cfg *config.Config) *rsync.Options {
 	opts := &rsync.Options{
-		Source:              flagSource,
-		Dest:                flagDest,
-		Mode:                flagMode,
-		DryRun:              flagDryRun,
-		UseSourceGitignore:  flagUseSourceGitignore,
-		ExcludeHiddenDirs:   flagExcludeHiddenDirs,
-		OnlySyncignore:      flagOnlySyncignore,
-		IgnoreSrc:           flagIgnoreSrc,
-		IgnoreDest:          flagIgnoreDest,
-		Only:                flagOnly,
-		LogLevel:            flagLogLevel,
-		LogFile:             flagLogFile,
-		LogFormat:           flagLogFormat,
-		DumpCommands:        flagDumpCommands,
-		Report:              flagReport,
-		ListFiltered:        flagListFiltered,
-		Interactive:         flagInteractive,
-		Patch:               flagPatch,
-		ApplyPatch:          flagApplyPatch,
-		Yes:                 flagYes,
-		Preview:             flagPreview,
+		Source:             flagSource,
+		Dest:               flagDest,
+		Mode:               flagMode,
+		DryRun:             flagDryRun,
+		UseSourceGitignore: flagUseSourceGitignore,
+		ExcludeHiddenDirs:  flagExcludeHiddenDirs,
+		OnlySyncignore:     flagOnlySyncignore,
+		IgnoreSrc:          flagIgnoreSrc,
+		IgnoreDest:         flagIgnoreDest,
+		Only:               flagOnly,
+		LogLevel:           flagLogLevel,
+		LogFile:            flagLogFile,
+		LogFormat:          flagLogFormat,
+		DumpCommands:       flagDumpCommands,
+		Report:             flagReport,
+		ListFiltered:       flagListFiltered,
+		Interactive:        flagInteractive,
+		Patch:              flagPatch,
+		ApplyPatch:         flagApplyPatch,
+		Yes:                flagYes,
+		Preview:            flagPreview,
 		// Interactive sync plan fields
-		Plan:                flagPlan,
-		ApplyPlan:           flagApplyPlan,
-		IncludeChanges:      flagIncludeChanges,
-		ExcludeChanges:      flagExcludeChanges,
-		Editor:              flagEditor,
+		Plan:           flagPlan,
+		ApplyPlan:      flagApplyPlan,
+		IncludeChanges: flagIncludeChanges,
+		ExcludeChanges: flagExcludeChanges,
+		Editor:         flagEditor,
 		// Conflict resolution fields
-		ConflictStrategy:    flagConflictStrategy,
-		SkipConflicts:       flagSkipConflicts,
+		ConflictStrategy:     flagConflictStrategy,
+		SkipConflicts:        flagSkipConflicts,
 		GenerateConflictPlan: flagGenerateConflictPlan,
 	}
 

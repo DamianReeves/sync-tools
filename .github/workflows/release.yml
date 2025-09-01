@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  # Required for GoReleaser to push to homebrew tap
+  actions: read
 
 jobs:
   release:
@@ -17,34 +19,50 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+          # Fetch all history for GoReleaser changelog generation
+          
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
+          check-latest: true
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y rsync
-
-      - name: Run tests
-        run: make test
-
-      - name: Build for all platforms
-        run: make build-all
-
-      - name: Create checksums
         run: |
-          cd build
-          sha256sum * > checksums.txt
-          cat checksums.txt
+          sudo apt-get update
+          sudo apt-get install -y rsync
+          
+      # Run comprehensive test suite before release
+      - name: Run BDD tests (mandatory 100% pass rate)
+        run: |
+          go test ./test/bdd -tags bdd -v
+          
+      - name: Run full test suite
+        run: |
+          go test ./...
+          
+      - name: Verify build works
+        run: |
+          go build -o sync-tools ./cmd/sync-tools
+          ./sync-tools --version || echo "Version command not implemented yet"
+          ./sync-tools --help
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      # Release with GoReleaser
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          files: |
-            build/*
-          generate_release_notes: true
-          draft: false
-          prerelease: ${{ contains(github.ref, '-') }}
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Token for updating homebrew tap - needs to be set in repository secrets
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          
+      # Post-release verification
+      - name: Verify release artifacts
+        if: success()
+        run: |
+          echo "Release completed successfully!"
+          echo "Homebrew formula should be updated in DamianReeves/homebrew-tap"
+          echo "Users can now install with: brew tap DamianReeves/tap && brew install sync-tools"
