@@ -133,6 +133,11 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the plan file should not contain "([^"]*)"$`, tc.planFileShouldNotContain)
 	ctx.Step(`^I have a plan file "([^"]*)" containing:$`, tc.createPlanFile)
 	ctx.Step(`^I have a SyncFile "([^"]*)" containing:$`, tc.createSyncFile)
+	ctx.Step(`^I have a patch file "([^"]*)" containing:$`, tc.createPatchFile)
+	ctx.Step(`^I run sync-tools with SyncFile "([^"]*)"$`, tc.runSyncToolsWithSyncFile)
+	ctx.Step(`^I have a temporary directory for sync operations$`, tc.iHaveATemporaryDirectoryForSyncOperations)
+	ctx.Step(`^the sync should succeed$`, tc.syncShouldSucceed)
+	ctx.Step(`^the sync should fail$`, tc.syncShouldFail)
 	ctx.Step(`^the destination file "([^"]*)" should contain "([^"]*)"$`, tc.destinationFileShouldContain)
 	ctx.Step(`^the error should contain "([^"]*)"$`, tc.errorShouldContain)
 
@@ -841,6 +846,19 @@ func (tc *TestContext) commandShouldSucceed() error {
 
 func (tc *TestContext) commandShouldFail() error {
 	return tc.env.AssertLastCommandFailed()
+}
+
+func (tc *TestContext) syncShouldSucceed() error {
+	return tc.env.AssertLastCommandSucceeded()
+}
+
+func (tc *TestContext) syncShouldFail() error {
+	return tc.env.AssertLastCommandFailed()
+}
+
+func (tc *TestContext) iHaveATemporaryDirectoryForSyncOperations() error {
+	// This is a no-op as the test framework already sets up temporary directories
+	return nil
 }
 
 func (tc *TestContext) destinationDirectoryShouldContain(filename string) error {
@@ -1775,4 +1793,30 @@ func (tc *TestContext) theOutputShouldContain(expectedText string) error {
 		return fmt.Errorf("expected output to contain '%s', but got: %s", expectedText, tc.lastOutput)
 	}
 	return nil
+}
+
+// createPatchFile creates a patch file with the given content
+func (tc *TestContext) createPatchFile(filename string, content *godog.DocString) error {
+	if tc.workingDir == "" {
+		return fmt.Errorf("working directory not initialized")
+	}
+	fullPath := filepath.Join(tc.workingDir, filename)
+	err := os.WriteFile(fullPath, []byte(content.Content), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create patch file %s: %w", filename, err)
+	}
+	return nil
+}
+
+// runSyncToolsWithSyncFile executes sync-tools with a SyncFile
+func (tc *TestContext) runSyncToolsWithSyncFile(syncFileName string) error {
+	if tc.workingDir == "" {
+		return fmt.Errorf("working directory not initialized")
+	}
+
+	// Build the sync-tools command: syncfile <filename>
+	cmd := []string{"syncfile", syncFileName}
+	
+	// Use the existing execute method pattern from runSyncToolsWithArguments
+	return tc.runSyncToolsWithArguments(strings.Join(cmd, " "))
 }

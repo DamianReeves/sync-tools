@@ -21,6 +21,7 @@ type PostSyncActionType string
 const (
 	PostSyncAppend  PostSyncActionType = "APPEND"
 	PostSyncPrepend PostSyncActionType = "PREPEND"
+	PostSyncPatch   PostSyncActionType = "PATCH"
 )
 
 // PostSyncAction represents an action to execute after sync completes
@@ -2031,6 +2032,10 @@ func (r *Runner) executePostSyncActions(opts *Options) error {
 			if err := r.executePrependAction(action, opts); err != nil {
 				return fmt.Errorf("failed to execute PREPEND action: %w", err)
 			}
+		case PostSyncPatch:
+			if err := r.executePatchAction(action, opts); err != nil {
+				return fmt.Errorf("failed to execute PATCH action: %w", err)
+			}
 		default:
 			r.logger.Warnf("Unknown post-sync action type: %s", action.Type)
 		}
@@ -2209,5 +2214,82 @@ func (r *Runner) executePrependAction(action PostSyncAction, opts *Options) erro
 	}
 
 	r.logger.Infof("Successfully prepended content to %s", targetPath)
+	return nil
+}
+
+// executePatchAction executes a PATCH post-sync action
+func (r *Runner) executePatchAction(action PostSyncAction, opts *Options) error {
+	targetPath := action.TargetFile
+	// If target path is not absolute, make it relative to destination directory
+	if !filepath.IsAbs(targetPath) {
+		targetPath = filepath.Join(opts.Dest, targetPath)
+	}
+
+	// The patch file path (from SourceFile field)
+	patchPath := action.SourceFile
+	if patchPath == "" {
+		return fmt.Errorf("PATCH action requires a patch file specified in SourceFile")
+	}
+	
+	// If patch path is not absolute, make it relative to working directory
+	if !filepath.IsAbs(patchPath) {
+		patchPath = filepath.Join(".", patchPath)
+	}
+
+	// Check flags for special behaviors
+	isDryRun := opts.DryRun
+	hasBackupFlag := false
+	
+	for _, flag := range action.Flags {
+		switch flag {
+		case "--dry-run":
+			isDryRun = true
+		case "--backup":
+			hasBackupFlag = true
+		}
+	}
+
+	// Handle dry-run mode
+	if isDryRun {
+		r.logger.Infof("Would apply patch %s to %s", patchPath, targetPath)
+		return nil
+	}
+
+	// Check if target file exists
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		return fmt.Errorf("target file not found: %s", action.TargetFile)
+	}
+
+	// Check if patch file exists
+	if _, err := os.Stat(patchPath); os.IsNotExist(err) {
+		return fmt.Errorf("patch file not found: %s", patchPath)
+	}
+
+	// Create backup if requested
+	if hasBackupFlag {
+		backupPath := fmt.Sprintf("%s.bak", targetPath)
+		if err := r.copyFile(targetPath, backupPath); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
+		r.logger.Infof("Created backup: %s", backupPath)
+	}
+
+	// Apply the patch using the 'patch' command
+	cmd := exec.Command("patch", "-i", patchPath, targetPath)
+	cmd.Dir = filepath.Dir(targetPath) // Set working directory to target file's directory
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Check if it's an invalid patch format error
+		outputStr := string(output)
+		if strings.Contains(strings.ToLower(outputStr), "malformed") || 
+		   strings.Contains(strings.ToLower(outputStr), "not found") ||
+		   strings.Contains(strings.ToLower(outputStr), "invalid") {
+			return fmt.Errorf("invalid patch format: %s", strings.TrimSpace(outputStr))
+		}
+		return fmt.Errorf("failed to apply patch %s to %s: %w\nOutput: %s", patchPath, targetPath, err, strings.TrimSpace(outputStr))
+	}
+
+	r.logger.Infof("Successfully applied patch %s to %s", patchPath, targetPath)
 	return nil
 }

@@ -40,8 +40,8 @@ const (
 	InstAutoConfirm InstructionType = "AUTOCONFIRM" // AUTOCONFIRM true|false (like -y flag)
 
 	// Post-sync action instructions
-	InstAppend  InstructionType = "APPEND"  // APPEND filename: content END APPEND
-	InstPrepend InstructionType = "PREPEND" // PREPEND filename: content END PREPEND
+	InstAppend    InstructionType = "APPEND"    // APPEND filename: content END APPEND
+	InstPrepend   InstructionType = "PREPEND"   // PREPEND filename: content END PREPEND
 
 	// Variable and environment instructions
 	InstVar InstructionType = "VAR" // VAR name=value
@@ -171,8 +171,8 @@ func parseInstruction(line string, lineNum int) (Instruction, error) {
 			return Instruction{}, fmt.Errorf("%s must be 'true' or 'false'", instType)
 		}
 	case InstPatch:
-		if len(args) != 1 {
-			return Instruction{}, fmt.Errorf("PATCH requires exactly 1 argument: filename")
+		if len(args) < 1 {
+			return Instruction{}, fmt.Errorf("PATCH requires at least 1 argument: [flags...] filename OR [flags...] patchfile targetfile")
 		}
 	case InstHiddenDirs:
 		if len(args) != 1 || (args[0] != "exclude" && args[0] != "include") {
@@ -484,6 +484,44 @@ func parsePrependAction(inst Instruction, variables map[string]string) rsync.Pos
 	return action
 }
 
+// parsePatchAction converts a PATCH instruction to a PostSyncAction
+func parsePatchAction(inst Instruction, variables map[string]string) rsync.PostSyncAction {
+	action := rsync.PostSyncAction{
+		Type:  rsync.PostSyncPatch,
+		Flags: make([]string, 0),
+	}
+
+	// Parse arguments: [flags...] patchfile targetfile
+	args := inst.Args
+	if len(args) < 2 {
+		return action
+	}
+
+	// Find non-flag arguments (patch file and target file are last two arguments)
+	nonFlagArgs := make([]string, 0)
+	flags := make([]string, 0)
+	
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--") {
+			flags = append(flags, arg)
+		} else {
+			nonFlagArgs = append(nonFlagArgs, arg)
+		}
+	}
+	
+	// We need exactly 2 non-flag arguments: patchfile targetfile
+	if len(nonFlagArgs) >= 2 {
+		patchFile := expandVariables(nonFlagArgs[0], variables)
+		targetFile := expandVariables(nonFlagArgs[1], variables)
+		
+		action.SourceFile = patchFile // Patch file goes in SourceFile
+		action.TargetFile = targetFile
+		action.Flags = flags
+	}
+
+	return action
+}
+
 // ToRsyncOptions converts a SyncFile to rsync.Options
 func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 	var optsList []*rsync.Options
@@ -570,12 +608,6 @@ func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 				currentOpts.Only = append(currentOpts.Only, pattern)
 			}
 
-		case InstPatch:
-			if currentOpts != nil {
-				patchFile := expandVariables(inst.Args[0], sf.Variables)
-				currentOpts.Patch = patchFile
-			}
-
 		case InstApplyPatch:
 			if currentOpts != nil {
 				applyPatch, _ := strconv.ParseBool(inst.Args[0])
@@ -606,6 +638,19 @@ func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 				// Parse PREPEND instruction and add to post-sync actions
 				action := parsePrependAction(inst, sf.Variables)
 				currentOpts.PostSyncActions = append(currentOpts.PostSyncActions, action)
+			}
+
+		case InstPatch:
+			if currentOpts != nil {
+				if len(inst.Args) == 1 {
+					// Single argument: PATCH filename → git patch generation (existing)
+					patchFile := expandVariables(inst.Args[0], sf.Variables)
+					currentOpts.Patch = patchFile
+				} else if len(inst.Args) == 2 {
+					// Two arguments: PATCH patchfile targetfile → post-sync action (new)
+					action := parsePatchAction(inst, sf.Variables)
+					currentOpts.PostSyncActions = append(currentOpts.PostSyncActions, action)
+				}
 			}
 		}
 	}
