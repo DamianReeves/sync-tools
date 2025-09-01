@@ -162,24 +162,94 @@ func (m *BubbleTeaModel) renderInitialState() string {
 	return content.String()
 }
 
+// renderSourceSelectionState renders the source directory selection screen
 func (m *BubbleTeaModel) renderSourceSelectionState(state SourceSelectionState) string {
 	var content strings.Builder
 	content.WriteString(headerStyle.Render("Select source directory"))
 	content.WriteString("\n\n")
-	content.WriteString(fmt.Sprintf("Current path: %s\n", state.CurrentPath))
-	content.WriteString("\n[Placeholder: Directory browser will be implemented here]\n")
-	content.WriteString("\nPress [Enter] to select current directory, [Esc] to go back")
+	
+	// Initialize directory browser if not exists
+	if state.Browser == nil {
+		// This should be handled in the state initialization
+		content.WriteString("Initializing directory browser...\n")
+		return content.String()
+	}
+	
+	content.WriteString(fmt.Sprintf("Current path: %s\n\n", state.Browser.GetCurrentPath()))
+	
+	// Render directory entries
+	entries := state.Browser.GetEntries()
+	selectedIndex := state.Browser.GetSelectedIndex()
+	
+	for i, entry := range entries {
+		prefix := "  "
+		if i == selectedIndex {
+			prefix = "▶ "
+		}
+		
+		icon := "📁"
+		if !entry.IsDir {
+			icon = "📄"
+		}
+		
+		sizeInfo := ""
+		if entry.IsDir && entry.FileCount > 0 {
+			sizeInfo = fmt.Sprintf(" (%d files, %s)", entry.FileCount, FormatSize(entry.Size))
+		} else if !entry.IsDir {
+			sizeInfo = fmt.Sprintf(" (%s)", FormatSize(entry.Size))
+		}
+		
+		content.WriteString(fmt.Sprintf("%s%s %s%s\n", prefix, icon, entry.Name, sizeInfo))
+	}
+	
+	content.WriteString("\n")
+	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter directory, ←: Go up, Enter: Select, Esc: Cancel"))
 	return content.String()
 }
 
+// renderDestinationSelectionState renders the destination directory selection screen
 func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelectionState) string {
 	var content strings.Builder
 	content.WriteString(headerStyle.Render("Select destination directory"))
 	content.WriteString("\n\n")
+	
 	content.WriteString(fmt.Sprintf("Source: %s\n", state.SourcePath))
-	content.WriteString(fmt.Sprintf("Current path: %s\n", state.CurrentPath))
-	content.WriteString("\n[Placeholder: Directory browser will be implemented here]\n")
-	content.WriteString("\nPress [Enter] to select current directory, [Esc] to go back")
+	
+	// Initialize directory browser if not exists
+	if state.Browser == nil {
+		content.WriteString("Initializing directory browser...\n")
+		return content.String()
+	}
+	
+	content.WriteString(fmt.Sprintf("Current path: %s\n\n", state.Browser.GetCurrentPath()))
+	
+	// Render directory entries
+	entries := state.Browser.GetEntries()
+	selectedIndex := state.Browser.GetSelectedIndex()
+	
+	for i, entry := range entries {
+		prefix := "  "
+		if i == selectedIndex {
+			prefix = "▶ "
+		}
+		
+		icon := "📁"
+		if !entry.IsDir {
+			icon = "📄"
+		}
+		
+		sizeInfo := ""
+		if entry.IsDir && entry.FileCount > 0 {
+			sizeInfo = fmt.Sprintf(" (%d files, %s)", entry.FileCount, FormatSize(entry.Size))
+		} else if !entry.IsDir {
+			sizeInfo = fmt.Sprintf(" (%s)", FormatSize(entry.Size))
+		}
+		
+		content.WriteString(fmt.Sprintf("%s%s %s%s\n", prefix, icon, entry.Name, sizeInfo))
+	}
+	
+	content.WriteString("\n")
+	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter directory, ←: Go up, Enter: Select, Esc: Back"))
 	return content.String()
 }
 
@@ -245,24 +315,57 @@ func (m *BubbleTeaModel) renderCompleteState(state CompleteState) string {
 func (m *BubbleTeaModel) handleInitialStateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		// Transition to source selection
+		// Transition to source selection with directory browser
+		browser := NewDirectoryBrowser(".")
 		m.Model.CurrentState = SourceSelectionState{
 			CurrentPath: ".",
 			Directories: []DirectoryInfo{},
+			Browser:     browser,
 		}
 	}
 	return m, nil
 }
 
 func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceSelectionState) (tea.Model, tea.Cmd) {
+	if state.Browser == nil {
+		// Initialize browser if missing
+		state.Browser = NewDirectoryBrowser(state.CurrentPath)
+		m.Model.CurrentState = state
+		return m, nil
+	}
+
 	switch msg.String() {
+	case "up", "k":
+		state.Browser.MoveUp()
+		m.Model.CurrentState = state
+		
+	case "down", "j":
+		state.Browser.MoveDown()
+		m.Model.CurrentState = state
+		
+	case "right", "l":
+		// Enter selected directory
+		if state.Browser.EnterDirectory() {
+			m.Model.CurrentState = state
+		}
+		
+	case "left", "h":
+		// Go to parent directory
+		if state.Browser.GoUp() {
+			m.Model.CurrentState = state
+		}
+		
 	case "enter":
-		// Transition to destination selection
+		// Select current directory as source
+		selectedPath := state.Browser.GetCurrentPath()
+		browser := NewDirectoryBrowser(".")
 		m.Model.CurrentState = DestinationSelectionState{
-			SourcePath:  state.CurrentPath,
+			SourcePath:  selectedPath,
 			CurrentPath: ".",
 			Directories: []DirectoryInfo{},
+			Browser:     browser,
 		}
+		
 	case "escape":
 		m.Model.CurrentState = InitialState{}
 	}
@@ -270,19 +373,54 @@ func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceS
 }
 
 func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state DestinationSelectionState) (tea.Model, tea.Cmd) {
+	if state.Browser == nil {
+		// Initialize browser if missing
+		state.Browser = NewDirectoryBrowser(state.CurrentPath)
+		m.Model.CurrentState = state
+		return m, nil
+	}
+
 	switch msg.String() {
+	case "up", "k":
+		state.Browser.MoveUp()
+		m.Model.CurrentState = state
+		
+	case "down", "j":
+		state.Browser.MoveDown()
+		m.Model.CurrentState = state
+		
+	case "right", "l":
+		// Enter selected directory
+		if state.Browser.EnterDirectory() {
+			m.Model.CurrentState = state
+		}
+		
+	case "left", "h":
+		// Go to parent directory
+		if state.Browser.GoUp() {
+			m.Model.CurrentState = state
+		}
+		
 	case "enter":
-		// Transition to sync options
+		// Select current directory as destination and move to sync options
+		selectedPath := state.Browser.GetCurrentPath()
 		m.Model.CurrentState = SyncOptionsState{
 			SourcePath:      state.SourcePath,
-			DestinationPath: state.CurrentPath,
+			DestinationPath: selectedPath,
 			Mode:           "one-way",
 			DryRun:         false,
+			HiddenDirs:     true,
+			UseGitIgnore:   false,
+			ConflictStrategy: "newest-wins",
 		}
+		
 	case "escape":
+		// Go back to source selection
+		browser := NewDirectoryBrowser(state.SourcePath)
 		m.Model.CurrentState = SourceSelectionState{
 			CurrentPath: state.SourcePath,
 			Directories: []DirectoryInfo{},
+			Browser:     browser,
 		}
 	}
 	return m, nil

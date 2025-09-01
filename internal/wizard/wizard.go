@@ -23,10 +23,12 @@ func New(config *Config) *Wizard {
 	
 	// If source is pre-filled, start at destination selection
 	if config.PrefilledSource != "" {
+		browser := NewDirectoryBrowser(".")
 		initialState = DestinationSelectionState{
-			SourcePath: config.PrefilledSource,
+			SourcePath:  config.PrefilledSource,
 			CurrentPath: ".",
-			Directories: []DirectoryInfo{}, // Will be populated by the UI
+			Directories: []DirectoryInfo{},
+			Browser:     browser,
 		}
 	}
 

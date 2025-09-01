@@ -16,6 +16,7 @@ func (InitialState) wizardState() {}
 type SourceSelectionState struct {
 	CurrentPath string
 	Directories []DirectoryInfo
+	Browser     *DirectoryBrowser
 }
 
 func (SourceSelectionState) wizardState() {}
@@ -25,6 +26,7 @@ type DestinationSelectionState struct {
 	SourcePath  string
 	CurrentPath string
 	Directories []DirectoryInfo
+	Browser     *DirectoryBrowser
 }
 
 func (DestinationSelectionState) wizardState() {}
