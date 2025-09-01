@@ -2,6 +2,8 @@ package bdd
 
 import (
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/DamianReeves/sync-tools/test/bdd/steps"
@@ -30,6 +32,11 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 }
 
 func TestMain(m *testing.M) {
+	// Build the sync-tools binary before running tests
+	if err := buildSyncToolsBinary(); err != nil {
+		os.Exit(1)
+	}
+
 	opts := godog.Options{
 		Format:        "pretty",
 		Paths:         []string{"../../features"},
@@ -47,4 +54,21 @@ func TestMain(m *testing.M) {
 	if suite.Run() != 0 {
 		os.Exit(1)
 	}
+}
+
+// buildSyncToolsBinary builds the sync-tools binary required for BDD tests
+func buildSyncToolsBinary() error {
+	// Get the project root directory (two levels up from test/bdd)
+	projectRoot, err := filepath.Abs("../..")
+	if err != nil {
+		return err
+	}
+
+	// Build the binary
+	cmd := exec.Command("go", "build", "-o", "sync-tools", "./cmd/sync-tools")
+	cmd.Dir = projectRoot
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }
