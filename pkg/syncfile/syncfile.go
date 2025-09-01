@@ -231,8 +231,9 @@ func parseAppendBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (I
 		return Instruction{}, fmt.Errorf("APPEND block not closed with END APPEND")
 	}
 	
-	// Join content with newlines
+	// Join content with newlines and normalize indentation
 	content := strings.Join(contentLines, "\n")
+	content = normalizeIndentation(content)
 	
 	return Instruction{
 		Type:          InstAppend,
@@ -240,6 +241,87 @@ func parseAppendBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (I
 		LineNum:       startLineNum,
 		InlineContent: content,
 	}, nil
+}
+
+// normalizeIndentation removes common leading whitespace from multi-line content
+func normalizeIndentation(content string) string {
+	if content == "" {
+		return content
+	}
+	
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return content
+	}
+	
+	// Find minimum indentation (ignoring empty lines)
+	minIndent := -1
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue // Skip empty lines
+		}
+		
+		indent := 0
+		for _, char := range line {
+			if char == ' ' || char == '\t' {
+				if char == '\t' {
+					indent += 4 // Count tabs as 4 spaces
+				} else {
+					indent++
+				}
+			} else {
+				break
+			}
+		}
+		
+		if minIndent == -1 || indent < minIndent {
+			minIndent = indent
+		}
+	}
+	
+	// If no indentation found, return as-is
+	if minIndent <= 0 {
+		return content
+	}
+	
+	// Remove common indentation from all lines
+	var normalizedLines []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			// Preserve empty lines as-is
+			normalizedLines = append(normalizedLines, "")
+		} else {
+			// Remove common indentation
+			dedented := removeLeadingSpaces(line, minIndent)
+			normalizedLines = append(normalizedLines, dedented)
+		}
+	}
+	
+	return strings.Join(normalizedLines, "\n")
+}
+
+// removeLeadingSpaces removes up to n leading spaces/tabs from a line
+func removeLeadingSpaces(line string, n int) string {
+	removed := 0
+	for i, char := range line {
+		if removed >= n {
+			return line[i:]
+		}
+		
+		if char == ' ' {
+			removed++
+		} else if char == '\t' {
+			removed += 4 // Count tabs as 4 spaces
+			if removed > n {
+				// If we removed too much, put back partial spaces
+				return strings.Repeat(" ", removed-n) + line[i+1:]
+			}
+		} else {
+			break
+		}
+	}
+	
+	return line[len(line):] // Return empty string if all chars were whitespace
 }
 
 // expandVariables expands variable references in a string
