@@ -33,13 +33,14 @@ func (DestinationSelectionState) wizardState() {}
 
 // SyncOptionsState - configuring sync options
 type SyncOptionsState struct {
-	SourcePath      string
-	DestinationPath string
-	Mode            string
-	DryRun          bool
-	HiddenDirs      bool
-	UseGitIgnore    bool
+	SourcePath       string
+	DestinationPath  string
+	Mode             string
+	DryRun           bool
+	HiddenDirs       bool
+	UseGitIgnore     bool
 	ConflictStrategy string
+	Editor           *SyncOptionsEditor
 }
 
 func (SyncOptionsState) wizardState() {}
@@ -73,6 +74,7 @@ type ProgressState struct {
 	Patterns        []ExclusionPattern
 	Directories     []SelectableDirectory
 	Progress        ProgressInfo
+	Monitor         *ProgressMonitor
 }
 
 func (ProgressState) wizardState() {}

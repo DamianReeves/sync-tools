@@ -253,16 +253,27 @@ func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelect
 	return content.String()
 }
 
+// renderSyncOptionsState renders the sync options configuration screen
 func (m *BubbleTeaModel) renderSyncOptionsState(state SyncOptionsState) string {
 	var content strings.Builder
 	content.WriteString(headerStyle.Render("Configure sync options"))
 	content.WriteString("\n\n")
+	
 	content.WriteString(fmt.Sprintf("Source: %s\n", state.SourcePath))
-	content.WriteString(fmt.Sprintf("Destination: %s\n", state.DestinationPath))
-	content.WriteString(fmt.Sprintf("Mode: %s\n", state.Mode))
-	content.WriteString(fmt.Sprintf("Dry Run: %v\n", state.DryRun))
-	content.WriteString("\n[Placeholder: Interactive controls will be implemented here]\n")
-	content.WriteString("\nPress [Enter] to continue, [Esc] to go back")
+	content.WriteString(fmt.Sprintf("Destination: %s\n\n", state.DestinationPath))
+	
+	// Initialize editor if not exists
+	if state.Editor == nil {
+		state.Editor = NewSyncOptionsEditor(&state)
+		m.Model.CurrentState = state
+		return content.String()
+	}
+	
+	// Render all option fields
+	content.WriteString(state.Editor.RenderAllFields())
+	
+	content.WriteString("\n")
+	content.WriteString(helpStyle.Render("↑↓: Navigate, Space/Enter: Toggle, ←→: Change value, Tab: Continue, Esc: Back"))
 	return content.String()
 }
 
@@ -286,13 +297,64 @@ func (m *BubbleTeaModel) renderDirectoryFilterState(state DirectoryFilterState) 
 	return content.String()
 }
 
+// renderProgressState renders the sync progress screen
 func (m *BubbleTeaModel) renderProgressState(state ProgressState) string {
 	var content strings.Builder
 	content.WriteString(headerStyle.Render("Sync Progress"))
 	content.WriteString("\n\n")
-	content.WriteString("[Placeholder: Real-time progress will be implemented here]\n")
-	content.WriteString(fmt.Sprintf("Current file: %s\n", state.Progress.CurrentFile))
-	content.WriteString(fmt.Sprintf("Progress: %d%%\n", state.Progress.ProgressPercent))
+
+	// Initialize monitor if needed
+	if state.Monitor == nil {
+		state.Monitor = NewProgressMonitor(&state)
+		state.Monitor.StartSync(&state)
+		m.Model.CurrentState = state
+		return content.String()
+	}
+
+	progress := state.Monitor.GetProgress()
+
+	// Current operation
+	content.WriteString(fmt.Sprintf("Current file: %s\n", progress.CurrentFile))
+	content.WriteString(fmt.Sprintf("Progress: %d/%d files\n", progress.FilesProcessed, progress.TotalFiles))
+	
+	// Progress bar
+	progressBar := RenderProgressBar(progress.ProgressPercent, 40)
+	content.WriteString(fmt.Sprintf("%s\n\n", progressBar))
+	
+	// Transfer statistics
+	if progress.TransferSpeed != "" {
+		content.WriteString(fmt.Sprintf("Transfer speed: %s\n", progress.TransferSpeed))
+	}
+	
+	if progress.BytesTransferred > 0 {
+		content.WriteString(fmt.Sprintf("Transferred: %s", FormatSize(progress.BytesTransferred)))
+		if progress.TotalBytes > 0 {
+			content.WriteString(fmt.Sprintf(" / %s", FormatSize(progress.TotalBytes)))
+		}
+		content.WriteString("\n")
+	}
+
+	// Status-specific content
+	if state.Monitor.IsActive() {
+		content.WriteString("\n")
+		content.WriteString(helpStyle.Render("Sync in progress... Press Ctrl+C to cancel"))
+	} else if state.Monitor.IsComplete() {
+		content.WriteString("\n✅ Sync completed successfully!\n")
+		
+		// Generate SyncFile
+		if syncFileContent, err := GenerateSyncFile(&state); err == nil {
+			content.WriteString("\n📄 Generated SyncFile:\n")
+			content.WriteString(infoStyle.Render(syncFileContent))
+		}
+		
+		content.WriteString("\n")
+		content.WriteString(helpStyle.Render("Press Enter to finish, Esc to go back"))
+	} else if state.Monitor.IsFailed() {
+		content.WriteString(fmt.Sprintf("\n❌ Sync failed: %v\n", state.Monitor.GetError()))
+		content.WriteString("\n")
+		content.WriteString(helpStyle.Render("Press Enter to finish, Esc to go back"))
+	}
+
 	return content.String()
 }
 
@@ -405,13 +467,14 @@ func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state De
 		// Select current directory as destination and move to sync options
 		selectedPath := state.Browser.GetCurrentPath()
 		m.Model.CurrentState = SyncOptionsState{
-			SourcePath:      state.SourcePath,
-			DestinationPath: selectedPath,
-			Mode:           "one-way",
-			DryRun:         false,
-			HiddenDirs:     true,
-			UseGitIgnore:   false,
+			SourcePath:       state.SourcePath,
+			DestinationPath:  selectedPath,
+			Mode:             "one-way",
+			DryRun:           false,
+			HiddenDirs:       true,
+			UseGitIgnore:     false,
 			ConflictStrategy: "newest-wins",
+			Editor:           nil, // Will be initialized when rendered
 		}
 		
 	case "escape":
@@ -427,20 +490,51 @@ func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state De
 }
 
 func (m *BubbleTeaModel) handleSyncOptionsKeys(msg tea.KeyMsg, state SyncOptionsState) (tea.Model, tea.Cmd) {
+	if state.Editor == nil {
+		// Initialize editor if missing
+		state.Editor = NewSyncOptionsEditor(&state)
+		m.Model.CurrentState = state
+		return m, nil
+	}
+
 	switch msg.String() {
-	case "enter":
-		// Transition to exclusion patterns
+	case "up", "k":
+		state.Editor.MoveUp()
+		m.Model.CurrentState = state
+		
+	case "down", "j":
+		state.Editor.MoveDown()
+		m.Model.CurrentState = state
+		
+	case "left", "h":
+		state.Editor.ChangeValue(-1)
+		m.Model.CurrentState = state
+		
+	case "right", "l":
+		state.Editor.ChangeValue(1)
+		m.Model.CurrentState = state
+		
+	case "space", "enter":
+		state.Editor.ToggleValue()
+		m.Model.CurrentState = state
+		
+	case "tab":
+		// Proceed to exclusion patterns
 		m.Model.CurrentState = ExclusionPatternsState{
 			SourcePath:      state.SourcePath,
 			DestinationPath: state.DestinationPath,
 			SyncOptions:     state,
 			Patterns:        []ExclusionPattern{{Pattern: ".git/", Source: "default", Valid: true}},
 		}
+		
 	case "escape":
+		// Go back to destination selection
+		browser := NewDirectoryBrowser(state.DestinationPath)
 		m.Model.CurrentState = DestinationSelectionState{
 			SourcePath:  state.SourcePath,
 			CurrentPath: state.DestinationPath,
 			Directories: []DirectoryInfo{},
+			Browser:     browser,
 		}
 	}
 	return m, nil
@@ -474,8 +568,8 @@ func (m *BubbleTeaModel) handleDirectoryFilterKeys(msg tea.KeyMsg, state Directo
 			Patterns:        state.Patterns,
 			Directories:     state.Directories,
 			Progress:        ProgressInfo{},
+			Monitor:         nil, // Will be initialized when rendered
 		}
-		// TODO: Start actual sync operation
 	case "escape":
 		m.Model.CurrentState = state.SyncOptions
 	}
@@ -483,7 +577,39 @@ func (m *BubbleTeaModel) handleDirectoryFilterKeys(msg tea.KeyMsg, state Directo
 }
 
 func (m *BubbleTeaModel) handleProgressKeys(msg tea.KeyMsg, state ProgressState) (tea.Model, tea.Cmd) {
-	// Progress state is usually non-interactive except for cancellation
+	switch msg.String() {
+	case "ctrl+c":
+		// Cancel sync if active
+		if state.Monitor != nil && state.Monitor.IsActive() {
+			state.Monitor.Cancel()
+			m.Model.CurrentState = state
+		} else {
+			// Quit if not active
+			m.quitting = true
+			return m, tea.Quit
+		}
+		
+	case "enter":
+		// Finish wizard if sync is complete or failed
+		if state.Monitor != nil && (state.Monitor.IsComplete() || state.Monitor.IsFailed()) {
+			m.Model.CurrentState = CompleteState{
+				SyncFilePath: "SyncFile", // TODO: Save to actual file
+				Success:      state.Monitor.IsComplete(),
+				Error:        "",
+			}
+			if state.Monitor.IsFailed() && state.Monitor.GetError() != nil {
+				completeState := m.Model.CurrentState.(CompleteState)
+				completeState.Error = state.Monitor.GetError().Error()
+				m.Model.CurrentState = completeState
+			}
+		}
+		
+	case "escape":
+		// Go back if sync is not active
+		if state.Monitor == nil || !state.Monitor.IsActive() {
+			m.Model.CurrentState = state.SyncOptions
+		}
+	}
 	return m, nil
 }
 
