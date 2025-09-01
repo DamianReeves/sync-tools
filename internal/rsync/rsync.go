@@ -15,6 +15,22 @@ import (
 	"github.com/DamianReeves/sync-tools/internal/logging"
 )
 
+// PostSyncActionType represents the type of post-sync action
+type PostSyncActionType string
+
+const (
+	PostSyncAppend PostSyncActionType = "APPEND"
+)
+
+// PostSyncAction represents an action to execute after sync completes
+type PostSyncAction struct {
+	Type         PostSyncActionType
+	TargetFile   string   // File to operate on
+	Flags        []string // Action-specific flags (e.g., --backup, --dry-run)
+	Content      string   // For inline content (APPEND)
+	SourceFile   string   // For file-based operations (APPEND --file)
+}
+
 // Options holds all the options for running rsync
 type Options struct {
 	Source              string
@@ -48,6 +64,9 @@ type Options struct {
 	ConflictStrategy        string // Default conflict resolution strategy: newest-wins, source-wins, dest-wins, backup
 	SkipConflicts          bool   // Skip conflicting files during plan execution  
 	GenerateConflictPlan   string // Generate a separate plan file containing only conflicts
+	
+	// Post-sync actions
+	PostSyncActions        []PostSyncAction // Actions to execute after sync completes
 }
 
 // Runner handles rsync operations
@@ -128,7 +147,13 @@ func (r *Runner) runOneWay(opts *Options) error {
 	cmd := r.buildRsyncCommand(opts, sourceFilter, destFilter)
 
 	// Execute rsync
-	return r.executeRsync(cmd, opts)
+	err = r.executeRsync(cmd, opts)
+	if err != nil {
+		return err
+	}
+
+	// Execute post-sync actions
+	return r.executePostSyncActions(opts)
 }
 
 // runTwoWay performs two-way synchronization
@@ -1984,3 +2009,114 @@ func (r *Runner) confirmPlanExecution(planPath string) bool {
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }
+
+// executePostSyncActions executes all post-sync actions for the given options
+func (r *Runner) executePostSyncActions(opts *Options) error {
+	if len(opts.PostSyncActions) == 0 {
+		return nil // No post-sync actions to execute
+	}
+
+	r.logger.Infof("Executing %d post-sync actions", len(opts.PostSyncActions))
+
+	for i, action := range opts.PostSyncActions {
+		r.logger.Infof("Executing post-sync action %d/%d: %s", i+1, len(opts.PostSyncActions), action.Type)
+		
+		switch action.Type {
+		case PostSyncAppend:
+			if err := r.executeAppendAction(action, opts); err != nil {
+				return fmt.Errorf("failed to execute APPEND action: %w", err)
+			}
+		default:
+			r.logger.Warnf("Unknown post-sync action type: %s", action.Type)
+		}
+	}
+
+	r.logger.Info("All post-sync actions completed successfully")
+	return nil
+}
+
+// executeAppendAction executes an APPEND post-sync action
+func (r *Runner) executeAppendAction(action PostSyncAction, opts *Options) error {
+	targetPath := action.TargetFile
+	
+	// If target path is not absolute, make it relative to destination directory
+	if !filepath.IsAbs(targetPath) {
+		targetPath = filepath.Join(opts.Dest, targetPath)
+	}
+	
+	// Check flags for special behaviors
+	isDryRun := opts.DryRun
+	hasBackupFlag := false
+	hasNewlineFlag := true // default
+	
+	for _, flag := range action.Flags {
+		switch flag {
+		case "--dry-run":
+			isDryRun = true
+		case "--backup":
+			hasBackupFlag = true
+		case "--newline=false":
+			hasNewlineFlag = false
+		}
+	}
+	
+	// Handle dry-run mode
+	if isDryRun {
+		r.logger.Infof("Would append to %s", targetPath)
+		if action.SourceFile != "" {
+			r.logger.Infof("  Content source: %s", action.SourceFile)
+		} else {
+			r.logger.Infof("  Inline content: %s", strings.TrimSpace(action.Content))
+		}
+		return nil
+	}
+	
+	// Check if target file exists
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		return fmt.Errorf("target file not found: %s", action.TargetFile)
+	}
+	
+	// Create backup if requested
+	if hasBackupFlag {
+		backupPath := fmt.Sprintf("%s.backup.%d", targetPath, time.Now().Unix())
+		if err := r.copyFile(targetPath, backupPath); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
+		r.logger.Infof("Created backup: %s", backupPath)
+	}
+	
+	// Get content to append
+	var contentToAppend string
+	if action.SourceFile != "" {
+		// Read content from source file
+		sourceData, err := os.ReadFile(action.SourceFile)
+		if err != nil {
+			return fmt.Errorf("failed to read source file %s: %w", action.SourceFile, err)
+		}
+		contentToAppend = string(sourceData)
+	} else {
+		// Use inline content
+		contentToAppend = action.Content
+	}
+	
+	// Open target file for appending
+	file, err := os.OpenFile(targetPath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open target file for appending: %w", err)
+	}
+	defer file.Close()
+	
+	// Add newline before content if needed
+	if hasNewlineFlag {
+		contentToAppend = "\n" + contentToAppend
+	}
+	
+	// Append content
+	if _, err := file.WriteString(contentToAppend); err != nil {
+		return fmt.Errorf("failed to append content to file: %w", err)
+	}
+	
+	r.logger.Infof("Successfully appended content to %s", targetPath)
+	return nil
+}
+

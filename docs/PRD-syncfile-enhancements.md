@@ -82,6 +82,36 @@ END PATCH
 - **Full Git Patch**: Complete git diff format with all metadata (for complex multi-file patches)
 - **Minimal Diff**: Unified diff without git metadata (`@@` context lines specify location)
 
+**Function-Style Variables:**
+PATCH instructions support function-style variables that provide post-sync file analysis:
+
+```dockerfile
+# File structure functions
+LAST_LINE(filename)                    # Last line number in file
+LINE_COUNT(filename)                   # Total lines (same as LAST_LINE)
+FILE_SIZE(filename)                    # File size in bytes
+
+# Content search functions  
+FIND_LINE(filename, "pattern")         # Line number containing pattern
+FIND_LAST_LINE(filename, "pattern")    # Last line containing pattern
+AFTER_LINE(filename, "pattern")        # Line number after pattern match
+BEFORE_LINE(filename, "pattern")       # Line number before pattern match
+
+# Examples using functions
+PATCH config/app.yml:
+  @@ -LAST_LINE(config/app.yml),0 +LAST_LINE(config/app.yml),3 @@
++# Environment: production
++debug: false
++log_level: info
+END PATCH
+
+PATCH src/main.js:
+  @@ -AFTER_LINE(src/main.js,"const app ="),0 +AFTER_LINE(src/main.js,"const app ="),2 @@
++
++app.use(authMiddleware);
+END PATCH
+```
+
 #### 2. SCRIPT Instruction
 
 Execute custom scripts with access to sync context and results.
@@ -116,7 +146,65 @@ END SCRIPT
 - `SYNC_DURATION`: Sync operation duration in seconds
 - `SYNC_SUCCESS`: "true" if sync completed without errors
 
-#### 3. REPLACE Instruction
+#### 3. PREPEND Instruction
+
+Add content to the beginning of files after synchronization.
+
+**Syntax:**
+```dockerfile
+PREPEND [OPTIONS] <target-file>
+PREPEND --file header.txt config/app.yml
+PREPEND config/app.yml:
+  # Configuration for ${ENVIRONMENT}
+  # Generated: ${BUILD_TIMESTAMP}
+  # Version: ${APP_VERSION}
+  
+END PREPEND
+```
+
+**Options:**
+- `--file <path>`: Prepend content from external file
+- `:` (colon): Start inline content definition (ends with `END PREPEND`)
+- `--backup`: Create backup before prepending content
+- `--target <directory>`: Apply to files in specific directory (default: sync destination)
+- `--newline`: Add newline after prepended content (default: true)
+
+**Common Use Cases:**
+- Add headers, licenses, or metadata to files
+- Insert shebang lines or encoding declarations
+- Add environment-specific comments or configuration
+
+#### 4. APPEND Instruction
+
+Add content to the end of files after synchronization.
+
+**Syntax:**
+```dockerfile
+APPEND [OPTIONS] <target-file>
+APPEND --file footer.txt README.md
+APPEND config/app.yml:
+  
+  # Production overrides
+  production:
+    debug: false
+    log_level: info
+    database_pool: 20
+END APPEND
+```
+
+**Options:**
+- `--file <path>`: Append content from external file  
+- `:` (colon): Start inline content definition (ends with `END APPEND`)
+- `--backup`: Create backup before appending content
+- `--target <directory>`: Apply to files in specific directory (default: sync destination)
+- `--newline`: Add newline before appended content (default: true)
+
+**Common Use Cases:**
+- Add environment-specific configuration sections
+- Append module exports, imports, or initialization code
+- Add footer information, credits, or build metadata
+
+#### 5. REPLACE Instruction
 
 Perform text replacements and content substitutions in files.
 
@@ -169,7 +257,7 @@ END REPLACE
 - **Block Find/Replace**: `FIND:` ... `REPLACE:` blocks (best for multi-line content)
 - **Mixed**: Combine sed-style and block replacements in single instruction
 
-#### 4. TRANSFORM Instruction
+#### 6. TRANSFORM Instruction
 
 Apply file transformations using templates or custom processors.
 
@@ -186,7 +274,7 @@ TRANSFORM --processor custom-config-processor config/
 - `--backup`: Create backup before transformation
 - `--target <directory>`: Directory to operate on (default: sync destination)
 
-#### 5. VALIDATE Instruction
+#### 7. VALIDATE Instruction
 
 Run validation checks with rollback capabilities.
 
@@ -204,7 +292,7 @@ VALIDATE --rollback-on-failure
 - `--rollback-on-failure`: Restore from backup if validation fails
 - `--timeout <seconds>`: Validation timeout (default: 60)
 
-#### 6. NOTIFY Instruction
+#### 8. NOTIFY Instruction
 
 Send notifications about sync completion and results.
 
@@ -307,16 +395,23 @@ MODE one-way
 EXCLUDE node_modules/
 EXCLUDE *.log
 
-# Apply environment-specific configuration
-PATCH:
-  diff --git a/config/app.yml b/config/app.yml
-  --- a/config/app.yml
-  +++ b/config/app.yml
-  @@ -1,3 +1,3 @@
-   environment: development
-  -database_url: localhost:5432
-  +database_url: ${DB_HOST}:${DB_PORT}
-END PATCH
+# Add deployment metadata
+PREPEND config/app.yml:
+  # Deployed: ${BUILD_TIMESTAMP}
+  # Version: ${APP_VERSION}
+  # Environment: ${DEPLOY_ENV}
+  
+END PREPEND
+
+# Add environment-specific configuration
+APPEND config/app.yml:
+  
+  # Production overrides
+  production:
+    database_url: ${DB_HOST}:${DB_PORT}
+    redis_url: ${REDIS_URL}
+    log_level: info
+END APPEND
 
 # Run database migrations
 SCRIPT:
@@ -418,6 +513,8 @@ const (
     // Post-sync action instructions
     InstPatch       InstructionType = "PATCH"       // PATCH --file changes.patch
     InstScript      InstructionType = "SCRIPT"      // SCRIPT deploy.sh
+    InstPrepend     InstructionType = "PREPEND"     // PREPEND config.yml header content
+    InstAppend      InstructionType = "APPEND"      // APPEND config.yml footer content
     InstReplace     InstructionType = "REPLACE"     // REPLACE config.yml s/old/new/g
     InstTransform   InstructionType = "TRANSFORM"   // TRANSFORM --template config/*.tmpl
     InstValidate    InstructionType = "VALIDATE"    // VALIDATE --command "test.sh"
@@ -462,6 +559,16 @@ type ReplaceExecutor struct {
     workingDir string
     backupDir  string
 }
+
+type PrependExecutor struct {
+    workingDir string
+    backupDir  string
+}
+
+type AppendExecutor struct {
+    workingDir string
+    backupDir  string
+}
 ```
 
 ### Sync Result Context
@@ -486,16 +593,18 @@ type SyncResult struct {
 ## Success Criteria
 
 ### Must-Have Features (MVP)
-- [x] PATCH instruction with file and inline support
-- [x] SCRIPT instruction with file and inline support  
-- [x] Basic error handling (abort, continue modes)
-- [x] Environment variable access to sync results
-- [x] Backup creation for destructive operations
+- [ ] PATCH instruction with file and inline support, function-style variables
+- [ ] PREPEND instruction for adding content to file beginnings  
+- [ ] APPEND instruction for adding content to file ends
+- [ ] Basic error handling (abort, continue modes)
+- [ ] Environment variable access to sync results
+- [ ] Backup creation for destructive operations
 
 ### Should-Have Features (V1.1)
-- [ ] TRANSFORM instruction with template and sed support
+- [ ] REPLACE instruction with sed-style and block find/replace
+- [ ] SCRIPT instruction with file and inline support
+- [ ] TRANSFORM instruction with template support
 - [ ] VALIDATE instruction with rollback capabilities
-- [ ] Conditional execution (IF/ELIF/ELSE/ENDIF)
 - [ ] Basic notification support (webhook, email)
 
 ### Could-Have Features (V2.0)
