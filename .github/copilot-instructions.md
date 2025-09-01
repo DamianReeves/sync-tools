@@ -1,383 +1,269 @@
 # sync-tools Development Instructions
 
-**Always follow these instructions first and fallback to additional search and context gathering only if the information here is incomplete or found to be in error.**
+**Always follow these instructions first and reference [CLAUDE.md](../CLAUDE.md) for comprehensive code guidelines and architectural principles.**
 
-sync-tools is a Python CLI wrapper around rsync that provides advanced directory synchronization with .syncignore files, whitelist mode, filter layering, one-way/two-way sync, and conflict preservation. The project includes both a modern Python CLI and build tooling for standalone artifacts.
+sync-tools is a **Go CLI wrapper** around rsync that provides advanced directory synchronization with .syncignore files, whitelist mode, filter layering, one-way/two-way sync, conflict preservation, and SyncFile post-sync actions. The project has been fully migrated from Python to Go for better performance and single-binary distribution.
+
+## Core Guidelines Reference
+
+**Primary Guidelines**: See [CLAUDE.md](../CLAUDE.md) for comprehensive code guidelines including:
+- BDD/TDD mandatory discipline (Red/Green/Refactor cycle)
+- Architecture preferences (composition, testability, modularity)
+- Testing approach (Gherkin features first, comprehensive coverage)
+- Development tracker maintenance requirements
+- Technical preferences and commit standards
+
+## Current Architecture (Go Implementation)
+
+### Project Structure
+```
+sync-tools/
+├── cmd/sync-tools/         # Main CLI application entry point
+├── internal/
+│   ├── cmd/               # Cobra CLI commands (sync, syncfile)
+│   └── rsync/             # Core rsync wrapper and sync logic
+├── pkg/syncfile/          # SyncFile parsing and post-sync actions
+├── features/              # BDD test scenarios (Godog/Gherkin)
+├── test/bdd/              # BDD step definitions and test context
+├── docs/                  # Documentation and PRDs
+├── CLAUDE.md              # Primary code guidelines and standards
+├── DEVELOPMENT-TRACKER.md # Mandatory progress tracking
+└── go.mod                 # Go module dependencies
+```
+
+### Development Commands (Go)
+```bash
+# Build application
+go build -o sync-tools ./cmd/sync-tools
+
+# Run BDD tests (primary test suite)
+go test ./test/bdd -tags bdd -v
+
+# Run all tests
+go test ./...
+
+# Run application
+go run ./cmd/sync-tools [command]
+
+# Install locally
+go install ./cmd/sync-tools
+
+# Lint code
+golangci-lint run
+```
 
 ## Working Effectively
 
 ### Bootstrap Environment
-Run these commands in sequence to set up a complete development environment:
-
 ```bash
-# Navigate to repository 
+# Navigate to repository
 cd /path/to/sync-tools
 
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# OR .venv\Scripts\activate  # Windows
+# Verify Go is installed (1.19+ required)
+go version
+
+# Verify rsync is available (3.1+ required)
+rsync --version
+
+# Build the application
+go build -o sync-tools ./cmd/sync-tools
+
+# Verify basic functionality
+./sync-tools --help
 ```
 
-**CRITICAL NETWORK ISSUE**: pip install commonly fails with ReadTimeoutError in this environment. Use these alternatives:
+### Testing and Validation (MANDATORY BDD/TDD)
+
+**CRITICAL**: Follow strict BDD/TDD discipline as outlined in [CLAUDE.md](../CLAUDE.md)
 
 ```bash
-# OPTION 1: Use system Python packages if available
-python3 -c "import click, behave, pytest; print('System packages available')"
-# If successful, skip pip install and use system packages
+# Run BDD tests (primary integration tests) - MUST pass 100%
+go test ./test/bdd -tags bdd -v
+# Expected: All scenarios pass, current: 57/57 scenarios
 
-# OPTION 2: Create minimal venv without network dependencies
-python3 -m venv .venv
-source .venv/bin/activate
-# Skip pip installs, test functionality directly
+# Run full test suite
+go test ./...
 
-# OPTION 3: If pip works, install individually with retries
-pip install click
-pip install behave  
-pip install pytest
-pip install pytest-bdd
-pip install tomli
+# Run specific feature tests
+go test ./test/bdd -tags bdd -run 'APPEND'
 
-# Verify basic functionality works regardless of install method
-PYTHONPATH=. python3 -c "import sync_tools.cli; sync_tools.cli.cli.main(['--help'])"
-```
-
-**CRITICAL TIMING**: Environment setup takes 2-5 minutes due to network timeouts. NEVER CANCEL during pip installs - they often succeed on retry.
-
-### Testing and Validation
-Always run both test suites before making changes:
-
-```bash
-# Run BDD tests (primary integration tests)
-behave --no-capture
-# Expected: ~2 seconds, 15 scenarios, all pass
-# NEVER CANCEL: Wait for completion even if appears to hang
-
-# Run pytest suite (unit and integration tests)  
-PYTHONPATH=. pytest -v
-# Expected: ~0.5 seconds, 26 tests, all pass
-# NEVER CANCEL: Set timeout to 300+ seconds for safety
-```
-
-**CRITICAL**: Git must be configured for BDD tests that use git repositories:
-```bash
-git config --global user.email "test@example.com"
-git config --global user.name "Test User"
+# BDD Red/Green/Refactor cycle for new features:
+# 1. RED: Create .feature file with failing scenarios
+# 2. GREEN: Implement minimal code to pass
+# 3. REFACTOR: Clean up while maintaining green tests
 ```
 
 ### Running the CLI
-Multiple ways to run sync-tools during development:
-
 ```bash
-# Method 1: Module runner (quickest, no install)
-PYTHONPATH=. python3 -c "import sync_tools.cli; sync_tools.cli.cli.main(['sync', '--help'])"
+# Method 1: Direct execution after build
+./sync-tools sync --help
+./sync-tools syncfile --help
 
-# Method 2: Module execution
-PYTHONPATH=. python3 -m sync_tools.cli sync --help
+# Method 2: Go run (development)
+go run ./cmd/sync-tools sync --help
+go run ./cmd/sync-tools syncfile --help
 
-# Method 3: After editable install (if pip works)
-pip install -e .
+# Method 3: After install
 sync-tools sync --help
 ```
 
-**Manual Validation Test** (run after any changes):
-
+### Manual Validation Test
 ```bash
 # Create test directories
-mkdir -p /tmp/test_sync/{src,dst}
-echo "test content" > /tmp/test_sync/src/file.txt
+mkdir -p /tmp/test_sync/{source,dest}
+echo "test content" > /tmp/test_sync/source/file.txt
 
 # Test dry run
-PYTHONPATH=. python3 -c "
-import sync_tools.cli
-sync_tools.cli.cli.main([
-    'sync', 
-    '--source', '/tmp/test_sync/src',
-    '--dest', '/tmp/test_sync/dst', 
-    '--dry-run'
-])"
+./sync-tools sync --source /tmp/test_sync/source --dest /tmp/test_sync/dest --dry-run
 
-# Test actual sync  
-PYTHONPATH=. python3 -c "
-import sync_tools.cli  
-sync_tools.cli.cli.main([
-    'sync',
-    '--source', '/tmp/test_sync/src',
-    '--dest', '/tmp/test_sync/dst'
-])"
+# Test actual sync
+./sync-tools sync --source /tmp/test_sync/source --dest /tmp/test_sync/dest
 
 # Verify result
-ls -la /tmp/test_sync/dst/  # Should contain file.txt
-```
-
-### Essential System Dependencies
-Verify these are available - sync-tools requires:
-
-```bash
-# Check versions
-python3 --version    # 3.8+ required, 3.12+ recommended
-rsync --version      # 3.1+ required, 3.2+ recommended  
-git --version        # Any recent version
+ls -la /tmp/test_sync/dest/  # Should contain file.txt
 ```
 
 ## Validation Status
 
-**EXHAUSTIVELY VALIDATED** (confirmed working):
-- ✅ **BDD Test Suite**: 15 scenarios, 11 features, ~2 seconds runtime - all pass
-- ✅ **pytest Test Suite**: 26 tests across 9 modules, ~0.5 seconds runtime - all pass  
-- ✅ **CLI Functionality**: Complete sync operations (dry-run and actual sync)
-- ✅ **Core Dependencies**: rsync 3.2.7, Python 3.12.3, git 2.51.0
-- ✅ **Project Structure**: Well-organized Python package with proper configuration
-- ✅ **One-way and Two-way Sync**: Conflict detection and resolution working
-- ✅ **Filter System**: .syncignore, whitelist, and pattern matching validated
+**FULLY VALIDATED** (Go implementation):
+- ✅ **BDD Test Suite**: 57 scenarios across multiple features, all passing
+- ✅ **Go CLI Framework**: Complete Cobra-based command structure
+- ✅ **Core Sync Operations**: One-way/two-way sync with conflict resolution  
+- ✅ **Filter System**: .syncignore, .gitignore import, whitelist mode, pattern matching
+- ✅ **SyncFile Format**: Dockerfile-like syntax with SYNC, APPEND, PREPEND instructions
+- ✅ **Post-Sync Actions**: APPEND and PREPEND actions with comprehensive flag support
+- ✅ **Cross-Platform**: Linux, macOS, Windows compatibility
+- ✅ **Performance**: Single-binary distribution, efficient rsync integration
 
-**BLOCKED BY NETWORK ISSUES**:
-- ⚠️ **pip install operations**: Persistent ReadTimeoutError from pypi.org
-- ⚠️ **Build artifacts**: Cannot reliably create PEX/shiv/PyInstaller builds
-- ⚠️ **Makefile targets**: Network dependencies cause timeouts
+**CURRENT FEATURES**:
+- **Basic Sync**: One-way and two-way directory synchronization
+- **Advanced Filtering**: Multi-layer filter system with sophisticated patterns
+- **SyncFile Support**: Declarative sync configurations with post-sync actions
+- **Interactive Mode**: Two-phased sync with plan generation and execution
+- **Git Integration**: Patch generation and application capabilities
+- **Report Generation**: Markdown reports with detailed sync statistics
 
-**DEVELOPMENT WORKFLOW VALIDATED**:
-When dependencies are available (via successful pip install or system packages), this complete workflow works perfectly:
+## Development Workflow (MANDATORY)
 
+**CRITICAL**: Always follow BDD/TDD discipline from [CLAUDE.md](../CLAUDE.md)
+
+### For New Features:
+1. **BDD First**: Create `.feature` file with Gherkin scenarios (RED phase)
+2. **Run Tests**: Confirm scenarios fail (`go test ./test/bdd -tags bdd`)
+3. **Implement**: Write minimal code to make tests pass (GREEN phase)
+4. **Refactor**: Clean up code while maintaining green tests
+5. **Update Tracker**: Update DEVELOPMENT-TRACKER.md with progress
+
+### Before Committing:
 ```bash
-# Setup (when network allows)
-python3 -m venv .venv && source .venv/bin/activate
-pip install click behave pytest pytest-bdd tomli
+# MANDATORY: All tests must pass at 100%
+go test ./...
 
-# Git configuration (required for BDD tests)
-git config --global user.email "test@example.com"
-git config --global user.name "Test User"
+# MANDATORY: BDD tests must pass
+go test ./test/bdd -tags bdd -v
 
-# Full test suite (validated timing)
-behave --no-capture          # ~2 seconds, 15 scenarios pass
-PYTHONPATH=. pytest -v      # ~0.5 seconds, 26 tests pass
+# MANDATORY: Code must compile
+go build -o sync-tools ./cmd/sync-tools
 
-# CLI validation (confirmed functional)
-PYTHONPATH=. python3 -c "
-import sync_tools.cli
-sync_tools.cli.cli.main(['sync', '--source', '/tmp/src', '--dest', '/tmp/dst', '--dry-run'])
-"
+# RECOMMENDED: Run linting
+golangci-lint run
+
+# MANDATORY: Update DEVELOPMENT-TRACKER.md
+# See [CLAUDE.md](../CLAUDE.md) for tracker maintenance requirements
 ```
 
-```bash
-# Basic sync test
-mkdir -p /tmp/test_sync/{src,dst}
-echo "test content" > /tmp/test_sync/src/file.txt
-
-# Dry run test
-PYTHONPATH=. python3 -c "
-import sync_tools.cli
-sync_tools.cli.cli.main([
-    'sync', 
-    '--source', '/tmp/test_sync/src',
-    '--dest', '/tmp/test_sync/dst', 
-    '--dry-run'
-])"
-
-# Actual sync test
-PYTHONPATH=. python3 -c "
-import sync_tools.cli  
-sync_tools.cli.cli.main([
-    'sync',
-    '--source', '/tmp/test_sync/src',
-    '--dest', '/tmp/test_sync/dst'
-])"
-
-# Verify result
-ls -la /tmp/test_sync/dst/  # Should contain file.txt
-```
-
-## Build and Distribution
-
-**WARNING**: Network timeouts commonly affect build commands. Set long timeouts and be patient.
-
-### Available Build Targets
-```bash
-# These commands create single-file distributions:
-make build-pex           # Creates dist/sync-tools.pex
-make build-shiv          # Creates dist/sync-tools.shiv  
-make build-pyinstaller   # Creates dist/sync-tools (Linux binary)
-
-# Install locally for testing
-make install-local       # User installation
-make install-local sudo=1  # System-wide installation
-```
-
-**CRITICAL BUILD TIMING**: 
-- Build processes take 2-5 minutes depending on network
-- NEVER CANCEL builds - set timeouts to 900+ seconds (15 minutes)
-- Network timeouts are common - retry if builds fail with ReadTimeoutError
-
-### Testing Builds
-After creating artifacts, always validate:
-
-```bash
-# Test PEX artifact
-./dist/sync-tools.pex sync --help
-
-# Test shiv artifact  
-./dist/sync-tools.shiv sync --help
-
-# Test PyInstaller binary (Linux)
-./dist/sync-tools sync --help
-```
-
-## Network Issues and Workarounds
-
-**KNOWN ISSUE**: pip install timeouts frequently occur in this environment.
-
-### Workaround for pip timeouts:
-```bash
-# If standard make install fails, install dependencies individually:
-source .venv/bin/activate
-pip install click
-pip install behave  
-pip install pytest
-pip install pytest-bdd
-pip install tomli
-
-# Then test functionality without full install:
-PYTHONPATH=. python3 -c "import sync_tools.cli; print('OK')"
-```
-
-### Makefile Targets - Use with Caution
-The Makefile has network dependencies that may timeout:
-
-```bash
-make venv      # Creates .venv - may timeout on pip upgrade
-make install   # Installs deps - frequently times out
-make test      # Runs both behave and pytest - preferred
-make bdd       # BDD tests only 
-make pytest    # pytest tests only
-```
-
-**RECOMMENDATION**: Use direct commands instead of Makefile for reliability.
+### Development Tracker Maintenance
+**MANDATORY**: Update `DEVELOPMENT-TRACKER.md` on every session
+- Track progress: In Progress → Pending → Refined → Backlog  
+- Document completions with dates and outcomes
+- Record architectural decisions and trade-offs
+- Maintain accurate current status and priorities
+- Reference BDD scenarios in commit messages
 
 ## Key Project Components
 
-### Source Structure
-```
-sync-tools/
-├── sync_tools/           # Main Python package
-│   ├── cli.py           # Click CLI interface
-│   ├── rsync_wrapper.py # Core rsync functionality
-│   └── config.py        # Configuration handling
-├── features/            # BDD test scenarios (behave)
-├── tests/              # Python unit/integration tests (pytest)
-├── tools/              # Build scripts and utilities
-├── sync.sh             # DEPRECATED - use Python CLI instead
-└── pyproject.toml      # Project configuration
-```
+### Core Architecture
+- **CLI Framework**: Cobra-based command structure with sync and syncfile subcommands
+- **Rsync Wrapper**: Efficient integration with rsync for file operations
+- **Filter Engine**: Sophisticated pattern matching and exclusion/inclusion logic  
+- **SyncFile Parser**: Dockerfile-like syntax processor with post-sync actions
+- **PostSyncAction Framework**: Pluggable action executors (APPEND, PREPEND, future PATCH)
+- **BDD Framework**: Godog integration for executable specifications
 
-### Common Development Tasks
+### Post-Sync Actions (Current)
+- **APPEND**: Add content to end of files with inline/file-based sources
+- **PREPEND**: Add content to beginning of files with headers/metadata
+- **Planned**: PATCH (git diff application), REPLACE (text substitution), SCRIPT (execution)
 
-**Before committing changes:**
+### Testing Framework
+- **BDD Primary**: Godog with Gherkin scenarios for integration testing
+- **Unit Tests**: Standard Go testing for component-level verification
+- **Manual Validation**: Real sync operations for end-to-end verification
+
+## Build and Distribution
+
 ```bash
-# Always run full test suite
-behave --no-capture && PYTHONPATH=. pytest -v
+# Build single binary
+go build -o sync-tools ./cmd/sync-tools
 
-# Verify CLI still works
-PYTHONPATH=. python3 -c "
-import sync_tools.cli
-sync_tools.cli.cli.main(['sync', '--help'])
-"
+# Cross-platform builds
+GOOS=linux GOARCH=amd64 go build -o sync-tools-linux ./cmd/sync-tools
+GOOS=windows GOARCH=amd64 go build -o sync-tools.exe ./cmd/sync-tools
+GOOS=darwin GOARCH=amd64 go build -o sync-tools-macos ./cmd/sync-tools
+
+# Install to GOPATH/bin
+go install ./cmd/sync-tools
 ```
 
-**Creating new tests:**
-- Add BDD scenarios in `features/*.feature`
-- Add pytest tests in `tests/test_*.py`  
-- Use existing test patterns as templates
+## Architectural Principles
 
-**Testing sync operations:**
-- Always use `--dry-run` first to validate filters
-- Test both one-way and two-way modes
-- Verify conflict resolution in two-way mode
-- Test .syncignore and whitelist functionality
+**Reference [CLAUDE.md](../CLAUDE.md) for comprehensive guidelines. Key principles:**
+
+1. **BDD/TDD Mandatory**: All features start with failing Gherkin scenarios
+2. **Composition Over Inheritance**: Build flexible, reusable components
+3. **Testability First**: Design all components with testing as primary concern
+4. **Explicit Interfaces**: Value explicit, testable interfaces over implicit coupling
+5. **Documentation as Code**: Tests serve as living documentation
+6. **Multi-Persona Design**: Serve DevOps Engineers, Developers, Compliance Auditors
+7. **Audit Trails**: Comprehensive logging and traceability
 
 ## Troubleshooting
 
-### Network Issues and Workarounds
-
-**KNOWN ISSUE**: This environment experiences persistent network timeouts affecting all pip operations.
-
+### Build Issues
 ```bash
-# ReadTimeoutError during pip install affects all commands
-# ERROR: HTTPSConnectionPool(host='pypi.org'): Read timed out
+# Verify Go version
+go version  # Requires 1.19+
 
-# STATUS OF VERIFIED FUNCTIONALITY:
-# ✓ Repository structure and code quality - excellent
-# ✓ BDD test suite - 15 scenarios in ~2 seconds (when deps available)
-# ✓ pytest test suite - 26 tests in ~0.5 seconds (when deps available)  
-# ✓ CLI functionality - full sync operations work correctly
-# ✓ rsync integration - version 3.2.7 compatible
-# ⚠️ pip install - network timeouts prevent reliable dependency installation
-# ⚠️ Build artifacts - network issues prevent reliable builds
-
-# WORKING APPROACH when environment allows:
-# 1. Install dependencies: click, behave, pytest, pytest-bdd, tomli
-# 2. Use PYTHONPATH=. for all operations
-# 3. Run tests: behave --no-capture && PYTHONPATH=. pytest -v
-# 4. Test functionality with real sync operations
-
-# FALLBACK when network prevents pip install:
-# Document that the code structure and functionality are validated
-# Network timeouts are environmental, not code-related issues
+# Clear module cache if needed  
+go clean -modcache
+go mod tidy
+go build -o sync-tools ./cmd/sync-tools
 ```
 
-### Import Errors
+### Test Failures
 ```bash
-# If getting "ModuleNotFoundError: No module named 'sync_tools'":
-export PYTHONPATH=.
-# OR
-export PYTHONPATH=$(pwd)
+# Run specific test suite
+go test ./test/bdd -tags bdd -run 'TestFeatures'
+
+# Verbose output for debugging
+go test ./test/bdd -tags bdd -v -run 'APPEND'
+
+# Check test isolation
+go test ./test/bdd -tags bdd -count=2
 ```
 
-### BDD Test Failures
+### BDD Development
 ```bash
-# Git-related BDD tests fail if git is not configured:
-git config --global user.email "test@example.com"  
-git config --global user.name "Test User"
+# Run specific feature
+go test ./test/bdd -tags bdd -run 'BasicSync'
+
+# Debug step definitions
+# Check test/bdd/steps/sync_steps.go for available steps
+
+# Add new scenarios to features/*.feature files
+# Implement step definitions in test/bdd/steps/
 ```
 
-### Build Failures
-```bash
-# Network timeouts during builds are common - documented working state:
-# - Basic CLI functionality: ✓ Works
-# - BDD tests: ✓ 2 seconds, all pass  
-# - pytest tests: ✓ 0.5 seconds, all pass
-# - Build artifacts: ⚠️  Network timeouts prevent reliable builds
-# 
-# WORKAROUND: Use PYTHONPATH method instead of builds
-# Builds may work with multiple retries but are not reliable
-```
+Remember: sync-tools provides reliable rsync-based synchronization with advanced filtering and post-sync actions. Always validate core functionality after changes and maintain 100% BDD test pass rate.
 
-### Testing Specific Features
-```bash
-# Test specific BDD feature
-behave features/sync.feature
-
-# Test specific pytest file
-PYTHONPATH=. pytest tests/test_hello_world.py -v
-
-# Debug with verbose output
-behave --no-capture -v
-PYTHONPATH=. pytest -s -v
-```
-
-## CI/CD Notes
-
-The project uses GitHub Actions with these jobs:
-- `test`: Basic test suite on Ubuntu
-- `integration`: Additional integration tests  
-
-Workflows are in `.github/workflows/` and expect Python 3.12 with rsync available.
-
-**ALWAYS run the complete validation workflow before pushing changes:**
-
-1. Set up clean environment
-2. Run behave --no-capture (expect ~2s, 15 scenarios pass)
-3. Run PYTHONPATH=. pytest -v (expect ~0.5s, 26 tests pass)  
-4. Test basic sync functionality manually
-5. Commit only if all steps succeed
-
-Remember: This tool's core value is reliable rsync-based synchronization with advanced filtering - always validate that core functionality works after changes.
+For comprehensive development guidelines, architectural principles, and mandatory practices, see [CLAUDE.md](../CLAUDE.md).

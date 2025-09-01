@@ -221,6 +221,11 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the plan file "([^"]*)" should exist$`, tc.thePlanFileShouldExist)
 	ctx.Step(`^the source file "([^"]*)" should contain "([^"]*)": "([^"]*)"$`, tc.theSourceFileShouldContain)
 
+	// APPEND step definitions
+	ctx.Step(`^I have a file "([^"]*)" containing:$`, tc.iHaveAFileContaining)
+	ctx.Step(`^the destination directory should contain "([^"]*)" with content:$`, tc.theDestinationDirectoryShouldContainWithContent)
+	ctx.Step(`^the output should contain "([^"]*)"$`, tc.theOutputShouldContain)
+
 	// Setup and cleanup hooks
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return tc.beforeScenario(ctx, sc)
@@ -1722,3 +1727,54 @@ func (tc *TestContext) validationShouldPassSuccessfully() error {
 	}
 	return nil
 }
+
+// APPEND step definition implementations
+
+func (tc *TestContext) iHaveAFileContaining(filename string, content *godog.DocString) error {
+	filePath := filepath.Join(tc.workingDir, filename)
+	
+	// Create directory if needed
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %w", filename, err)
+	}
+	
+	// Write file content
+	if err := os.WriteFile(filePath, []byte(content.Content), 0644); err != nil {
+		return fmt.Errorf("failed to create file %s: %w", filename, err)
+	}
+	
+	return nil
+}
+
+func (tc *TestContext) theDestinationDirectoryShouldContainWithContent(filename string, expectedContent *godog.DocString) error {
+	filePath := filepath.Join(tc.destDir, filename)
+	
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("expected file %s to exist in destination directory, but it doesn't", filename)
+	}
+	
+	// Read file content
+	actualBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filename, err)
+	}
+	
+	actualContent := string(actualBytes)
+	expectedContentStr := expectedContent.Content
+	
+	// Compare content
+	if actualContent != expectedContentStr {
+		return fmt.Errorf("expected file %s to contain:\n%s\n\nbut got:\n%s", filename, expectedContentStr, actualContent)
+	}
+	
+	return nil
+}
+
+func (tc *TestContext) theOutputShouldContain(expectedText string) error {
+	if !strings.Contains(tc.lastOutput, expectedText) {
+		return fmt.Errorf("expected output to contain '%s', but got: %s", expectedText, tc.lastOutput)
+	}
+	return nil
+}
+

@@ -39,6 +39,10 @@ const (
 	InstPreview     InstructionType = "PREVIEW"     // PREVIEW true|false
 	InstAutoConfirm InstructionType = "AUTOCONFIRM" // AUTOCONFIRM true|false (like -y flag)
 	
+	// Post-sync action instructions
+	InstAppend      InstructionType = "APPEND"      // APPEND filename: content END APPEND
+	InstPrepend     InstructionType = "PREPEND"     // PREPEND filename: content END PREPEND
+	
 	// Variable and environment instructions
 	InstVar         InstructionType = "VAR"         // VAR name=value
 	InstEnv         InstructionType = "ENV"         // ENV name=value (exported to rsync)
@@ -50,10 +54,11 @@ const (
 
 // Instruction represents a single SyncFile instruction
 type Instruction struct {
-	Type     InstructionType
-	Args     []string
-	Comment  string
-	LineNum  int
+	Type          InstructionType
+	Args          []string
+	Comment       string
+	LineNum       int
+	InlineContent string // For multi-line instructions like APPEND
 }
 
 // ParseSyncFile parses a SyncFile from the given path
@@ -91,7 +96,27 @@ func ParseSyncFile(path string) (*SyncFile, error) {
 			continue
 		}
 
-		// Parse instruction
+		// Check for APPEND inline block
+		if strings.HasPrefix(strings.ToUpper(line), "APPEND ") && strings.HasSuffix(line, ":") {
+			instruction, err := parseAppendBlock(scanner, line, &lineNum)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNum, err)
+			}
+			sf.Instructions = append(sf.Instructions, instruction)
+			continue
+		}
+
+		// Check for PREPEND inline block
+		if strings.HasPrefix(strings.ToUpper(line), "PREPEND ") && strings.HasSuffix(line, ":") {
+			instruction, err := parsePrependBlock(scanner, line, &lineNum)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNum, err)
+			}
+			sf.Instructions = append(sf.Instructions, instruction)
+			continue
+		}
+
+		// Parse regular instruction
 		instruction, err := parseInstruction(line, lineNum)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: %w", lineNum, err)
@@ -161,6 +186,22 @@ func parseInstruction(line string, lineNum int) (Instruction, error) {
 		if len(args) < 1 {
 			return Instruction{}, fmt.Errorf("RUN requires at least 1 argument")
 		}
+	case InstAppend:
+		if len(args) < 1 {
+			return Instruction{}, fmt.Errorf("APPEND requires at least 1 argument")
+		}
+		// Validate --file flag format: APPEND --file source.txt target.txt
+		if len(args) >= 1 && args[0] == "--file" && len(args) != 3 {
+			return Instruction{}, fmt.Errorf("APPEND --file requires format: APPEND --file source.txt target.txt")
+		}
+	case InstPrepend:
+		if len(args) < 1 {
+			return Instruction{}, fmt.Errorf("PREPEND requires at least 1 argument")
+		}
+		// Validate --file flag format: PREPEND --file source.txt target.txt
+		if len(args) >= 1 && args[0] == "--file" && len(args) != 3 {
+			return Instruction{}, fmt.Errorf("PREPEND --file requires format: PREPEND --file source.txt target.txt")
+		}
 	default:
 		return Instruction{}, fmt.Errorf("unknown instruction: %s", instType)
 	}
@@ -172,6 +213,185 @@ func parseInstruction(line string, lineNum int) (Instruction, error) {
 	}, nil
 }
 
+// parseAppendBlock parses an APPEND inline block with content until END APPEND
+func parseAppendBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (Instruction, error) {
+	startLineNum := *lineNum
+	
+	// Parse the APPEND line: "APPEND [flags] filename:"
+	line := strings.TrimSuffix(firstLine, ":")
+	parts := strings.Fields(line)
+	if len(parts) < 2 {
+		return Instruction{}, fmt.Errorf("APPEND requires format: APPEND [flags] filename:")
+	}
+	
+	// Find the filename (last part) and collect flags
+	filename := parts[len(parts)-1]
+	flags := parts[1 : len(parts)-1] // Everything between APPEND and filename
+	
+	// Combine flags and filename for args
+	args := append(flags, filename)
+	var contentLines []string
+	
+	// Read lines until END APPEND
+	for scanner.Scan() {
+		*lineNum++
+		line := strings.TrimSpace(scanner.Text())
+		
+		if strings.ToUpper(line) == "END APPEND" {
+			// Found the end marker
+			break
+		}
+		
+		// Add the raw line (preserving original spacing for content)
+		contentLines = append(contentLines, scanner.Text())
+	}
+	
+	if *lineNum == startLineNum {
+		return Instruction{}, fmt.Errorf("APPEND block not closed with END APPEND")
+	}
+	
+	// Join content with newlines and normalize indentation
+	content := strings.Join(contentLines, "\n")
+	content = normalizeIndentation(content)
+	
+	return Instruction{
+		Type:          InstAppend,
+		Args:          args,
+		LineNum:       startLineNum,
+		InlineContent: content,
+	}, nil
+}
+
+// parsePrependBlock parses a PREPEND inline block with content until END PREPEND
+func parsePrependBlock(scanner *bufio.Scanner, firstLine string, lineNum *int) (Instruction, error) {
+	startLineNum := *lineNum
+	
+	// Parse the PREPEND line: "PREPEND [flags] filename:"
+	line := strings.TrimSuffix(firstLine, ":")
+	parts := strings.Fields(line)
+	if len(parts) < 2 {
+		return Instruction{}, fmt.Errorf("PREPEND requires format: PREPEND [flags] filename:")
+	}
+	
+	// Find the filename (last part) and collect flags
+	filename := parts[len(parts)-1]
+	flags := parts[1 : len(parts)-1] // Everything between PREPEND and filename
+	
+	// Combine flags and filename for args
+	args := append(flags, filename)
+	var contentLines []string
+	
+	// Read lines until END PREPEND
+	for scanner.Scan() {
+		*lineNum++
+		line := strings.TrimSpace(scanner.Text())
+		
+		if strings.ToUpper(line) == "END PREPEND" {
+			// Found the end marker
+			break
+		}
+		
+		// Add the raw line (preserving original spacing for content)
+		contentLines = append(contentLines, scanner.Text())
+	}
+	
+	if *lineNum == startLineNum {
+		return Instruction{}, fmt.Errorf("PREPEND block not closed with END PREPEND")
+	}
+	
+	// Join content with newlines and normalize indentation
+	content := strings.Join(contentLines, "\n")
+	content = normalizeIndentation(content)
+	
+	return Instruction{
+		Type:          InstPrepend,
+		Args:          args,
+		LineNum:       startLineNum,
+		InlineContent: content,
+	}, nil
+}
+
+// normalizeIndentation removes common leading whitespace from multi-line content
+func normalizeIndentation(content string) string {
+	if content == "" {
+		return content
+	}
+	
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return content
+	}
+	
+	// Find minimum indentation (ignoring empty lines)
+	minIndent := -1
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue // Skip empty lines
+		}
+		
+		indent := 0
+		for _, char := range line {
+			if char == ' ' || char == '\t' {
+				if char == '\t' {
+					indent += 4 // Count tabs as 4 spaces
+				} else {
+					indent++
+				}
+			} else {
+				break
+			}
+		}
+		
+		if minIndent == -1 || indent < minIndent {
+			minIndent = indent
+		}
+	}
+	
+	// If no indentation found, return as-is
+	if minIndent <= 0 {
+		return content
+	}
+	
+	// Remove common indentation from all lines
+	var normalizedLines []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			// Preserve empty lines as-is
+			normalizedLines = append(normalizedLines, "")
+		} else {
+			// Remove common indentation
+			dedented := removeLeadingSpaces(line, minIndent)
+			normalizedLines = append(normalizedLines, dedented)
+		}
+	}
+	
+	return strings.Join(normalizedLines, "\n")
+}
+
+// removeLeadingSpaces removes up to n leading spaces/tabs from a line
+func removeLeadingSpaces(line string, n int) string {
+	removed := 0
+	for i, char := range line {
+		if removed >= n {
+			return line[i:]
+		}
+		
+		if char == ' ' {
+			removed++
+		} else if char == '\t' {
+			removed += 4 // Count tabs as 4 spaces
+			if removed > n {
+				// If we removed too much, put back partial spaces
+				return strings.Repeat(" ", removed-n) + line[i+1:]
+			}
+		} else {
+			break
+		}
+	}
+	
+	return line[len(line):] // Return empty string if all chars were whitespace
+}
+
 // expandVariables expands variable references in a string
 func expandVariables(s string, vars map[string]string) string {
 	result := s
@@ -180,6 +400,88 @@ func expandVariables(s string, vars map[string]string) string {
 		result = strings.ReplaceAll(result, "$"+name, value)
 	}
 	return result
+}
+
+// parseAppendAction converts an APPEND instruction to a PostSyncAction
+func parseAppendAction(inst Instruction, variables map[string]string) rsync.PostSyncAction {
+	action := rsync.PostSyncAction{
+		Type:    rsync.PostSyncAppend,
+		Flags:   make([]string, 0),
+		Content: inst.InlineContent,
+	}
+	
+	// Parse arguments: [flags...] filename
+	args := inst.Args
+	if len(args) == 0 {
+		return action
+	}
+	
+	// Last argument is always the target file
+	targetFile := expandVariables(args[len(args)-1], variables)
+	action.TargetFile = targetFile
+	
+	// Everything before the last argument are flags
+	flags := args[:len(args)-1]
+	
+	// Parse flags
+	for _, flag := range flags {
+		switch flag {
+		case "--file":
+			// For --file flag, we need the source file from the next argument
+			// This should have been validated during parsing
+			if len(args) >= 3 && args[0] == "--file" {
+				action.SourceFile = expandVariables(args[1], variables)
+				action.TargetFile = expandVariables(args[2], variables)
+				action.Content = "" // No inline content for file-based append
+			}
+		default:
+			// Add other flags as-is
+			action.Flags = append(action.Flags, flag)
+		}
+	}
+	
+	return action
+}
+
+// parsePrependAction converts a PREPEND instruction to a PostSyncAction
+func parsePrependAction(inst Instruction, variables map[string]string) rsync.PostSyncAction {
+	action := rsync.PostSyncAction{
+		Type:    rsync.PostSyncPrepend,
+		Flags:   make([]string, 0),
+		Content: inst.InlineContent,
+	}
+	
+	// Parse arguments: [flags...] filename
+	args := inst.Args
+	if len(args) == 0 {
+		return action
+	}
+	
+	// Last argument is always the target file
+	targetFile := expandVariables(args[len(args)-1], variables)
+	action.TargetFile = targetFile
+	
+	// Everything before the last argument are flags
+	flags := args[:len(args)-1]
+	
+	// Parse flags
+	for _, flag := range flags {
+		switch flag {
+		case "--file":
+			// For --file flag, we need the source file from the next argument
+			// This should have been validated during parsing
+			if len(args) >= 3 && args[0] == "--file" {
+				action.SourceFile = expandVariables(args[1], variables)
+				action.TargetFile = expandVariables(args[2], variables)
+				action.Content = "" // No inline content for file-based prepend
+			}
+		default:
+			// Add other flags as-is
+			action.Flags = append(action.Flags, flag)
+		}
+	}
+	
+	return action
 }
 
 // ToRsyncOptions converts a SyncFile to rsync.Options
@@ -290,6 +592,20 @@ func (sf *SyncFile) ToRsyncOptions() ([]*rsync.Options, error) {
 			if currentOpts != nil {
 				autoConfirm, _ := strconv.ParseBool(inst.Args[0])
 				currentOpts.Yes = autoConfirm
+			}
+		
+		case InstAppend:
+			if currentOpts != nil {
+				// Parse APPEND instruction and add to post-sync actions
+				action := parseAppendAction(inst, sf.Variables)
+				currentOpts.PostSyncActions = append(currentOpts.PostSyncActions, action)
+			}
+		
+		case InstPrepend:
+			if currentOpts != nil {
+				// Parse PREPEND instruction and add to post-sync actions
+				action := parsePrependAction(inst, sf.Variables)
+				currentOpts.PostSyncActions = append(currentOpts.PostSyncActions, action)
 			}
 		}
 	}

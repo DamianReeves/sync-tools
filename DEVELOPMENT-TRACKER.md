@@ -1,14 +1,29 @@
 # sync-tools Development Tracker
 
-**Last Updated**: 2025-08-29  
-**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete, Markdown Report Generation Implemented
+**Last Updated**: 2025-08-31  
+**Current Status**: SyncFile APPEND and PREPEND Instructions Complete with 100% BDD Test Coverage (57/57 scenarios passing)
 
 ## TASKS
 
 ### In Progress
-*No active tasks - ready for next development cycle*
 
-### Pending
+### Pending  
+- **SyncFile PATCH Instruction** [Priority: P1 - High]
+  - Implement PATCH post-sync action for SyncFile format
+  - Support full git patch and minimal diff formats with function-style variables
+  - Add backup and rollback capabilities for patch operations
+  - Create BDD test scenarios for patch application workflows
+
+- **SyncFile REPLACE Instruction** [Priority: P2 - Medium]
+  - Implement REPLACE post-sync action with sed-style and block find/replace
+  - Support regex replacements and multi-line content blocks
+  - Add variable substitution and template processing
+
+- **SyncFile SCRIPT Instruction** [Priority: P2 - Medium]
+  - Implement SCRIPT post-sync action with sync context variables
+  - Provide environment variables with sync results (files changed, duration, etc.)
+  - Add timeout controls and failure handling strategies
+
 - **Structured Output Formats** [Priority: P2 - Medium]
   - Add JSON report format for programmatic parsing
   - Add YAML report format for configuration workflows
@@ -42,6 +57,89 @@
   - Validate rsync integration on Windows
 
 ## Changelog
+
+### 2025-08-31: SyncFile PREPEND Instruction Implementation Complete
+
+**Completed Work**:
+- ✅ **SyncFile PREPEND Post-Sync Action** [Priority: P1 - High]
+  - Implemented complete PREPEND instruction parsing with inline and file-based content support
+  - Created executePrependAction with full feature parity to APPEND (prepends content to beginning of files)
+  - Added comprehensive BDD test suite with 8 scenarios covering all PREPEND use cases
+  - Integrated with existing PostSyncAction architecture for seamless execution
+  - Supports PREPEND flags: --file (external content), --backup (backup creation), --dry-run, --newline control
+  - Achieved immediate 100% BDD test success rate (57/57 scenarios passing)
+
+**Key Features**:
+- **Inline Content**: `PREPEND config.yml: header content END PREPEND` syntax for direct header specification
+- **External Files**: `PREPEND --file header.txt config.yml` for file-based header sources
+- **Multiple Operations**: Support for sequential PREPEND operations with proper content ordering
+- **Backup Support**: `PREPEND --backup` creates timestamped backups before modification
+- **Dry-Run Integration**: PREPEND respects global dry-run mode and instruction-level --dry-run flags
+- **Content Positioning**: Properly prepends content + newline before existing file content
+- **Error Handling**: Clear error messages for missing files, validation failures
+
+**Technical Implementation**:
+- Added InstPrepend instruction type and parsePrependBlock function for parsing
+- Implemented parsePrependAction to convert PREPEND instructions to PostSyncAction
+- Created executePrependAction with file reading, content prepending, and atomic file writing
+- Added PostSyncPrepend action type with full integration in post-sync executor
+- Reused existing BDD step definitions from APPEND implementation (excellent architecture reuse)
+- Proper indentation normalization and newline handling
+
+**Current Status**: PREPEND functionality complete and fully tested
+**Total Test Coverage**: 57/57 scenarios passing (100% success rate)
+
+### 2025-08-31: SyncFile APPEND Instruction Implementation Complete
+
+**Completed Work**:
+- ✅ **SyncFile APPEND Post-Sync Action** [Priority: P1 - High]
+  - Implemented complete APPEND instruction parsing with inline and file-based content support
+  - Created PostSyncAction architecture with pluggable action executors for extensibility
+  - Added comprehensive BDD test suite with 8 scenarios covering all APPEND use cases
+  - Integrated APPEND execution into rsync workflow after successful sync operations
+  - Supports APPEND flags: --file (external content), --backup (backup creation), --dry-run, --newline control
+  - Added proper error handling, logging, and validation for post-sync actions
+  - Updated PRD with detailed APPEND and PREPEND instruction specifications
+
+**Key Features**:
+- **Inline Content**: `APPEND config.yml: content here END APPEND` syntax for direct content specification
+- **External Files**: `APPEND --file footer.txt config.yml` for file-based content sources
+- **Multiple Operations**: Support for sequential APPEND operations on same or different files  
+- **Backup Support**: `APPEND --backup` creates timestamped backup before modification
+- **Dry-Run Integration**: APPEND respects global dry-run mode and instruction-level --dry-run flags
+- **Robust Error Handling**: Clear error messages for missing files, validation failures
+- **BDD Test Coverage**: 8 comprehensive scenarios with step definitions for all functionality
+
+**Technical Implementation**:
+- Extended Instruction struct with InlineContent field for multi-line content blocks
+- Added parseAppendBlock function for handling APPEND: ... END APPEND syntax
+- Implemented PostSyncAction and PostSyncActionType for pluggable post-sync operations
+- Modified rsync.Runner to execute post-sync actions after successful sync completion  
+- Added executeAppendAction with proper file handling, backup creation, and content processing
+- Created APPEND-specific BDD step definitions with proper test isolation
+
+**Current Status**: APPEND functionality working with minor formatting issues in 6/8 BDD scenarios
+**Next**: Fix indentation handling and dry-run test expectations to achieve 100% BDD test pass rate
+
+### 2025-01-09: SyncFile Post-Sync Actions PRD Complete
+
+**Completed Work**:
+- ✅ **SyncFile Post-Sync Actions PRD** [Priority: P0 - Critical]
+  - Created comprehensive Product Requirements Document for SyncFile enhancements
+  - Defined PATCH, REPLACE, SCRIPT, TRANSFORM, VALIDATE, and NOTIFY instructions
+  - Established INSTRUCTION: syntax with END INSTRUCTION blocks for inline content
+  - Separated PATCH (diff formats) from REPLACE (text substitution) for semantic clarity
+  - Designed concise patch formats supporting full git patch and minimal diff
+  - Included comprehensive examples, implementation architecture, and phased rollout plan
+
+**Key Outcomes**:
+- Clear technical specification for extending SyncFile beyond basic sync operations
+- Post-sync actions enable complex deployment and automation workflows
+- PATCH instruction prioritized as MVP for patch application capabilities
+- Architecture supports pluggable action executors for extensibility
+- PRD provides foundation for transforming sync-tools into comprehensive deployment platform
+
+**Next Development Phase**: Implementation of PATCH instruction as first post-sync action
 
 ### 2025-08-29: Sync From Subcommand and Markdown Report Generation Complete
 
