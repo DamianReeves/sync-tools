@@ -1,13 +1,15 @@
-# Product Requirements Document: Two-Phased Interactive Sync
+# Product Requirements Document: Interactive Sync
 
 ## Executive Summary
 
-This PRD defines a two-phased interactive synchronization feature for sync-tools that provides users with fine-grained control over file synchronization operations. Similar to git's interactive rebase, users can review and modify sync operations before execution, choosing direction and selective inclusion for each file or directory.
+This PRD defines interactive synchronization features for sync-tools that provide users with intuitive control over file synchronization operations. The system offers two complementary approaches: a **wizard-like UI** using Bubble Tea for guided sync setup, and a **plan-based workflow** similar to git's interactive rebase for advanced users who want fine-grained control over sync operations.
 
 ## Problem Statement
 
 Current synchronization tools operate in an all-or-nothing manner:
-- Users cannot preview and selectively modify sync operations before execution
+- Users lack intuitive interfaces for configuring sync operations
+- No guided workflow to help users make informed sync decisions
+- Users cannot easily preview and selectively modify sync operations before execution
 - No ability to change sync direction on a per-file basis
 - Difficult to handle complex scenarios where some files should sync one way and others another way
 - No audit trail of what sync decisions were made and why
@@ -15,20 +17,586 @@ Current synchronization tools operate in an all-or-nothing manner:
 ## Target Personas
 
 1. **DevOps Engineers**: Need precise control over deployment synchronization with audit trails
-2. **Data Scientists**: Selectively sync large datasets and model files between environments
+2. **Data Scientists**: Selectively sync large datasets and model files between environments  
 3. **System Administrators**: Carefully manage configuration file synchronization across servers
 4. **Developers**: Fine-tune project file synchronization between development environments
+5. **Casual Users**: Need simple, guided sync setup without complex command-line options
 
 ## Solution Overview
 
-A two-phased synchronization workflow:
+The interactive sync feature provides two complementary workflows:
 
-**Phase 1 - Plan Generation**: Analyze differences and generate an editable sync plan file
-**Phase 2 - Plan Execution**: Apply the reviewed and modified sync plan
+### Wizard-Like Interactive UI (Primary - Phase 1)
+A **Bubble Tea-powered terminal UI** that guides users through sync setup with:
+- **Setup Wizard**: Step-by-step sync configuration (source, destination, mode)
+- **Directory Tree Selection**: Visual folder browser to select what to sync
+- **Exclusion Management**: Interactive interface to exclude unwanted files/folders
+- **Preview & Confirmation**: Show planned operations before execution
+- **Progress Monitoring**: Real-time sync progress with visual indicators
+
+### Plan-Based Workflow (Advanced - Phase 2)  
+A **two-phased synchronization workflow** for power users:
+- **Phase 1 - Plan Generation**: Analyze differences and generate an editable sync plan file
+- **Phase 2 - Plan Execution**: Apply the reviewed and modified sync plan
 
 ## Detailed Requirements
 
-### Phase 1: Sync Plan Generation
+## Interactive Wizard UI (Bubble Tea Implementation)
+
+### Command Structure
+```bash
+# Launch interactive wizard mode
+sync-tools sync --wizard
+sync-tools wizard  # Dedicated wizard command (alias)
+
+# Launch with pre-filled options
+sync-tools sync --wizard --source ./src
+sync-tools wizard --destination ./backup --mode one-way
+
+# Examples
+sync-tools wizard                              # Full guided setup
+sync-tools sync --wizard --source ./project   # Pre-set source, wizard for rest
+```
+
+### Wizard Flow Overview
+
+The wizard provides a step-by-step interface with the following screens:
+
+1. **Welcome & Mode Selection**
+2. **Source Directory Selection**
+3. **Destination Directory Selection** 
+4. **Sync Options Configuration**
+5. **Directory Tree Filter Selection**
+6. **Exclusion Pattern Management**
+7. **Preview & Confirmation**
+8. **Execution & Progress Monitoring**
+
+### Detailed Screen Specifications
+
+#### Screen 1: Welcome & Mode Selection
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          sync-tools Interactive Wizard                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Welcome! This wizard will guide you through setting up a sync operation.  │
+│                                                                             │
+│  Select sync mode:                                                          │
+│                                                                             │
+│  ● One-way sync    (source → destination)                                  │
+│    ○ Two-way sync   (source ↔ destination)  [Coming in future release]     │
+│                                                                             │
+│  One-way sync copies files from source to destination only.                │
+│  Files in destination that don't exist in source will be preserved.        │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [Tab] Navigate • [Enter] Select • [q] Quit                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- Radio button selection for sync mode
+- Clear description of selected mode
+- Future modes clearly marked as "Coming soon"
+- **Initial Release**: Only one-way sync available
+- **Future Release**: Two-way sync support
+
+#### Screen 2: Source Directory Selection
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Select Source Directory                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Choose the directory to sync FROM:                                        │
+│                                                                             │
+│  Current: /home/user/projects                                              │
+│                                                                             │
+│  📁 /home/user/                                                            │
+│  ├── 📁 Documents/                                                         │
+│  ├── 📁 Downloads/                                                         │
+│  ├── 📁 projects/ ●                                                        │
+│  │   ├── 📁 my-app/                                                        │
+│  │   ├── 📁 sync-tools/                                                    │
+│  │   └── 📁 website/                                                       │
+│  └── 📁 workspace/                                                         │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────┐           │
+│  │ Path: /home/user/projects                                  │           │
+│  └─────────────────────────────────────────────────────────────┘           │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [↑↓] Navigate • [→] Expand • [←] Collapse • [Enter] Select • [/] Search   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- Interactive directory tree browser
+- Real-time path display
+- Expandable/collapsible folders
+- Search functionality for large directory structures
+- Breadcrumb navigation
+- Visual indicators (folders, current selection)
+
+#### Screen 3: Destination Directory Selection  
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Select Destination Directory                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Choose the directory to sync TO:                                          │
+│                                                                             │
+│  Source: /home/user/projects                                               │
+│  Current: /backup/projects                                                 │
+│                                                                             │
+│  📁 /backup/                                                               │
+│  ├── 📁 documents/                                                         │
+│  ├── 📁 projects/ ●                                                        │
+│  │   ├── 📁 old-backups/                                                   │
+│  │   └── 📁 archives/                                                      │
+│  └── 📁 system/                                                            │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────┐           │
+│  │ Path: /backup/projects                                     │           │
+│  └─────────────────────────────────────────────────────────────┘           │
+│                                                                             │
+│  □ Create destination directory if it doesn't exist                        │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [↑↓] Navigate • [→] Expand • [←] Collapse • [Enter] Select • [Space] Toggle│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- Same directory browser as source selection
+- Shows selected source path for reference
+- Option to create destination directory
+- Warning if destination exists and contains files
+- Path validation and permission checking
+
+#### Screen 4: Sync Options Configuration
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Sync Options                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Configure sync behavior:                                                  │
+│                                                                             │
+│  Basic Options:                                                            │
+│  ☑ Dry run (preview only - no actual changes)                             │
+│  ☑ Verbose output                                                         │
+│  □ Delete files in destination that don't exist in source                 │
+│                                                                             │
+│  Advanced Options:                                                         │
+│  ☑ Use .gitignore files to exclude files                                  │
+│  □ Follow symbolic links                                                   │
+│  □ Preserve file timestamps                                                │
+│  ☑ Exclude hidden files and directories                                   │
+│                                                                             │
+│  Performance:                                                              │
+│  Parallel transfers: [4     ] (1-16)                                      │
+│  Transfer timeout:   [300s  ] seconds                                     │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [↑↓] Navigate • [Space] Toggle • [←→] Adjust • [Tab] Next section         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- Checkbox options for boolean settings
+- Slider/input controls for numeric values
+- Grouped options (Basic, Advanced, Performance)
+- Helpful descriptions for each option
+- Sensible defaults with dry-run enabled initially
+
+#### Screen 5: Directory Tree Filter Selection
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       Select Folders to Sync                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Choose which folders from source should be synchronized:                   │
+│                                                                             │
+│  Source: /home/user/projects                                               │
+│                                                                             │
+│  📁 projects/                                                              │
+│  ├── ☑ 📁 src/                           (156 files, 2.4 MB)             │
+│  ├── ☑ 📁 docs/                          (24 files, 180 KB)              │
+│  ├── ☑ 📁 config/                        (8 files, 32 KB)                │
+│  ├── ☐ 📁 node_modules/                  (15,420 files, 480 MB)           │
+│  ├── ☐ 📁 .git/                          (892 files, 45 MB)               │
+│  ├── ☑ 📁 assets/                        (67 files, 8.2 MB)              │
+│  ├── ☐ 📁 logs/                          (145 files, 23 MB)               │
+│  ├── ☑ 📁 tests/                         (43 files, 256 KB)              │
+│  └── ☐ 📁 tmp/                           (0 files, 0 MB)                  │
+│                                                                             │
+│  Selected: 298 files (11.1 MB) • Excluded: 16,457 files (548 MB)          │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [↑↓] Navigate • [Space] Toggle • [a] Select All • [n] Select None         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Interactive checkbox tree** showing all top-level folders from source
+- **File count and size information** for each folder to help users decide
+- **Real-time summary** of selected vs excluded files and sizes
+- **Bulk operations**: Select all, select none, toggle selection
+- **Smart defaults**: Common exclude patterns (node_modules, .git, logs, tmp) unchecked by default
+- **Visual indicators**: Clear distinction between selected ☑ and unselected ☐ folders
+
+#### Screen 6: Exclusion Pattern Management  
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        File Exclusion Patterns                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Add patterns to exclude specific files or folders:                        │
+│                                                                             │
+│  Current patterns:                                                         │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ *.log                                                               │   │
+│  │ *.tmp                                                               │   │
+│  │ .DS_Store                                                          │   │
+│  │ __pycache__/                                                       │   │
+│  │ *.pyc                                                              │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Add new pattern:                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ *.env                                                              │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Common patterns:                                                          │
+│  [*.log] [*.tmp] [node_modules/] [.git/] [*.env] [coverage/]              │
+│                                                                             │
+│  Pattern examples:                                                         │
+│  • *.log          - All log files                                         │
+│  • temp/          - Entire temp directory                                 │
+│  • **/cache/      - Any cache directory at any level                      │
+│  • !important.*  - Don't exclude files starting with "important"          │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [↑↓] Navigate • [Enter] Add • [Delete] Remove • [Tab] Quick add patterns  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Editable list** of exclusion patterns with add/remove functionality
+- **Quick-add buttons** for common patterns
+- **Pattern examples** and syntax help
+- **Real-time validation** of pattern syntax
+- **Smart suggestions** based on detected file types in source
+
+#### Screen 7: Preview & Confirmation
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Sync Preview                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Ready to sync with these settings:                                        │
+│                                                                             │
+│  Mode:         One-way (source → destination)                             │
+│  Source:       /home/user/projects                                         │
+│  Destination:  /backup/projects                                            │
+│  Dry run:      Yes (preview mode)                                         │
+│                                                                             │
+│  Selected folders:                                                         │
+│  • src/ (156 files, 2.4 MB)                                              │
+│  • docs/ (24 files, 180 KB)                                              │
+│  • config/ (8 files, 32 KB)                                              │
+│  • assets/ (67 files, 8.2 MB)                                            │
+│  • tests/ (43 files, 256 KB)                                             │
+│                                                                             │
+│  Exclusions:                                                               │
+│  • *.log, *.tmp, .DS_Store, __pycache__/, *.pyc, *.env                   │
+│                                                                             │
+│  Summary:                                                                  │
+│  • Files to copy: 298 files (11.1 MB)                                    │
+│  • Files to skip: 16,457 files (548 MB)                                  │
+│  • Estimated time: 2-3 seconds                                           │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [Enter] Start Sync • [b] Back to edit • [s] Save as SyncFile • [q] Quit   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Complete summary** of all sync settings
+- **File count and size estimates**
+- **Clear action buttons** with keyboard shortcuts
+- **Option to save configuration** as a SyncFile for future use
+- **Back navigation** to modify any previous settings
+
+#### Screen 8: Execution & Progress Monitoring
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Sync Progress                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Synchronizing: /home/user/projects → /backup/projects                     │
+│                                                                             │
+│  Progress: ████████████████████░░░░░ 67% (198/298 files)                  │
+│                                                                             │
+│  Current: src/components/Header.tsx                                        │
+│                                                                             │
+│  Completed:                                                                │
+│  ✓ src/                     156/156 files    2.4 MB                       │
+│  ✓ docs/                     24/24 files     180 KB                       │
+│  ✓ config/                   8/8 files       32 KB                        │
+│  ⏳ assets/                  10/67 files      1.2 MB                       │
+│  ⏳ tests/                   0/43 files       0 MB                         │
+│                                                                             │
+│  Transferred: 3.8 MB of 11.1 MB                                           │
+│  Speed: 1.2 MB/s • Elapsed: 00:03 • Remaining: 00:06                      │
+│                                                                             │
+│  Skipped: 16,457 files (matched exclusion patterns)                       │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [Ctrl+C] Cancel • [Space] Pause • [l] View logs                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Real-time progress bar** with percentage and file count
+- **Current file being processed**
+- **Per-folder progress breakdown**
+- **Transfer speed and time estimates**  
+- **Pause/resume functionality**
+- **Access to detailed logs**
+- **Cancellation with confirmation**
+
+### Technical Implementation Requirements
+
+#### Type State Pattern Architecture
+
+**Design Philosophy**: Use the **Type State Pattern** (popularized in Rust) to create compile-time guarantees about wizard flow and prevent invalid state transitions.
+
+**Benefits:**
+- **Compile-time Safety**: Impossible states become unrepresentable in the type system
+- **Clear State Transitions**: Each state can only transition to valid next states
+- **Type-safe Data Access**: Screen-specific data is only accessible when in that screen's state
+- **Maintainable Code**: Adding new screens requires explicit handling of all transitions
+- **Runtime Performance**: Zero-cost state validation - all checks happen at compile time
+
+**Go Implementation Strategy:**
+```go
+// Type state pattern using Go generics and interfaces
+type WizardState[T any] interface {
+    GetCommonData() *CommonWizardData
+    GetSpecificData() T
+    Render(styles *Styles) string
+    HandleInput(key tea.KeyMsg) WizardTransition
+}
+
+// Each screen state has its own type
+type WelcomeState struct {
+    common     *CommonWizardData
+    selectedMode SyncMode
+}
+
+type SourceDirectoryState struct {
+    common        *CommonWizardData
+    directoryTree *DirectoryTree
+    currentPath   string
+}
+
+type DestinationDirectoryState struct {
+    common         *CommonWizardData
+    directoryTree  *DirectoryTree
+    currentPath    string
+    createIfMissing bool
+    // Source path is guaranteed to exist by type system
+    sourcePath     string // Carried from previous state
+}
+
+// Transitions are explicitly typed
+type WizardTransition interface {
+    Apply() WizardState[any]
+}
+
+type ToSourceDirectory struct {
+    mode SyncMode
+}
+
+func (t ToSourceDirectory) Apply() WizardState[any] {
+    return &SourceDirectoryState{
+        common: &CommonWizardData{
+            selectedMode: t.mode,
+        },
+        directoryTree: NewDirectoryTree("/"),
+    }
+}
+
+// Invalid transitions are impossible to create
+```
+
+**Common Wizard Problems Solved:**
+
+1. **The "Null/Empty Field" Problem**:
+   ```go
+   // ❌ TRADITIONAL: Runtime null checks everywhere
+   if wizard.destinationPath == "" {
+       return errors.New("destination not set")
+   }
+   
+   // ✅ TYPE STATE: Impossible to access unset fields
+   func (s *DestinationDirectoryState) GetDestinationPath() string {
+       return s.destinationPath // Always set by type construction
+   }
+   ```
+
+2. **The "Impossible State" Problem**:
+   ```go
+   // ❌ TRADITIONAL: Can be in progress AND complete simultaneously
+   type BadWizardState struct {
+       inProgress bool
+       complete   bool
+       error      error  // What if all three are true?
+   }
+   
+   // ✅ TYPE STATE: Mutually exclusive states
+   type ProgressState struct { startTime time.Time }
+   type CompleteState struct { result SyncResult }
+   type ErrorState struct { error error }
+   ```
+
+3. **The "Screen Validation" Problem**:
+   ```go
+   // ❌ TRADITIONAL: Runtime validation required everywhere
+   func canGoToNextScreen(current ScreenType) bool {
+       switch current {
+       case SourceScreen:
+           return wizard.sourcePath != ""
+       case DestScreen: 
+           return wizard.sourcePath != "" && wizard.destPath != ""
+       // ... complex validation logic
+       }
+   }
+   
+   // ✅ TYPE STATE: Transitions encode validation
+   func (s *SourceDirectoryState) SelectDirectory(path string) (*DestinationDirectoryState, error) {
+       if !isValidDirectory(path) {
+           return nil, errors.New("invalid directory")
+       }
+       return &DestinationDirectoryState{
+           sourcePath: path, // Guaranteed valid by construction
+           directoryTree: NewDirectoryTree("/"),
+       }, nil
+   }
+   ```
+
+4. **The "Back Button" Problem**:
+   ```go
+   // ❌ TRADITIONAL: Lose data when going back
+   func goBack() {
+       wizard.currentScreen--
+       // Data might be lost or inconsistent
+   }
+   
+   // ✅ TYPE STATE: Preserve data in transition history
+   type DestinationDirectoryState struct {
+       sourcePath    string           // From previous state
+       previousState *SourceDirectoryState  // Can reconstruct
+   }
+   ```
+
+**State Flow Guarantees:**
+- **Welcome → Source**: Must have selected sync mode
+- **Source → Destination**: Must have valid source directory path
+- **Destination → Options**: Must have both source and destination paths
+- **Options → Filters**: Must have valid sync configuration
+- **Filters → Exclusions**: Must have folder selections
+- **Exclusions → Preview**: Must have exclusion patterns (can be empty)
+- **Preview → Progress**: Must have confirmed configuration
+- **Progress → Complete**: Must have finished sync operation
+
+**Type Safety Examples:**
+```go
+// ✅ VALID: Can only access source path after it's been set
+func (s *DestinationDirectoryState) GetSourcePath() string {
+    return s.sourcePath // Guaranteed to exist
+}
+
+// ❌ INVALID: Cannot access destination path from source state
+func (s *SourceDirectoryState) GetDestinationPath() string {
+    // This method doesn't exist - compile error!
+}
+
+// ✅ VALID: Sync can only start from preview state with complete config
+func (s *PreviewState) StartSync() *ProgressState {
+    return &ProgressState{
+        config: s.BuildSyncConfig(), // All data guaranteed present
+        startTime: time.Now(),
+    }
+}
+
+// ❌ INVALID: Cannot start sync from incomplete state
+func (s *WelcomeState) StartSync() *ProgressState {
+    // This method doesn't exist - compile error!
+}
+```
+
+#### Bubble Tea Components
+- **Navigation**: Consistent keyboard navigation across all screens
+- **State Management**: Type-safe state machine using type state pattern
+- **Data Validation**: Compile-time validation with runtime error messages  
+- **Responsive Layout**: Adapts to different terminal sizes (minimum 80x24)
+- **Accessibility**: Screen reader compatible, clear visual hierarchy
+
+#### Directory Tree Browser
+- **Lazy Loading**: Only load directory contents when needed for performance
+- **Caching**: Cache directory structure to avoid repeated filesystem calls
+- **Error Handling**: Graceful handling of permission denied, symlinks, etc.
+- **Search**: Fast substring search across directory tree
+- **Filtering**: Hide/show hidden files, filter by type
+
+#### File System Integration  
+- **Permission Checking**: Validate read/write access before starting sync
+- **Space Calculation**: Accurate disk space requirements calculation
+- **Path Validation**: Handle edge cases (long paths, special characters, etc.)
+- **Real-time Updates**: Refresh file counts if source changes during wizard
+
+#### Progress Monitoring
+- **Non-blocking UI**: Progress updates don't freeze the interface
+- **Detailed Logging**: Structured logs for debugging and audit trails
+- **Error Recovery**: Handle partial failures gracefully
+- **Performance Metrics**: Track and display transfer speeds, file counts
+
+### Integration with Existing Features
+
+#### SyncFile Generation
+Users can save wizard configurations as SyncFile format:
+```bash
+# Generated SyncFile from wizard
+SYNC /home/user/projects /backup/projects
+MODE one-way
+EXCLUDE *.log
+EXCLUDE *.tmp
+EXCLUDE .DS_Store
+EXCLUDE __pycache__/
+EXCLUDE *.pyc
+EXCLUDE *.env
+ONLY src/
+ONLY docs/
+ONLY config/
+ONLY assets/
+ONLY tests/
+DRYRUN false
+GITIGNORE true
+VERBOSE true
+```
+
+#### Plan Mode Integration
+Advanced users can generate plans from wizard output:
+```bash
+# Wizard saves temp config, then generates plan
+sync-tools wizard --save-config temp.syncfile
+sync-tools syncfile temp.syncfile --plan review.plan
+```
+
+## Plan-Based Workflow (Advanced Users)
+
+### Advanced Plan Generation
 
 #### Command Structure
 ```bash
@@ -526,10 +1094,31 @@ sync-tools sync --apply-plan sync.plan --audit-log sync-audit.log
 
 ## Success Metrics
 
-1. **Reduced Sync Errors**: 50% reduction in accidental overwrites
-2. **Adoption Rate**: 30% of power users adopt interactive mode within 3 months
+### Phase 1: Wizard UI Success Metrics
+1. **User Adoption**: 50% of new users try wizard mode within first week
+2. **Completion Rate**: 80% of users who start wizard complete the full flow
+3. **Error Reduction**: 60% reduction in sync misconfigurations compared to CLI-only usage
+4. **User Satisfaction**: 4.5+ star rating for wizard experience
+5. **Learning Curve**: Average time to first successful sync < 5 minutes for new users
+
+### Type State Pattern Benefits Metrics
+1. **Development Velocity**: 40% reduction in wizard-related bug reports after implementation
+2. **Code Maintainability**: 100% test coverage achievable due to impossible states being unrepresentable
+3. **Onboarding Time**: New developers can contribute to wizard screens 50% faster due to compile-time constraints
+4. **Runtime Errors**: 90% reduction in wizard state-related runtime errors
+5. **Refactoring Safety**: Major wizard refactors can be done with 100% confidence due to type safety
+
+### Phase 2: Plan-Based Success Metrics  
+1. **Power User Adoption**: 30% of advanced users adopt plan-based mode within 3 months
+2. **Reduced Sync Errors**: 50% reduction in accidental overwrites during deployments
 3. **Time Saved**: Average 20% reduction in sync-related troubleshooting
-4. **User Satisfaction**: 4.5+ star rating for the feature
+4. **Workflow Integration**: 40% of plan users save and reuse configurations
+
+### Overall Success Metrics
+1. **User Base Growth**: 25% increase in active users within 6 months
+2. **Feature Usage**: 70% of syncs use interactive features (wizard or plan-based)
+3. **Support Reduction**: 40% decrease in sync-related support tickets
+4. **Retention**: 85% user retention rate for interactive features after 30 days
 
 ## Technical Considerations
 
@@ -550,27 +1139,177 @@ sync-tools sync --apply-plan sync.plan --audit-log sync-audit.log
 
 ## Implementation Phases
 
-### MVP (Phase 1)
-- Basic plan generation
-- Simple s2d/d2s/skip commands
-- Plan execution
-- Basic validation
+### Phase 1: Interactive Wizard (MVP)
+**Target**: User-friendly sync setup with type-safe state management
 
-### Enhanced (Phase 2)
-- Bidirectional sync
-- Conflict detection and marking
-- Editor integration
-- Progress display
+**Core Features:**
+- Type state pattern wizard architecture with compile-time guarantees
+- Bubble Tea wizard UI with all 8 screens
+- One-way sync mode only
+- Source/destination directory browser with lazy loading
+- Folder selection with file count/size display
+- Basic exclusion pattern management
+- Preview and confirmation screen
+- Real-time progress monitoring
+- Save configuration as SyncFile
 
-### Advanced (Phase 3)
-- Plan templates
-- Audit logging
+**Technical Requirements:**
+- **Type State Implementation**: Complete state machine with typed transitions
+- **Bubble Tea Integration**: Screen components with type-safe state binding
+- **Directory Tree Browser**: Lazy-loading filesystem browser with caching
+- **File System Scanning**: Async file counting and size calculation
+- **Progress Monitoring**: Non-blocking rsync integration with pause/resume
+- **State Persistence**: SyncFile generation from type-safe wizard state
+
+**Implementation Architecture:**
+```go
+// Core wizard driver with type-safe state management
+type WizardModel struct {
+    currentState WizardState[any]
+    history      []WizardState[any] // For back navigation
+    styles       *Styles
+    windowSize   tea.WindowSizeMsg
+}
+
+// State machine handles all transitions
+func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    transition := m.currentState.HandleInput(msg)
+    if transition != nil {
+        m.history = append(m.history, m.currentState)
+        m.currentState = transition.Apply()
+    }
+    return m, nil
+}
+
+// Rendering delegates to current state
+func (m WizardModel) View() string {
+    return m.currentState.Render(m.styles)
+}
+```
+
+### Phase 2: Plan-Based Workflow (Advanced)
+**Target**: Power users who need fine-grained control
+
+**Core Features:**
+- Plan generation from wizard output
+- Text-based plan editing with visual aliases (`<<`, `>>`, `<>`)
+- Plan execution with validation
+- Basic conflict detection and resolution
+- Editor integration ($EDITOR support)
+- Configuration layering (config files + CLI overrides)
+
+**Integration:**
+- Wizard → Plan workflow
+- SyncFile → Plan generation
+- Plan templates and reuse
+
+### Phase 3: Two-Way Sync & Advanced Features
+**Target**: Complex synchronization scenarios
+
+**Core Features:**
+- Two-way sync mode in wizard
+- Bidirectional conflict resolution
+- Interactive merge tool integration
+- Advanced plan filtering (change types)
+- Audit logging and compliance features
+- Bulk operations and plan templates
+
+**Advanced Integration:**
+- Git integration for merge tools
 - Custom conflict resolution strategies
-- Bulk operations in plan files
+- Performance optimizations for large directories
 
 ## Example Use Cases
 
-### 1. Deployment Sync with SyncFile Base
+### 1. New User Project Backup (Wizard Workflow)
+Casual user wants to backup their project to external drive:
+
+**Scenario**: Developer backing up project for the first time
+
+**Workflow:**
+```bash
+# Launch wizard
+sync-tools wizard
+
+# Screen 1: Welcome & Mode Selection
+# → User selects "One-way sync" 
+
+# Screen 2: Source Directory Selection  
+# → User navigates to /home/user/my-project
+# → Wizard shows folder structure, user selects project root
+
+# Screen 3: Destination Directory Selection
+# → User navigates to /media/backup-drive/projects
+# → Selects ☑ "Create destination directory if it doesn't exist"
+
+# Screen 4: Sync Options
+# → Keeps defaults: ☑ Dry run, ☑ Verbose, ☑ Use .gitignore
+# → Unchecks "Delete files in destination that don't exist in source" (safe default)
+
+# Screen 5: Directory Tree Filter Selection
+# → Wizard shows project folders with file counts:
+#   ☑ src/ (245 files, 1.2 MB)
+#   ☑ docs/ (15 files, 89 KB)  
+#   ☑ config/ (5 files, 12 KB)
+#   ☐ node_modules/ (8,431 files, 156 MB)  [auto-unchecked]
+#   ☐ .git/ (423 files, 12 MB)             [auto-unchecked] 
+#   ☐ build/ (89 files, 2.1 MB)           [auto-unchecked]
+#   ☑ assets/ (34 files, 8.9 MB)
+# → User keeps smart defaults
+
+# Screen 6: Exclusion Patterns
+# → Pre-populated with: *.log, *.tmp, .DS_Store, __pycache__/, *.pyc
+# → User adds: *.env (clicks quick-add button)
+
+# Screen 7: Preview & Confirmation
+# → Shows: "299 files (10.3 MB) will be copied"
+# → User clicks "Start Sync"
+
+# Screen 8: Progress
+# → Real-time progress bar
+# → Shows current file being copied
+# → Completes successfully
+
+# Wizard offers to save config for future use
+# → Saves as ProjectBackup.syncfile
+```
+
+**User Benefits:**
+- **No command-line knowledge required**
+- **Visual feedback** shows exactly what will be copied
+- **Smart defaults** prevent common mistakes
+- **File size awareness** helps user understand storage impact
+- **Reusable configuration** for future backups
+
+### 2. Advanced Deployment with Plan Review (Hybrid Workflow)
+DevOps engineer combines wizard convenience with plan-based precision:
+
+**Workflow:**
+```bash
+# Start with wizard for convenience
+sync-tools wizard --source ./app --destination /var/www/production
+
+# Wizard generates initial SyncFile with user selections
+# → Saves as production-deploy.syncfile
+
+# Generate plan for review
+sync-tools syncfile production-deploy.syncfile --plan deploy-review.plan --exclude-changes unchanged
+
+# Edit plan file to:
+# - Skip large asset files that haven't changed
+# - Pull critical config from production (>> commands)
+# - Add comments for manual verification steps
+
+# Execute with audit trail
+sync-tools sync --apply-plan deploy-review.plan --audit-log deploy-$(date +%Y%m%d).log
+```
+
+**Benefits:**
+- **Best of both worlds**: Wizard convenience + plan precision
+- **Audit compliance**: Full trail of what was deployed
+- **Team collaboration**: Plan files can be reviewed and version-controlled
+
+### 3. Legacy Deployment with SyncFile Base
 DevOps engineer uses SyncFile as deployment template, then reviews with plan:
 
 **DeploymentFile:**
@@ -690,11 +1429,114 @@ sync-tools sync --apply-plan backup-conflicts.plan --verbose
 sync-tools sync --apply-plan backup-cleanup.plan --verbose
 ```
 
+## Architectural Decision: Type State Pattern
+
+### Comparison with Alternative Approaches
+
+#### Traditional State Machine Approach
+```go
+// ❌ TRADITIONAL: Single state struct with validation everywhere
+type WizardState struct {
+    currentScreen     ScreenType
+    sourcePath        string  // Could be empty
+    destinationPath   string  // Could be empty  
+    syncOptions       SyncOptions // Could be invalid
+    selectedFolders   []string    // Could be empty when required
+}
+
+func (w *WizardState) CanProceed() bool {
+    switch w.currentScreen {
+    case SourceScreen:
+        return w.sourcePath != ""
+    case DestScreen:
+        return w.sourcePath != "" && w.destinationPath != ""
+    // ... 50+ lines of validation logic
+    }
+}
+```
+
+**Problems:**
+- Runtime validation required everywhere
+- Impossible states are representable (sourcePath set but on WelcomeScreen)
+- Easy to forget validation checks
+- Testing requires covering all invalid state combinations
+- Back navigation loses data or creates inconsistencies
+
+#### Type State Pattern Approach
+```go
+// ✅ TYPE STATE: Each state can only contain valid data
+type SourceDirectoryChosen struct {
+    path          string           // Always valid (constructor validates)
+    directoryTree *DirectoryTree   // Always initialized
+    syncMode      SyncMode         // Inherited from previous state
+}
+
+type DestinationDirectoryChosen struct {
+    sourcePath      string         // Guaranteed from previous state
+    destinationPath string         // Guaranteed valid by constructor
+    createIfMissing bool           // Explicit choice made
+    syncMode        SyncMode       // Carried through states
+}
+
+func NewDestinationDirectoryChosen(
+    prev *SourceDirectoryChosen, 
+    destPath string,
+    createIfMissing bool,
+) (*DestinationDirectoryChosen, error) {
+    if !isValidDirectory(destPath) {
+        return nil, errors.New("invalid destination")
+    }
+    return &DestinationDirectoryChosen{
+        sourcePath:      prev.path,          // Type safety ensures this exists
+        destinationPath: destPath,
+        createIfMissing: createIfMissing,
+        syncMode:        prev.syncMode,
+    }, nil
+}
+```
+
+**Benefits:**
+- No runtime validation needed (compile-time guarantees)
+- Impossible states cannot be constructed
+- Exhaustive pattern matching forces handling all cases
+- Back navigation preserves all data through state history
+- Unit tests only need to cover valid transitions
+
+### Implementation Complexity Comparison
+
+| Aspect | Traditional | Type State | Winner |
+|--------|-------------|------------|--------|
+| **Lines of Code** | ~800 LOC | ~1200 LOC | Traditional |
+| **Runtime Bugs** | High risk | Near zero | **Type State** |
+| **Compile-time Safety** | None | Complete | **Type State** |
+| **Refactoring Risk** | High | Very Low | **Type State** |
+| **New Developer Onboarding** | Weeks | Days | **Type State** |
+| **Test Coverage Required** | >95% for safety | <50% (types prevent bugs) | **Type State** |
+| **Documentation Needs** | Extensive | Self-documenting | **Type State** |
+
+### Trade-offs Analysis
+
+**Type State Pattern Costs:**
+- 50% more initial implementation time
+- Steeper learning curve for Go developers unfamiliar with the pattern
+- More complex type definitions
+- Requires disciplined approach to state transitions
+
+**Type State Pattern Benefits:**
+- 90% fewer runtime bugs related to state management
+- 100% confidence during refactoring
+- Self-documenting state flow through types
+- Impossible to ship wizard with invalid state transitions
+- New features require explicit handling of all existing states (forces design consideration)
+
+**Decision:** The benefits heavily outweigh the costs, especially for a complex wizard with 8+ screens where state consistency is critical for user experience.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Complex UI confuses users | Low adoption | Provide simple mode with sensible defaults |
+| Type state pattern learning curve | Developer productivity | Provide comprehensive examples and documentation |
 | Plan file corruption | Data loss | Validation before execution, backup original plan |
 | Editor integration issues | Poor UX | Fallback to simple text file generation |
 | Performance with large directories | User frustration | Implement pagination and filtering |
@@ -711,27 +1553,79 @@ sync-tools sync --apply-plan backup-cleanup.plan --verbose
 ### Sample Configuration
 ```toml
 [interactive]
+# Wizard UI settings
+default_mode = "wizard"           # Default to wizard for new users
+wizard_theme = "default"          # UI theme: default, compact, minimal
+min_terminal_size = "80x24"       # Minimum terminal size for wizard
+directory_scan_depth = 3          # How deep to scan directories initially
+file_count_threshold = 10000      # Warn when directories have many files
+
+# Directory browser
+show_hidden_files = false         # Show .files in directory browser
+show_file_sizes = true           # Display file/folder sizes
+cache_directory_scans = true     # Cache directory contents for performance
+
+# Smart defaults
+auto_exclude_patterns = ["node_modules/", ".git/", "*.log", "*.tmp", ".DS_Store"]
+auto_dry_run = true              # Start with dry-run enabled by default
+auto_verbose = true              # Enable verbose output by default
+
+# Plan-based settings (advanced users)
 default_editor = "vim"
-auto_skip_patterns = ["*.log", "*.tmp", ".DS_Store"]
 conflict_strategy = "newest-wins"
 show_size_threshold = "1MB"
 audit_log_dir = "~/.sync-tools/audit/"
+
+# Performance
+max_concurrent_scans = 4         # Parallel directory scanning
+scan_timeout_seconds = 30       # Timeout for large directory scans
 ```
 
 ### Command Reference Summary
+
+#### Wizard Commands (Phase 1)
+```bash
+# Launch wizard
+sync-tools wizard
+sync-tools sync --wizard
+
+# Wizard with pre-filled options  
+sync-tools wizard --source ./src
+sync-tools sync --wizard --source ./project --destination ./backup
+
+# Wizard shortcuts
+sync-tools wizard --help             # Show wizard help
+sync-tools wizard --theme compact    # Use compact UI theme
+```
+
+#### Plan Commands (Phase 2)
 ```bash
 # Generate plan
 sync-tools sync --plan <file>
+sync-tools syncfile MySyncFile --plan <file>
 
-# Interactive mode
+# Interactive plan mode
 sync-tools sync --interactive
 
 # Apply plan
 sync-tools sync --apply-plan <file>
 
-# Dry run
+# Dry run plan
 sync-tools sync --apply-plan <file> --dry-run
 
-# With audit
+# Plan with audit
 sync-tools sync --apply-plan <file> --audit-log <log-file>
+```
+
+#### Integration Commands
+```bash
+# Save wizard config as SyncFile
+sync-tools wizard --save-config MySyncFile
+
+# Generate plan from wizard config
+sync-tools wizard --source ./src --destination ./dest --plan review.plan
+
+# Hybrid workflow
+sync-tools wizard --generate-plan    # Wizard → Plan workflow
+sync-tools syncfile MySyncFile --wizard --plan review.plan  # SyncFile → Wizard → Plan
 ```
