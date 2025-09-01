@@ -1,14 +1,28 @@
 # sync-tools Development Tracker
 
-**Last Updated**: 2025-08-29  
-**Current Status**: Go Migration Complete, BDD Framework Active, Git Patch Feature Complete, Markdown Report Generation Implemented
+**Last Updated**: 2025-01-09  
+**Current Status**: v0.3.0 Released with Two-Phased Interactive Sync, SyncFile Post-Sync Actions PRD Complete
 
 ## TASKS
 
 ### In Progress
-*No active tasks - ready for next development cycle*
+- **SyncFile PATCH Instruction** [Priority: P1 - High]
+  - Implement PATCH post-sync action for SyncFile format
+  - Support full git patch and minimal diff formats
+  - Add backup and rollback capabilities for patch operations
+  - Create BDD test scenarios for patch application workflows
 
 ### Pending
+- **SyncFile REPLACE Instruction** [Priority: P1 - High]
+  - Implement REPLACE post-sync action with sed-style and block find/replace
+  - Support regex replacements and multi-line content blocks
+  - Add variable substitution and template processing
+
+- **SyncFile SCRIPT Instruction** [Priority: P1 - High]
+  - Implement SCRIPT post-sync action with sync context variables
+  - Provide environment variables with sync results (files changed, duration, etc.)
+  - Add timeout controls and failure handling strategies
+
 - **Structured Output Formats** [Priority: P2 - Medium]
   - Add JSON report format for programmatic parsing
   - Add YAML report format for configuration workflows
@@ -42,6 +56,26 @@
   - Validate rsync integration on Windows
 
 ## Changelog
+
+### 2025-01-09: SyncFile Post-Sync Actions PRD Complete
+
+**Completed Work**:
+- ✅ **SyncFile Post-Sync Actions PRD** [Priority: P0 - Critical]
+  - Created comprehensive Product Requirements Document for SyncFile enhancements
+  - Defined PATCH, REPLACE, SCRIPT, TRANSFORM, VALIDATE, and NOTIFY instructions
+  - Established INSTRUCTION: syntax with END INSTRUCTION blocks for inline content
+  - Separated PATCH (diff formats) from REPLACE (text substitution) for semantic clarity
+  - Designed concise patch formats supporting full git patch and minimal diff
+  - Included comprehensive examples, implementation architecture, and phased rollout plan
+
+**Key Outcomes**:
+- Clear technical specification for extending SyncFile beyond basic sync operations
+- Post-sync actions enable complex deployment and automation workflows
+- PATCH instruction prioritized as MVP for patch application capabilities
+- Architecture supports pluggable action executors for extensibility
+- PRD provides foundation for transforming sync-tools into comprehensive deployment platform
+
+**Next Development Phase**: Implementation of PATCH instruction as first post-sync action
 
 ### 2025-08-29: Sync From Subcommand and Markdown Report Generation Complete
 
