@@ -128,7 +128,7 @@ Feature: Interactive Wizard
     And I should be able to select a different directory
 
   Scenario: Wizard supports pre-filled options from command line
-    When I run sync-tools with arguments "wizard --source ./test_source --mode two-way"
+    When I run sync-tools with arguments "wizard --test --source ./test_source --mode two-way"
     Then the wizard should start with source directory pre-selected as "./test_source"
     And the sync mode should be pre-configured as "two-way"
     And I should be able to proceed to destination selection
