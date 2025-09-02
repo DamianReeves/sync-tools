@@ -102,6 +102,85 @@ This is the **sync-tools** repository - a Go CLI wrapper around rsync that provi
 - Install: `go install ./cmd/sync-tools`
 - Lint: `golangci-lint run`
 
+## Pre-commit Hooks Setup
+
+This project uses the **pre-commit framework** for automated code quality checks before commits. This ensures consistent code formatting and catches issues early across all platforms (Linux, macOS, Windows).
+
+### Installation & Setup
+
+1. **Install pre-commit** (one-time setup):
+   ```bash
+   # Option 1: Using pip (Python package manager)
+   pip install pre-commit
+
+   # Option 2: Using Homebrew (macOS)
+   brew install pre-commit
+
+   # Option 3: Using conda
+   conda install -c conda-forge pre-commit
+   ```
+
+2. **Install the hooks** (run from project root):
+   ```bash
+   pre-commit install
+   ```
+
+3. **Test the setup** (optional):
+   ```bash
+   pre-commit run --all-files
+   ```
+
+### What the Pre-commit Hooks Do
+
+The `.pre-commit-config.yaml` configuration runs these checks automatically before each commit:
+
+1. **Code Formatting**:
+   - `gofmt` - Formats all Go files with standard Go formatting
+   - `trailing-whitespace` - Removes trailing whitespace
+   - `end-of-file-fixer` - Ensures files end with newlines
+
+2. **Code Quality**:
+   - `go vet` - Runs Go's built-in code analyzer
+   - `golangci-lint` - Comprehensive linting with auto-fixes where possible
+   - `check-yaml` - Validates YAML file syntax
+   - `check-added-large-files` - Prevents accidentally committing large files
+
+3. **Build & Test Verification**:
+   - `go build` - Ensures the project compiles successfully
+   - `go test` - Runs all tests to verify functionality
+
+### Usage
+
+Once installed, the hooks run automatically on every `git commit`. If any check fails:
+
+1. **Fix the issues** reported by the hooks
+2. **Stage the changes**: `git add .`
+3. **Commit again**: `git commit -m "your message"`
+
+### Manual Execution
+
+You can also run pre-commit hooks manually:
+
+```bash
+# Run on all files
+pre-commit run --all-files
+
+# Run specific hooks
+pre-commit run gofmt
+pre-commit run golangci-lint
+
+# Skip hooks for a specific commit (not recommended)
+git commit --no-verify -m "emergency fix"
+```
+
+### Benefits
+
+- **Cross-platform**: Works identically on Linux, macOS, and Windows
+- **Team consistency**: All developers get the same code quality checks
+- **Fast feedback**: Catches issues before they reach CI/CD
+- **Automated formatting**: Fixes many issues automatically
+- **No surprises**: Prevents CI failures due to formatting/linting issues
+
 ## Commit Standards
 - All changes must compile successfully before commit (`go build`)
 - **BDD tests must pass at 100% success rate** (`go test ./...`)
