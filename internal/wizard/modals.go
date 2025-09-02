@@ -112,6 +112,18 @@ func (m *ManualPathEntryModal) Render(baseContent string) string {
 
 func (m *ManualPathEntryModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool) {
 	switch msg.String() {
+	case "tab":
+		// Complete the current path from suggestions
+		m.performPathCompletion()
+		return m, nil, true
+	case "up":
+		// Navigate backward through history
+		m.navigateHistory(-1)
+		return m, nil, true
+	case "down":
+		// Navigate forward through history
+		m.navigateHistory(1)
+		return m, nil, true
 	case "enter":
 		// Validate and complete path entry
 		if m.pathInput == "" {
@@ -120,18 +132,39 @@ func (m *ManualPathEntryModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool
 		}
 
 		expandedPath := m.expandPath(m.pathInput)
-		if err := m.validatePath(expandedPath); err != nil {
-			m.pathError = err.Error()
+
+		// Check if path exists
+		info, err := os.Stat(expandedPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Path doesn't exist - ask user if they want to create it
+				creationModal := NewDirectoryCreationModal(m.baseState, expandedPath, m.pathInput)
+				return creationModal, nil, true
+			} else {
+				// Other error (permission, etc.)
+				// Use validator for consistent error messaging
+				if vErr := m.validatePath(expandedPath); vErr != nil {
+					m.pathError = vErr.Error()
+				} else {
+					m.pathError = fmt.Sprintf("Cannot access path: %v", err)
+				}
+				return m, nil, true
+			}
+		}
+
+		// Validate directory type via helper
+		if !info.IsDir() {
+			if vErr := m.validatePath(expandedPath); vErr != nil {
+				m.pathError = vErr.Error()
+			} else {
+				m.pathError = fmt.Sprintf("Path is not a directory: %s", expandedPath)
+			}
 			return m, nil, true
 		}
 
-		// Add to history
+		// Path exists and is valid - proceed
 		m.addToHistory(m.pathInput)
-
-		// Update base state with the selected path
 		m.updateBaseStateWithPath(expandedPath)
-
-		// Signal completion by returning nil - modal should be closed
 		return nil, nil, true
 
 	case "escape":
@@ -147,49 +180,30 @@ func (m *ManualPathEntryModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool
 		}
 		return m, nil, true
 
-	case "tab":
-		// Path completion
-		m.performPathCompletion()
-		return m, nil, true
-
-	case "up":
-		// Previous history
-		m.navigateHistory(-1)
-		return m, nil, true
-
-	case "down":
-		// Next history
-		m.navigateHistory(1)
-		return m, nil, true
-
 	case "ctrl+u":
-		// Clear entire path
+		// Clear entire path (keep this as it's a non-conflicting control sequence)
 		m.pathInput = ""
 		m.pathError = ""
 		m.suggestions = []string{}
 		return m, nil, true
 
 	default:
-		// Handle character input and special keys
-		switch msg.String() {
-		case "~":
-			// Home directory shortcut (only if path is empty or starts with ~)
-			if m.pathInput == "" || strings.HasPrefix(m.pathInput, "~") {
-				if homeDir, err := os.UserHomeDir(); err == nil {
-					m.pathInput = homeDir
-					m.pathError = ""
-					m.updateSuggestions()
-				}
-			} else {
-				// Treat as regular character if not at start
-				m.pathInput += msg.String()
-				m.pathError = ""
-				m.updateSuggestions()
-			}
+		// Treat most keys as regular character input
+		// Only handle truly special key combinations, let everything else be typed
+		keyStr := msg.String()
+
+		// Handle special control sequences that don't conflict with path typing
+		switch keyStr {
+		case "ctrl+a":
+			// Future: could implement select all
+			return m, nil, true
+		case "ctrl+c", "ctrl+x", "ctrl+v":
+			// Future: could implement clipboard operations
+			return m, nil, true
 		default:
-			// Regular character input (including path separators like "/")
-			if len(msg.String()) == 1 {
-				m.pathInput += msg.String()
+			// Regular character input - accept almost all printable characters
+			if len(keyStr) == 1 {
+				m.pathInput += keyStr
 				m.pathError = ""
 				m.updateSuggestions()
 			}
@@ -652,4 +666,86 @@ func (h *HomeNavigationModal) updateBaseStateWithBookmark(bookmark Bookmark) {
 		state.CurrentPath = bookmark.Path
 		h.baseState = state
 	}
+}
+
+// DirectoryCreationModal prompts user to create a non-existent directory
+type DirectoryCreationModal struct {
+	baseState    WizardState
+	targetPath   string
+	originalPath string // The path user originally entered
+	confirmed    bool
+}
+
+// NewDirectoryCreationModal creates a new directory creation prompt modal
+func NewDirectoryCreationModal(baseState WizardState, targetPath string, originalPath string) *DirectoryCreationModal {
+	return &DirectoryCreationModal{
+		baseState:    baseState,
+		targetPath:   targetPath,
+		originalPath: originalPath,
+		confirmed:    false,
+	}
+}
+
+func (d *DirectoryCreationModal) BaseState() WizardState {
+	return d.baseState
+}
+
+func (d *DirectoryCreationModal) ModalType() string {
+	return "directory-creation"
+}
+
+func (d *DirectoryCreationModal) Render(baseContent string) string {
+	var content strings.Builder
+
+	// Modal title
+	content.WriteString(modalTitleStyle.Render("📁 Create Directory"))
+	content.WriteString("\n\n")
+
+	// Message
+	content.WriteString("The directory does not exist:\n")
+	content.WriteString(errorModalStyle.Render(d.targetPath))
+	content.WriteString("\n\n")
+	content.WriteString("Would you like to create this directory?\n\n")
+
+	// Options
+	content.WriteString(suggestionStyle.Render("Y - Yes, create the directory"))
+	content.WriteString("\n")
+	content.WriteString(suggestionStyle.Render("N - No, go back to path entry"))
+	content.WriteString("\n")
+	content.WriteString(suggestionStyle.Render("Esc - Cancel and return to directory selection"))
+
+	// Compose with base content
+	modalContent := modalStyle.Render(content.String())
+	return baseContent + "\n" + modalContent
+}
+
+func (d *DirectoryCreationModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool) {
+	switch strings.ToLower(msg.String()) {
+	case "y", "enter":
+		// User wants to create the directory
+		d.confirmed = true
+		return nil, nil, true // Close this modal and let the parent handle creation
+
+	case "n":
+		// User wants to go back to path entry - reopen ManualPathEntryModal
+		pathModal := NewManualPathEntryModal(d.baseState, d.originalPath)
+		return pathModal, nil, true
+
+	case "escape":
+		// User wants to cancel entirely - close all modals
+		return nil, nil, true
+	}
+	return d, nil, true
+}
+
+func (d *DirectoryCreationModal) IsComplete() (bool, WizardState) {
+	return d.confirmed, d.baseState
+}
+
+func (d *DirectoryCreationModal) ShouldCreateDirectory() bool {
+	return d.confirmed
+}
+
+func (d *DirectoryCreationModal) GetTargetPath() string {
+	return d.targetPath
 }

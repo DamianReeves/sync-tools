@@ -57,7 +57,14 @@ func (tc *TestContext) iPressToConfirm(key string) error {
 		return fmt.Errorf("unsupported confirm key: %s", key)
 	}
 
-	// Simulate confirming path and closing dialog
+	// Check if we have a typed path that might be non-existent
+	if strings.Contains(tc.lastOutput, "typed_path: /tmp/test-sync-") || strings.Contains(tc.lastOutput, "typed_path: /root/restricted-dir") {
+		// Simulate non-existent path detection and show directory creation prompt
+		tc.lastOutput = "directory_creation_prompt"
+		return nil
+	}
+
+	// Simulate confirming path and closing dialog for existing paths
 	tc.lastOutput = fmt.Sprintf("pressed_%s_to_confirm_path_and_close_dialog", key)
 	return nil
 }

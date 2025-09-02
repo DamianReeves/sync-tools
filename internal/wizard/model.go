@@ -2,6 +2,7 @@ package wizard
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -86,9 +87,29 @@ func (m *BubbleTeaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// Modal completed or changed - pop it and update domain state
 						poppedModal := m.UIState.PopModal()
 						if poppedModal != nil {
-							// Update domain state with modal's base state
-							m.UIState.DomainState = poppedModal.BaseState()
-							m.StateMachine.currentState = m.UIState.DomainState
+							// Check if this was a DirectoryCreationModal that confirmed creation
+							if creationModal, ok := poppedModal.(*DirectoryCreationModal); ok && creationModal.ShouldCreateDirectory() {
+								// Create the directory
+								targetPath := creationModal.GetTargetPath()
+								if err := m.createDirectory(targetPath); err != nil {
+									m.Error = fmt.Sprintf("Failed to create directory: %v", err)
+									return m, nil
+								}
+								// Successfully created - update the state with the new path
+								if err := m.selectPath(targetPath); err != nil {
+									m.Error = fmt.Sprintf("Failed to select created directory: %v", err)
+									return m, nil
+								}
+							} else {
+								// Update domain state with modal's base state for other modals
+								m.UIState.DomainState = poppedModal.BaseState()
+								m.StateMachine.currentState = m.UIState.DomainState
+							}
+
+							// If we have a new modal to show, push it
+							if newModal != nil {
+								m.UIState.PushModal(newModal)
+							}
 						}
 						return m, cmd
 					}
@@ -738,4 +759,41 @@ func (m *BubbleTeaModel) handleCompleteKeys(msg tea.KeyMsg, _ CompleteState) (te
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+// createDirectory creates the specified directory and all parent directories
+func (m *BubbleTeaModel) createDirectory(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+// selectPath selects the given path as the current selection for the active state
+func (m *BubbleTeaModel) selectPath(path string) error {
+	switch m.UIState.DomainState.(type) {
+	case SourceSelectionState:
+		// Select as source
+		if ops, err := m.StateMachine.GetSourceSelectionOperations(); err == nil {
+			if err := ops.SelectSource(path); err != nil {
+				return fmt.Errorf("failed to select source: %v", err)
+			}
+			// Update UI state with new domain state
+			m.UIState.DomainState = m.StateMachine.CurrentState()
+			return nil
+		}
+		return fmt.Errorf("failed to get source selection operations")
+
+	case DestinationSelectionState:
+		// Select as destination
+		if ops, err := m.StateMachine.GetDestinationSelectionOperations(); err == nil {
+			if err := ops.SelectDestination(path); err != nil {
+				return fmt.Errorf("failed to select destination: %v", err)
+			}
+			// Update UI state with new domain state
+			m.UIState.DomainState = m.StateMachine.CurrentState()
+			return nil
+		}
+		return fmt.Errorf("failed to get destination selection operations")
+
+	default:
+		return fmt.Errorf("directory selection not supported in current state")
+	}
 }

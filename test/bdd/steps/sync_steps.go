@@ -343,6 +343,26 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the path input should be set to the home directory$`, tc.thePathInputShouldBeSetToTheHomeDirectory)
 	ctx.Step(`^the path should be extended with "([^"]*)"$`, tc.thePathShouldBeExtendedWith)
 
+	// Shortcut Character Conflict steps
+	ctx.Step(`^the path should be shortened$`, tc.thePathShouldBeShortened)
+	ctx.Step(`^I press "([^"]*)" to remove character$`, tc.iPressToRemoveCharacter)
+	ctx.Step(`^I press "([^"]*)" to clear path$`, tc.iPressToClearPath)
+	ctx.Step(`^the path input should be empty$`, tc.thePathInputShouldBeEmpty)
+
+	// Directory creation steps
+	ctx.Step(`^I should see a directory creation prompt$`, tc.iShouldSeeADirectoryCreationPrompt)
+	ctx.Step(`^I press "([^"]*)" to confirm directory creation$`, tc.iPressToConfirmDirectoryCreation)
+	ctx.Step(`^the directory should be created$`, tc.theDirectoryShouldBeCreated)
+	ctx.Step(`^I should proceed to the next step$`, tc.iShouldProceedToTheNextStep)
+	ctx.Step(`^I press "([^"]*)" to decline directory creation$`, tc.iPressToDeclineDirectoryCreation)
+	ctx.Step(`^I should be back in manual path entry$`, tc.iShouldBeBackInManualPathEntry)
+	ctx.Step(`^I should be back to directory selection$`, tc.iShouldBeBackToDirectorySelection)
+	ctx.Step(`^no directory should be created$`, tc.noDirectoryShouldBeCreated)
+	ctx.Step(`^I should see an error about directory creation failure$`, tc.iShouldSeeAnErrorAboutDirectoryCreationFailure)
+	ctx.Step(`^I should remain on the current screen$`, tc.iShouldRemainOnTheCurrentScreen)
+	ctx.Step(`^I press "([^"]*)" to cancel$`, tc.iPressToCancel)
+	ctx.Step(`^the path field should contain "([^"]*)"$`, tc.thePathFieldShouldContain)
+
 	// Setup and cleanup hooks
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return tc.beforeScenario(ctx, sc)
