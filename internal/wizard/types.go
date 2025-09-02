@@ -1,10 +1,61 @@
 package wizard
 
+import tea "github.com/charmbracelet/bubbletea"
+
 // WizardState represents the type-safe state of the wizard
 // This implements the Type State Pattern for compile-time safety
 type WizardState interface {
 	// Type method ensures compile-time type safety
 	wizardState()
+}
+
+// Modal represents a UI overlay that can be displayed on top of a base state
+type Modal interface {
+	// BaseState returns the underlying wizard state this modal overlays
+	BaseState() WizardState
+	// Render composes the modal content with the base state content
+	Render(baseContent string) string
+	// HandleInput processes input specific to this modal
+	HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool) // returns (newModal, cmd, handled)
+	// IsComplete returns whether the modal should be closed and optionally an updated base state
+	IsComplete() (bool, WizardState)
+	// ModalType returns a string identifier for this modal type
+	ModalType() string
+}
+
+// WizardUIState contains both domain state and UI overlay state
+type WizardUIState struct {
+	DomainState WizardState
+	ModalStack  []Modal
+}
+
+// ActiveModal returns the top modal from the stack, or nil if no modals are active
+func (ui *WizardUIState) ActiveModal() Modal {
+	if len(ui.ModalStack) == 0 {
+		return nil
+	}
+	return ui.ModalStack[len(ui.ModalStack)-1]
+}
+
+// PushModal adds a new modal to the stack
+func (ui *WizardUIState) PushModal(modal Modal) {
+	ui.ModalStack = append(ui.ModalStack, modal)
+}
+
+// PopModal removes the top modal from the stack
+func (ui *WizardUIState) PopModal() Modal {
+	if len(ui.ModalStack) == 0 {
+		return nil
+	}
+
+	modal := ui.ModalStack[len(ui.ModalStack)-1]
+	ui.ModalStack = ui.ModalStack[:len(ui.ModalStack)-1]
+	return modal
+}
+
+// HasModals returns true if there are any active modals
+func (ui *WizardUIState) HasModals() bool {
+	return len(ui.ModalStack) > 0
 }
 
 // InitialState - wizard just started
@@ -17,9 +68,6 @@ type SourceSelectionState struct {
 	CurrentPath string
 	Directories []DirectoryInfo
 	Browser     *DirectoryBrowser
-	ManualEntry bool   // True when in manual path entry mode
-	PathInput   string // Current path being typed
-	PathError   string // Error message if path is invalid
 }
 
 func (SourceSelectionState) wizardState() {}
@@ -30,9 +78,6 @@ type DestinationSelectionState struct {
 	CurrentPath string
 	Directories []DirectoryInfo
 	Browser     *DirectoryBrowser
-	ManualEntry bool   // True when in manual path entry mode
-	PathInput   string // Current path being typed
-	PathError   string // Error message if path is invalid
 }
 
 func (DestinationSelectionState) wizardState() {}
