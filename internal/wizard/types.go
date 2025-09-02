@@ -125,6 +125,18 @@ type ProgressInfo struct {
 type Config struct {
 	PrefilledSource string
 	PrefilledMode   string
+	TestMode        bool   // When true, runs non-interactively for testing
+	TestOptions     *TestModeOptions // Test mode configuration
+}
+
+// TestModeOptions configures how the wizard behaves in test mode
+type TestModeOptions struct {
+	SourceDir        string
+	DestinationDir   string
+	Mode             string
+	ExclusionPatterns []string
+	EnableGitIgnore  bool
+	DryRun           bool
 }
 
 // WizardModel represents the complete wizard state machine
