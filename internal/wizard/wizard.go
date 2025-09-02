@@ -8,8 +8,8 @@ import (
 
 // Wizard represents the interactive sync wizard
 type Wizard struct {
-	config *Config
-	model  *WizardModel
+	config       *Config
+	stateMachine *StateMachine
 }
 
 // New creates a new wizard with the given configuration
@@ -18,26 +18,24 @@ func New(config *Config) *Wizard {
 		config = &Config{}
 	}
 
-	// Initialize with appropriate starting state
-	var initialState WizardState = InitialState{}
-	
+	stateMachine := NewStateMachine()
+
 	// If source is pre-filled, start at destination selection
 	if config.PrefilledSource != "" {
 		browser := NewDirectoryBrowser(".")
-		initialState = DestinationSelectionState{
+		destState := DestinationSelectionState{
 			SourcePath:  config.PrefilledSource,
 			CurrentPath: ".",
 			Directories: []DirectoryInfo{},
 			Browser:     browser,
 		}
+		// Use the state machine to transition properly
+		_ = stateMachine.TransitionTo(destState)
 	}
 
 	return &Wizard{
-		config: config,
-		model: &WizardModel{
-			CurrentState: initialState,
-			Config:       config,
-		},
+		config:       config,
+		stateMachine: stateMachine,
 	}
 }
 
@@ -48,8 +46,8 @@ func (w *Wizard) Run() error {
 		return w.runTestMode()
 	}
 	
-	// Create the Bubble Tea model
-	teaModel := NewBubbleTeaModel(w.model)
+	// Create the Bubble Tea model using the state machine
+	teaModel := NewBubbleTeaModel(w.stateMachine, w.config)
 	
 	// Start the Bubble Tea program
 	p := tea.NewProgram(teaModel, tea.WithAltScreen())
@@ -66,8 +64,7 @@ func (w *Wizard) Run() error {
 		}
 		
 		// Check if we reached the complete state
-		if _, isComplete := wizModel.Model.CurrentState.(CompleteState); !isComplete {
-			// User cancelled or quit
+		if wizModel.StateMachine.IsInState(CompleteState{}) {
 			return nil
 		}
 	}

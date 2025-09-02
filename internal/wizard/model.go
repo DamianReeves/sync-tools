@@ -33,17 +33,19 @@ var (
 			Foreground(lipgloss.Color("#626262"))
 )
 
-// BubbleTeaModel wraps WizardModel for Bubble Tea
+// BubbleTeaModel wraps StateMachine for Bubble Tea
 type BubbleTeaModel struct {
-	Model    *WizardModel
-	Error    string
-	quitting bool
+	StateMachine *StateMachine
+	Config       *Config
+	Error        string
+	quitting     bool
 }
 
 // NewBubbleTeaModel creates a new Bubble Tea model
-func NewBubbleTeaModel(model *WizardModel) *BubbleTeaModel {
+func NewBubbleTeaModel(stateMachine *StateMachine, config *Config) *BubbleTeaModel {
 	return &BubbleTeaModel{
-		Model: model,
+		StateMachine: stateMachine,
+		Config:       config,
 	}
 }
 
@@ -106,7 +108,8 @@ func (m *BubbleTeaModel) View() string {
 
 // renderCurrentState renders the UI for the current state
 func (m *BubbleTeaModel) renderCurrentState() string {
-	switch state := m.Model.CurrentState.(type) {
+	currentState := m.StateMachine.CurrentState()
+	switch state := currentState.(type) {
 	case InitialState:
 		return m.renderInitialState()
 	case SourceSelectionState:
@@ -130,7 +133,8 @@ func (m *BubbleTeaModel) renderCurrentState() string {
 
 // handleStateSpecificKeys handles keyboard input based on current state
 func (m *BubbleTeaModel) handleStateSpecificKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch state := m.Model.CurrentState.(type) {
+	currentState := m.StateMachine.CurrentState()
+	switch state := currentState.(type) {
 	case InitialState:
 		return m.handleInitialStateKeys(msg)
 	case SourceSelectionState:
@@ -265,7 +269,7 @@ func (m *BubbleTeaModel) renderSyncOptionsState(state SyncOptionsState) string {
 	// Initialize editor if not exists
 	if state.Editor == nil {
 		state.Editor = NewSyncOptionsEditor(&state)
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		return content.String()
 	}
 	
@@ -307,7 +311,7 @@ func (m *BubbleTeaModel) renderProgressState(state ProgressState) string {
 	if state.Monitor == nil {
 		state.Monitor = NewProgressMonitor(&state)
 		state.Monitor.StartSync(&state)
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		return content.String()
 	}
 
@@ -373,16 +377,15 @@ func (m *BubbleTeaModel) renderCompleteState(state CompleteState) string {
 	return content.String()
 }
 
-// Placeholder key handlers - will be implemented with real logic
+// Placeholder key handlers - now using type-safe state machine
 func (m *BubbleTeaModel) handleInitialStateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		// Transition to source selection with directory browser
-		browser := NewDirectoryBrowser(".")
-		m.Model.CurrentState = SourceSelectionState{
-			CurrentPath: ".",
-			Directories: []DirectoryInfo{},
-			Browser:     browser,
+		// Use type-safe operations
+		if ops, err := m.StateMachine.GetInitialOperations(); err == nil {
+			if err := ops.StartSourceSelection(); err != nil {
+				m.Error = fmt.Sprintf("Failed to start source selection: %v", err)
+			}
 		}
 	}
 	return m, nil
@@ -392,44 +395,46 @@ func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceS
 	if state.Browser == nil {
 		// Initialize browser if missing
 		state.Browser = NewDirectoryBrowser(state.CurrentPath)
-		m.Model.CurrentState = state
+		// Update the state in the state machine
+		_ = m.StateMachine.TransitionTo(state)
 		return m, nil
 	}
 
 	switch msg.String() {
 	case "up", "k":
 		state.Browser.MoveUp()
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "down", "j":
 		state.Browser.MoveDown()
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "right", "l":
 		// Enter selected directory
 		if state.Browser.EnterDirectory() {
-			m.Model.CurrentState = state
+			_ = m.StateMachine.TransitionTo(state)
 		}
 		
 	case "left", "h":
 		// Go to parent directory
 		if state.Browser.GoUp() {
-			m.Model.CurrentState = state
+			_ = m.StateMachine.TransitionTo(state)
 		}
 		
 	case "enter":
-		// Select current directory as source
+		// Select current directory as source using type-safe operations
 		selectedPath := state.Browser.GetCurrentPath()
-		browser := NewDirectoryBrowser(".")
-		m.Model.CurrentState = DestinationSelectionState{
-			SourcePath:  selectedPath,
-			CurrentPath: ".",
-			Directories: []DirectoryInfo{},
-			Browser:     browser,
+		if ops, err := m.StateMachine.GetSourceSelectionOperations(); err == nil {
+			if err := ops.SelectSource(selectedPath); err != nil {
+				m.Error = fmt.Sprintf("Failed to select source: %v", err)
+			}
 		}
 		
 	case "escape":
-		m.Model.CurrentState = InitialState{}
+		// Navigate back using state machine
+		if m.StateMachine.CanGoBack() {
+			_ = m.StateMachine.GoBack()
+		}
 	}
 	return m, nil
 }
@@ -438,52 +443,44 @@ func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state De
 	if state.Browser == nil {
 		// Initialize browser if missing
 		state.Browser = NewDirectoryBrowser(state.CurrentPath)
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		return m, nil
 	}
 
 	switch msg.String() {
 	case "up", "k":
 		state.Browser.MoveUp()
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "down", "j":
 		state.Browser.MoveDown()
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "right", "l":
 		// Enter selected directory
 		if state.Browser.EnterDirectory() {
-			m.Model.CurrentState = state
+			_ = m.StateMachine.TransitionTo(state)
 		}
 		
 	case "left", "h":
 		// Go to parent directory
 		if state.Browser.GoUp() {
-			m.Model.CurrentState = state
+			_ = m.StateMachine.TransitionTo(state)
 		}
 		
 	case "enter":
-		// Select current directory as destination and move to sync options
+		// Select current directory as destination using type-safe operations
 		selectedPath := state.Browser.GetCurrentPath()
-		m.Model.CurrentState = SyncOptionsState{
-			SourcePath:       state.SourcePath,
-			DestinationPath:  selectedPath,
-			Mode:             "one-way",
-			DryRun:           false,
-			HiddenDirs:       true,
-			UseGitIgnore:     false,
-			ConflictStrategy: "newest-wins",
-			Editor:           nil, // Will be initialized when rendered
+		if ops, err := m.StateMachine.GetDestinationSelectionOperations(); err == nil {
+			if err := ops.SelectDestination(selectedPath); err != nil {
+				m.Error = fmt.Sprintf("Failed to select destination: %v", err)
+			}
 		}
 		
 	case "escape":
-		// Go back to source selection
-		browser := NewDirectoryBrowser(state.SourcePath)
-		m.Model.CurrentState = SourceSelectionState{
-			CurrentPath: state.SourcePath,
-			Directories: []DirectoryInfo{},
-			Browser:     browser,
+		// Navigate back using state machine
+		if m.StateMachine.CanGoBack() {
+			_ = m.StateMachine.GoBack()
 		}
 	}
 	return m, nil
@@ -493,48 +490,45 @@ func (m *BubbleTeaModel) handleSyncOptionsKeys(msg tea.KeyMsg, state SyncOptions
 	if state.Editor == nil {
 		// Initialize editor if missing
 		state.Editor = NewSyncOptionsEditor(&state)
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		return m, nil
 	}
 
 	switch msg.String() {
 	case "up", "k":
 		state.Editor.MoveUp()
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "down", "j":
 		state.Editor.MoveDown()
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "left", "h":
 		state.Editor.ChangeValue(-1)
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "right", "l":
 		state.Editor.ChangeValue(1)
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "space", "enter":
 		state.Editor.ToggleValue()
-		m.Model.CurrentState = state
+		_ = m.StateMachine.TransitionTo(state)
 		
 	case "tab":
 		// Proceed to exclusion patterns
-		m.Model.CurrentState = ExclusionPatternsState{
+		newState := ExclusionPatternsState{
 			SourcePath:      state.SourcePath,
 			DestinationPath: state.DestinationPath,
 			SyncOptions:     state,
 			Patterns:        []ExclusionPattern{{Pattern: ".git/", Source: "default", Valid: true}},
 		}
+		_ = m.StateMachine.TransitionTo(newState)
 		
 	case "escape":
-		// Go back to destination selection
-		browser := NewDirectoryBrowser(state.DestinationPath)
-		m.Model.CurrentState = DestinationSelectionState{
-			SourcePath:  state.SourcePath,
-			CurrentPath: state.DestinationPath,
-			Directories: []DirectoryInfo{},
-			Browser:     browser,
+		// Navigate back using state machine
+		if m.StateMachine.CanGoBack() {
+			_ = m.StateMachine.GoBack()
 		}
 	}
 	return m, nil
@@ -544,15 +538,19 @@ func (m *BubbleTeaModel) handleExclusionPatternsKeys(msg tea.KeyMsg, state Exclu
 	switch msg.String() {
 	case "enter":
 		// Transition to directory filter
-		m.Model.CurrentState = DirectoryFilterState{
+		newState := DirectoryFilterState{
 			SourcePath:      state.SourcePath,
 			DestinationPath: state.DestinationPath,
 			SyncOptions:     state.SyncOptions,
 			Patterns:        state.Patterns,
 			Directories:     []SelectableDirectory{},
 		}
+		_ = m.StateMachine.TransitionTo(newState)
 	case "escape":
-		m.Model.CurrentState = state.SyncOptions
+		// Navigate back using state machine
+		if m.StateMachine.CanGoBack() {
+			_ = m.StateMachine.GoBack()
+		}
 	}
 	return m, nil
 }
@@ -561,7 +559,7 @@ func (m *BubbleTeaModel) handleDirectoryFilterKeys(msg tea.KeyMsg, state Directo
 	switch msg.String() {
 	case "enter":
 		// Transition to progress
-		m.Model.CurrentState = ProgressState{
+		newState := ProgressState{
 			SourcePath:      state.SourcePath,
 			DestinationPath: state.DestinationPath,
 			SyncOptions:     state.SyncOptions,
@@ -570,8 +568,12 @@ func (m *BubbleTeaModel) handleDirectoryFilterKeys(msg tea.KeyMsg, state Directo
 			Progress:        ProgressInfo{},
 			Monitor:         nil, // Will be initialized when rendered
 		}
+		_ = m.StateMachine.TransitionTo(newState)
 	case "escape":
-		m.Model.CurrentState = state.SyncOptions
+		// Navigate back using state machine
+		if m.StateMachine.CanGoBack() {
+			_ = m.StateMachine.GoBack()
+		}
 	}
 	return m, nil
 }
@@ -582,7 +584,7 @@ func (m *BubbleTeaModel) handleProgressKeys(msg tea.KeyMsg, state ProgressState)
 		// Cancel sync if active
 		if state.Monitor != nil && state.Monitor.IsActive() {
 			state.Monitor.Cancel()
-			m.Model.CurrentState = state
+			_ = m.StateMachine.TransitionTo(state)
 		} else {
 			// Quit if not active
 			m.quitting = true
@@ -592,22 +594,23 @@ func (m *BubbleTeaModel) handleProgressKeys(msg tea.KeyMsg, state ProgressState)
 	case "enter":
 		// Finish wizard if sync is complete or failed
 		if state.Monitor != nil && (state.Monitor.IsComplete() || state.Monitor.IsFailed()) {
-			m.Model.CurrentState = CompleteState{
+			completeState := CompleteState{
 				SyncFilePath: "SyncFile", // TODO: Save to actual file
 				Success:      state.Monitor.IsComplete(),
 				Error:        "",
 			}
 			if state.Monitor.IsFailed() && state.Monitor.GetError() != nil {
-				completeState := m.Model.CurrentState.(CompleteState)
 				completeState.Error = state.Monitor.GetError().Error()
-				m.Model.CurrentState = completeState
 			}
+			_ = m.StateMachine.TransitionTo(completeState)
 		}
 		
 	case "escape":
-		// Go back if sync is not active
+		// Navigate back if sync is not active
 		if state.Monitor == nil || !state.Monitor.IsActive() {
-			m.Model.CurrentState = state.SyncOptions
+			if m.StateMachine.CanGoBack() {
+				_ = m.StateMachine.GoBack()
+			}
 		}
 	}
 	return m, nil

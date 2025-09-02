@@ -1,7 +1,6 @@
 package steps
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DamianReeves/sync-tools/internal/wizard"
 	"github.com/DamianReeves/sync-tools/test/bdd/mother"
 	"github.com/DamianReeves/sync-tools/test/bdd/testcontext"
 	"github.com/cucumber/godog"
@@ -1846,7 +1844,19 @@ func (tc *TestContext) theOutputShouldContain(expectedText string) error {
 // Wizard step definitions
 
 func (tc *TestContext) iStartTheInteractiveWizard() error {
-	// Initialize wizard test configuration
+	// Use the TestEnvironment's wizard driver
+	result := tc.env.StartWizard()
+	
+	// Update legacy fields for backward compatibility
+	tc.lastOutput = "Interactive wizard started"
+	if result.Error != "" {
+		tc.lastError = result.Error
+		tc.lastExitCode = 1
+	} else {
+		tc.lastExitCode = 0
+	}
+	
+	// Initialize wizard test configuration for state tracking
 	tc.wizardTestConfig = &WizardTestConfig{
 		SourceDir:         "",
 		DestinationDir:    "",
@@ -1855,7 +1865,7 @@ func (tc *TestContext) iStartTheInteractiveWizard() error {
 		EnableGitIgnore:   false,
 		DryRun:            false,
 	}
-	tc.lastOutput = "Interactive wizard started"
+	
 	return nil
 }
 
@@ -2065,60 +2075,42 @@ func (tc *TestContext) iCompleteTheWizard() error {
 	
 	tc.lastOutput += "\nWizard completed successfully"
 	
-	// Import the wizard package to use real wizard functionality
-	// We need to run the wizard in test mode to generate actual SyncFile content
-	config := &wizard.Config{
-		TestMode: true,
-		TestOptions: &wizard.TestModeOptions{
-			SourceDir:         tc.wizardTestConfig.SourceDir,
-			DestinationDir:    tc.wizardTestConfig.DestinationDir,
-			Mode:              tc.wizardTestConfig.Mode,
-			ExclusionPatterns: tc.wizardTestConfig.ExclusionPatterns,
-			EnableGitIgnore:   tc.wizardTestConfig.EnableGitIgnore,
-			DryRun:           tc.wizardTestConfig.DryRun,
-		},
-	}
+	// Use ObjectMother pattern to create wizard configuration
+	wizardConfig := mother.NewWizardConfig().
+		WithSourceDir(tc.wizardTestConfig.SourceDir).
+		WithDestinationDir(tc.wizardTestConfig.DestinationDir).
+		WithMode(tc.wizardTestConfig.Mode).
+		WithExclusionPatterns(tc.wizardTestConfig.ExclusionPatterns...).
+		WithGitIgnore(tc.wizardTestConfig.EnableGitIgnore).
+		WithDryRun(tc.wizardTestConfig.DryRun).
+		Build()
 	
-	w := wizard.New(config)
+	// Use TestEnvironment's wizard driver
+	result := tc.env.GenerateWizardSyncFile(wizardConfig)
 	
-	// Capture the wizard output
-	var buf bytes.Buffer
-	oldStdout := os.Stdout
-	r, w_pipe, _ := os.Pipe()
-	os.Stdout = w_pipe
-	
-	// Run the wizard in test mode
-	err := w.Run()
-	
-	// Restore stdout and capture output
-	w_pipe.Close()
-	os.Stdout = oldStdout
-	buf.ReadFrom(r)
-	
-	if err != nil {
-		return fmt.Errorf("wizard execution failed: %w", err)
+	if result.Error != "" {
+		return fmt.Errorf("wizard execution failed: %s", result.Error)
 	}
 	
 	// Add the generated SyncFile content to the test output
-	syncFileContent := buf.String()
-	tc.lastOutput += fmt.Sprintf("\nSyncFile generated:\n%s", syncFileContent)
+	tc.lastOutput += fmt.Sprintf("\nSyncFile generated:\n%s", result.SyncFileContent)
 	
 	return nil
 }
 
 func (tc *TestContext) aSyncFileShouldBeGeneratedWith(expectedContent *godog.DocString) error {
-	// Check that a SyncFile was generated with expected content
-	if !strings.Contains(tc.lastOutput, "SyncFile") {
-		return fmt.Errorf("expected SyncFile to be generated, but no SyncFile found in output: %s", tc.lastOutput)
+	// Use TestEnvironment assertion helper
+	if err := tc.env.AssertLastWizardSucceeded(); err != nil {
+		return err
 	}
 	
-	// For now, just verify that expected content patterns are mentioned
+	// Check that expected content patterns are in the SyncFile
 	expectedLines := strings.Split(expectedContent.Content, "\n")
 	for _, line := range expectedLines {
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.HasPrefix(line, "#") {
-			if !strings.Contains(tc.lastOutput, line) {
-				tc.lastOutput += fmt.Sprintf("\n[Expected in SyncFile] %s", line)
+			if err := tc.env.AssertWizardSyncFileContains(line); err != nil {
+				return err
 			}
 		}
 	}

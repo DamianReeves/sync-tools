@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/DamianReeves/sync-tools/internal/wizard"
 	"github.com/DamianReeves/sync-tools/test/bdd/driver"
 	"github.com/DamianReeves/sync-tools/test/bdd/mother"
 )
@@ -21,8 +22,14 @@ type TestEnvironment struct {
 	// Driver for sync-tools interaction
 	Driver driver.SyncDriver
 
+	// Driver for wizard testing
+	WizardDriver driver.WizardDriver
+
 	// Last command result for assertions
 	LastResult *driver.SyncResult
+	
+	// Last wizard result for assertions
+	LastWizardResult *driver.WizardResult
 }
 
 // NewTestEnvironment creates a new isolated test environment
@@ -34,14 +41,16 @@ func NewTestEnvironment(binaryPath string) (*TestEnvironment, error) {
 	}
 
 	env := &TestEnvironment{
-		TempRoot:   tempRoot,
-		SourceDir:  filepath.Join(tempRoot, "source"),
-		DestDir:    filepath.Join(tempRoot, "dest"),
-		WorkingDir: filepath.Join(tempRoot, "work"),
-		Driver:     driver.NewSyncDriver(binaryPath),
+		TempRoot:     tempRoot,
+		SourceDir:    filepath.Join(tempRoot, "source"),
+		DestDir:      filepath.Join(tempRoot, "dest"),
+		WorkingDir:   filepath.Join(tempRoot, "work"),
+		Driver:       driver.NewSyncDriver(binaryPath),
+		WizardDriver: driver.NewWizardDriver(),
 	}
 
 	env.Driver.SetWorkingDir(env.WorkingDir)
+	env.WizardDriver.SetWorkingDir(env.WorkingDir)
 
 	// Create working directory
 	if err := os.MkdirAll(env.WorkingDir, 0755); err != nil {
@@ -218,6 +227,56 @@ func containsAt(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// Wizard operations using Test Driver
+func (env *TestEnvironment) StartWizard(options ...driver.WizardOption) *driver.WizardResult {
+	env.LastWizardResult = env.WizardDriver.StartInteractiveWizard(options...)
+	return env.LastWizardResult
+}
+
+func (env *TestEnvironment) GenerateWizardSyncFile(config *wizard.TestModeOptions) *driver.WizardResult {
+	env.LastWizardResult = env.WizardDriver.GenerateSyncFile(config)
+	return env.LastWizardResult
+}
+
+func (env *TestEnvironment) StartWizardWithConfig(config *wizard.Config) *driver.WizardResult {
+	env.LastWizardResult = env.WizardDriver.StartWizardWithConfig(config)
+	return env.LastWizardResult
+}
+
+// Wizard assertion helpers
+func (env *TestEnvironment) AssertLastWizardSucceeded() error {
+	if env.LastWizardResult == nil {
+		return fmt.Errorf("no wizard operation has been executed")
+	}
+	if !env.LastWizardResult.Success {
+		return fmt.Errorf("expected wizard to succeed, but it failed. Error: %s", env.LastWizardResult.Error)
+	}
+	return nil
+}
+
+func (env *TestEnvironment) AssertLastWizardFailed() error {
+	if env.LastWizardResult == nil {
+		return fmt.Errorf("no wizard operation has been executed")
+	}
+	if env.LastWizardResult.Success {
+		return fmt.Errorf("expected wizard to fail, but it succeeded")
+	}
+	return nil
+}
+
+func (env *TestEnvironment) AssertWizardSyncFileContains(expectedContent string) error {
+	if env.LastWizardResult == nil {
+		return fmt.Errorf("no wizard operation has been executed")
+	}
+	
+	if !contains(env.LastWizardResult.SyncFileContent, expectedContent) {
+		return fmt.Errorf("expected wizard SyncFile to contain '%s', but got: %s",
+			expectedContent, env.LastWizardResult.SyncFileContent)
+	}
+	
+	return nil
 }
 
 // ExecuteRawCommand executes a raw command string with path replacement
