@@ -12,7 +12,18 @@ This guide will help you install sync-tools and get started with basic synchroni
 
 ## Installation
 
-### Download from Releases (Recommended)
+### Homebrew (macOS/Linux) - Recommended
+
+```bash
+# Add the tap and install sync-tools
+brew tap DamianReeves/tap
+brew install sync-tools
+
+# Verify installation
+sync-tools --version
+```
+
+### Download from Releases
 
 ```bash
 # Download the latest binary for your platform
@@ -30,6 +41,28 @@ make build
 ```
 
 ## Basic Usage
+
+### Interactive Wizard (New in v0.4.0) ✨
+
+The easiest way to get started is with the interactive wizard:
+
+```bash
+# Launch the interactive wizard
+sync-tools wizard
+
+# Start with a pre-filled source directory
+sync-tools wizard --source ./my-project
+
+# Quick test mode (non-interactive for scripts/CI)
+sync-tools wizard --source ./src --mode two-way --test
+```
+
+The wizard provides:
+- **Step-by-step guidance** through source, destination, and options selection
+- **Real-time validation** with immediate feedback
+- **Directory browsing** with file counts and sizes
+- **Option configuration** with helpful descriptions
+- **SyncFile generation** for repeatable operations
 
 ### Simple One-way Sync
 
@@ -54,6 +87,26 @@ sync-tools sync --source ./project --dest ./backup --interactive
 ```bash
 # Two-way sync with conflict detection
 sync-tools sync --source ./local --dest ./remote --mode two-way
+```
+
+### Two-Phase Interactive Sync ✨
+
+Generate and review sync plans before execution:
+
+```bash
+# Generate a sync plan with visual aliases
+sync-tools sync --source ./src --dest ./dst --plan sync.plan
+
+# Review the generated plan:
+# << file   new_file.txt      (will copy to destination)  
+# >> file   dest_only.txt     (will copy to source)
+# <> file   conflict.txt      (conflict detected)
+
+# Edit the plan by commenting out unwanted operations:
+# # << file   skip_this.txt   (commented out = skip)
+
+# Apply the reviewed plan
+sync-tools sync --apply-plan sync.plan
 ```
 
 ## Preview Changes

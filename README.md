@@ -4,17 +4,32 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Release](https://img.shields.io/github/release/DamianReeves/sync-tools.svg)](https://github.com/DamianReeves/sync-tools/releases/latest)
 
-A powerful Go CLI wrapper around rsync that provides fast directory synchronization with advanced filtering capabilities, SyncFile post-sync actions, and sophisticated conflict resolution.
+A powerful Go CLI wrapper around rsync that provides fast directory synchronization with advanced filtering capabilities, interactive wizard interface, and sophisticated conflict resolution using type-safe patterns.
 
 ## Features
 
+### 🎯 **Core Synchronization**
 - **Fast Directory Synchronization**: Built on rsync for efficient file transfers
 - **Advanced Filtering**: Support for `.syncignore` files, `.gitignore` import, and CLI overrides  
 - **Whitelist Mode**: Explicit path inclusion with "only" patterns for precise sync control
-- **Two-Phase Interactive Sync**: Generate and review sync plans before execution
-- **SyncFile Post-Sync Actions**: APPEND and PREPEND operations for automated file modifications
 - **Conflict Resolution**: Multiple strategies including newest-wins, oldest-wins, and interactive
+
+### 🧙‍♂️ **Interactive Wizard (New in v0.4.0)**
+- **Terminal UI**: Beautiful interactive wizard powered by Bubble Tea
+- **Step-by-Step Configuration**: Guided setup for source, destination, and sync options
+- **Real-time Validation**: Immediate feedback on configuration choices
+- **Multi-Persona Support**: Tailored workflows for DevOps, Developers, and Compliance teams
+
+### 📋 **Two-Phase Interactive Sync**
+- **Sync Plan Generation**: Preview changes before execution with visual aliases
+- **Plan Editing**: Modify sync operations by commenting/uncommenting lines
+- **Batch Execution**: Apply reviewed plans with confidence
+- **Change Filtering**: Focus on specific types of changes (new, modified, conflicts)
+
+### 🔧 **Advanced Operations**
+- **SyncFile Post-Sync Actions**: APPEND and PREPEND operations for automated file modifications
 - **Git Patch Generation**: Create patch files for version control integration
+- **Type-Safe Architecture**: Compile-time guarantees prevent configuration errors
 - **Cross-Platform**: Supports Linux, macOS, and Windows
 - **Single Binary**: No external dependencies except rsync
 
@@ -40,6 +55,19 @@ go build -o sync-tools ./cmd/sync-tools
 ```
 
 ## Quick Start
+
+### Interactive Wizard (Recommended for New Users)
+
+```bash
+# Launch the interactive wizard
+sync-tools wizard
+
+# Start wizard with a pre-filled source directory
+sync-tools wizard --source ./my-project
+
+# Quick test mode (non-interactive) 
+sync-tools wizard --source ./src --mode two-way --test
+```
 
 ### Basic Synchronization
 
@@ -144,9 +172,16 @@ PREPEND file content
 
 ### Main Commands
 
+- `sync-tools wizard` - Interactive wizard for guided sync setup ✨ **New in v0.4.0**
 - `sync-tools sync` - Synchronize directories
 - `sync-tools syncfile` - Execute SyncFile configuration
 - `sync-tools version` - Show version information
+
+### Wizard Options ✨ **New in v0.4.0**
+
+- `--source` - Pre-fill source directory in wizard
+- `--mode` - Pre-fill sync mode (one-way or two-way)
+- `--test` - Run wizard in non-interactive test mode
 
 ### Sync Options
 
@@ -175,7 +210,7 @@ PREPEND file content
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.25 or later
 - rsync installed on the system
 - golangci-lint for code quality
 
@@ -233,6 +268,13 @@ sync-tools is built with a modular architecture focusing on:
 - **Composition**: Flexible, reusable components over complex hierarchies  
 - **BDD/TDD Discipline**: Comprehensive test coverage with executable specifications
 - **Integration Boundaries**: Clear separation between core logic and external systems
+
+### v0.4.0 Architecture Enhancements ✨
+
+- **Type State Pattern**: Compile-time safety for state transitions in the wizard
+- **Enhanced Test Driver**: Fluent API for building complex test scenarios
+- **Object Mother Patterns**: Domain-specific builders for DevOps, Developer, and Compliance personas
+- **Multi-Persona Design**: UI/APIs tailored for different user roles and workflows
 
 ## Contributing
 
