@@ -13,6 +13,8 @@ type DirectoryBrowser struct {
 	currentPath   string
 	entries       []DirectoryEntry
 	selectedIndex int
+	scrollOffset  int
+	maxVisible    int
 }
 
 // DirectoryEntry represents a filesystem entry
@@ -29,6 +31,8 @@ func NewDirectoryBrowser(startPath string) *DirectoryBrowser {
 	browser := &DirectoryBrowser{
 		currentPath:   startPath,
 		selectedIndex: 0,
+		scrollOffset:  0,
+		maxVisible:    15, // Default to showing 15 entries
 	}
 	browser.refreshEntries()
 	return browser
@@ -61,6 +65,10 @@ func (db *DirectoryBrowser) GetSelectedEntry() *DirectoryEntry {
 func (db *DirectoryBrowser) MoveUp() {
 	if db.selectedIndex > 0 {
 		db.selectedIndex--
+		// Adjust scroll if needed
+		if db.selectedIndex < db.scrollOffset {
+			db.scrollOffset = db.selectedIndex
+		}
 	}
 }
 
@@ -68,6 +76,10 @@ func (db *DirectoryBrowser) MoveUp() {
 func (db *DirectoryBrowser) MoveDown() {
 	if db.selectedIndex < len(db.entries)-1 {
 		db.selectedIndex++
+		// Adjust scroll if needed
+		if db.selectedIndex >= db.scrollOffset+db.maxVisible {
+			db.scrollOffset = db.selectedIndex - db.maxVisible + 1
+		}
 	}
 }
 
@@ -80,6 +92,7 @@ func (db *DirectoryBrowser) EnterDirectory() bool {
 
 	db.currentPath = entry.Path
 	db.selectedIndex = 0
+	db.scrollOffset = 0
 	db.refreshEntries()
 	return true
 }
@@ -93,6 +106,7 @@ func (db *DirectoryBrowser) GoUp() bool {
 
 	db.currentPath = parent
 	db.selectedIndex = 0
+	db.scrollOffset = 0
 	db.refreshEntries()
 	return true
 }
@@ -106,6 +120,7 @@ func (db *DirectoryBrowser) SetPath(path string) error {
 
 	db.currentPath = path
 	db.selectedIndex = 0
+	db.scrollOffset = 0
 	db.refreshEntries()
 	return nil
 }
@@ -198,4 +213,53 @@ func FormatSize(size int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f%cB", float64(size)/float64(div), "KMGTPE"[exp])
+}
+
+// GetVisibleEntries returns the entries that should be displayed
+func (db *DirectoryBrowser) GetVisibleEntries() []DirectoryEntry {
+	if len(db.entries) == 0 {
+		return []DirectoryEntry{}
+	}
+
+	start := db.scrollOffset
+	end := db.scrollOffset + db.maxVisible
+
+	if start >= len(db.entries) {
+		start = len(db.entries) - 1
+		db.scrollOffset = start
+	}
+
+	if end > len(db.entries) {
+		end = len(db.entries)
+	}
+
+	return db.entries[start:end]
+}
+
+// GetVisibleSelectedIndex returns the selected index relative to visible entries
+func (db *DirectoryBrowser) GetVisibleSelectedIndex() int {
+	return db.selectedIndex - db.scrollOffset
+}
+
+// HasMoreAbove returns true if there are entries above the visible range
+func (db *DirectoryBrowser) HasMoreAbove() bool {
+	return db.scrollOffset > 0
+}
+
+// HasMoreBelow returns true if there are entries below the visible range
+func (db *DirectoryBrowser) HasMoreBelow() bool {
+	return db.scrollOffset+db.maxVisible < len(db.entries)
+}
+
+// SetMaxVisible sets the maximum number of visible entries
+func (db *DirectoryBrowser) SetMaxVisible(max int) {
+	if max < 1 {
+		max = 1
+	}
+	db.maxVisible = max
+
+	// Adjust scroll offset if needed
+	if db.selectedIndex >= db.scrollOffset+db.maxVisible {
+		db.scrollOffset = db.selectedIndex - db.maxVisible + 1
+	}
 }

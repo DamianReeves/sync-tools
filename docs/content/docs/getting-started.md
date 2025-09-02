@@ -98,7 +98,7 @@ Generate and review sync plans before execution:
 sync-tools sync --source ./src --dest ./dst --plan sync.plan
 
 # Review the generated plan:
-# << file   new_file.txt      (will copy to destination)  
+# << file   new_file.txt      (will copy to destination)
 # >> file   dest_only.txt     (will copy to source)
 # <> file   conflict.txt      (conflict detected)
 

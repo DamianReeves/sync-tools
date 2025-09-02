@@ -18,7 +18,7 @@ Feature: SyncFile PREPEND Post-Sync Action
         # Configuration Header
         # Generated: 2025-08-31
         # Version: v1.0
-        
+
       END PREPEND
       """
     When I run sync-tools with arguments "syncfile PrependTest"
@@ -28,7 +28,7 @@ Feature: SyncFile PREPEND Post-Sync Action
       # Configuration Header
       # Generated: 2025-08-31
       # Version: v1.0
-      
+
       app_name: myapp
       port: 8080
       """
@@ -39,7 +39,7 @@ Feature: SyncFile PREPEND Post-Sync Action
       # Auto-generated header
       # Build: ${BUILD_ID}
       # Deployed: ${DEPLOY_TIME}
-      
+
       """
     And I have a SyncFile "PrependFromFile" containing:
       """
@@ -53,7 +53,7 @@ Feature: SyncFile PREPEND Post-Sync Action
       # Auto-generated header
       # Build: ${BUILD_ID}
       # Deployed: ${DEPLOY_TIME}
-      
+
       app_name: myapp
       port: 8080
       """
@@ -64,11 +64,11 @@ Feature: SyncFile PREPEND Post-Sync Action
       SYNC ../source ../dest
       PREPEND config/app.yml:
         # App Configuration
-        
+
       END PREPEND
       PREPEND src/main.js:
         // Main Application Entry Point
-        
+
       END PREPEND
       """
     When I run sync-tools with arguments "syncfile PrependMultiple"
@@ -76,14 +76,14 @@ Feature: SyncFile PREPEND Post-Sync Action
     And the destination directory should contain "config/app.yml" with content:
       """
       # App Configuration
-      
+
       app_name: myapp
       port: 8080
       """
     And the destination directory should contain "src/main.js" with content:
       """
       // Main Application Entry Point
-      
+
       console.log('hello');
       """
 
@@ -93,7 +93,7 @@ Feature: SyncFile PREPEND Post-Sync Action
       SYNC ../source ../dest
       PREPEND --backup config/app.yml:
         # Backed Up Configuration
-        
+
       END PREPEND
       """
     When I run sync-tools with arguments "syncfile PrependBackup"
@@ -101,7 +101,7 @@ Feature: SyncFile PREPEND Post-Sync Action
     And the destination directory should contain "config/app.yml" with content:
       """
       # Backed Up Configuration
-      
+
       app_name: myapp
       port: 8080
       """
@@ -113,7 +113,7 @@ Feature: SyncFile PREPEND Post-Sync Action
       SYNC ../source ../dest
       PREPEND nonexistent/config.yml:
         # Header for missing file
-        
+
       END PREPEND
       """
     When I run sync-tools with arguments "syncfile PrependMissingFile"
@@ -126,11 +126,11 @@ Feature: SyncFile PREPEND Post-Sync Action
       SYNC ../source ../dest
       PREPEND config/app.yml:
         # First header
-        
+
       END PREPEND
       PREPEND config/app.yml:
         # Second header
-        
+
       END PREPEND
       """
     When I run sync-tools with arguments "syncfile PrependSequence"
@@ -138,9 +138,9 @@ Feature: SyncFile PREPEND Post-Sync Action
     And the destination directory should contain "config/app.yml" with content:
       """
       # Second header
-      
+
       # First header
-      
+
       app_name: myapp
       port: 8080
       """
@@ -151,7 +151,7 @@ Feature: SyncFile PREPEND Post-Sync Action
       SYNC ../source ../dest
       PREPEND --dry-run config/app.yml:
         # Dry run header
-        
+
       END PREPEND
       """
     When I run sync-tools with arguments "syncfile PrependDryRun --dry-run"

@@ -72,44 +72,44 @@ brews:
     description: "Go CLI wrapper around rsync with advanced filtering and SyncFile post-sync actions"
     homepage: "https://github.com/DamianReeves/sync-tools"
     license: "Apache-2.0"
-    
+
     repository:
       owner: DamianReeves
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    
+
     commit_author:
       name: "Damian Reeves"
       email: "damian@reevescodes.me"
-    
+
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    
+
     directory: Formula
-    
+
     # Dependencies
     dependencies:
       - name: rsync
         type: runtime
-    
+
     # Install configuration
     install: |
       bin.install "sync-tools"
-      
+
       # Generate and install shell completions if available
       if File.exist?(buildpath/"completions")
         bash_completion.install "completions/sync-tools.bash" => "sync-tools"
         zsh_completion.install "completions/_sync-tools"
         fish_completion.install "completions/sync-tools.fish"
       end
-    
+
     # Test the installation
     test: |
       assert_match version.to_s, shell_output("#{bin}/sync-tools --version 2>&1")
-      
+
       # Test basic help functionality
       assert_match "Advanced directory synchronization", shell_output("#{bin}/sync-tools --help")
-      
+
       # Test subcommands exist
       assert_match "sync", shell_output("#{bin}/sync-tools --help")
       assert_match "syncfile", shell_output("#{bin}/sync-tools --help")
@@ -133,6 +133,6 @@ brews:
 #   - name: sync-tools
 #     summary: Advanced directory synchronization tool
 #     description: |
-#       Go CLI wrapper around rsync that provides advanced directory synchronization 
-#       with .syncignore files, whitelist mode, filter layering, one-way/two-way sync, 
+#       Go CLI wrapper around rsync that provides advanced directory synchronization
+#       with .syncignore files, whitelist mode, filter layering, one-way/two-way sync,
 #       conflict preservation, and SyncFile post-sync actions.

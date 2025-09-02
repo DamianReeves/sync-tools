@@ -21,7 +21,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   config/settings.json          32B   2025-08-30T10:40:00  [CONFLICT: both-modified, auto:newest]
       <> file   src/module.js                 28B   2025-08-30T10:35:00  [CONFLICT: both-modified, auto:source]
       """
@@ -37,7 +37,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   config/settings.json          32B   2025-08-30T10:40:00  [CONFLICT: both-modified, merge-tool:vimdiff]
       """
     And the environment variable "EDITOR" is set to "vimdiff"
@@ -52,7 +52,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   src/module.js                 28B   2025-08-30T10:35:00  [CONFLICT: both-modified]
       """
     When I run sync-tools with arguments "sync --apply-plan custom-merge.plan --interactive-merge --merge-tool meld"
@@ -66,7 +66,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   config/settings.json          32B   2025-08-30T10:40:00  [CONFLICT: both-modified, auto:backup]
       """
     When I run sync-tools with arguments "sync --apply-plan backup-conflict.plan"
@@ -81,7 +81,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   config/settings.json          32B   2025-08-30T10:40:00  [CONFLICT: both-modified]
       <> file   src/module.js                 28B   2025-08-30T10:35:00  [CONFLICT: both-modified]
       """
@@ -91,7 +91,7 @@ Feature: Interactive Merge Tool Integration
     And no merge tool prompts should appear
 
   Scenario: Skip conflicts and generate resolution plan
-    Given I have a source file "src/new.js" with content "console.log('new');" 
+    Given I have a source file "src/new.js" with content "console.log('new');"
     And I have a source file "config/settings.json" with content "{\"version\": \"1.0\"}"
     And I have a destination file "config/settings.json" with content "{\"version\": \"2.0\"}"
     And I have a plan file "skip-conflicts.plan" containing:
@@ -100,7 +100,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       << file   src/new.js                    15B   2025-08-30T10:35:00  [new-in-source]
       <> file   config/settings.json          32B   2025-08-30T10:40:00  [CONFLICT: both-modified]
       """
@@ -119,7 +119,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   config/settings.json          32B   2025-08-30T10:40:00  [CONFLICT: both-modified, merge-tool:slow-tool]
       """
     And a merge tool "slow-tool" that takes longer than timeout
@@ -140,7 +140,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   assets/logo.png               12KB  2025-08-30T10:40:00  [CONFLICT: both-modified]
       """
     When I run sync-tools with arguments "sync --apply-plan binary-conflict.plan --interactive-merge"
@@ -155,7 +155,7 @@ Feature: Interactive Merge Tool Integration
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       <> file   src/module.js                 28B   2025-08-30T10:35:00  [CONFLICT: both-modified]
       """
     When I run sync-tools with arguments "sync --apply-plan three-way.plan --interactive-merge --use-git-base"

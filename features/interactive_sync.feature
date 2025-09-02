@@ -76,7 +76,7 @@ Feature: Two-Phased Interactive Sync
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: one-way
-      
+
       << file   src/main.js                    17B   2025-08-30T10:35:00  [new-in-source]
       << file   config/app.yml                13B   2025-08-30T10:30:00  [update: newer-in-source]
       # >> file   config/db.yml                15B   2025-08-30T10:00:00  [new-in-dest]
@@ -94,7 +94,7 @@ Feature: Two-Phased Interactive Sync
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: two-way
-      
+
       << file   src/main.js                    17B   2025-08-30T10:35:00  [new-in-source]
       >> file   config/db.yml                 15B   2025-08-30T10:00:00  [new-in-dest]
       """
@@ -110,7 +110,7 @@ Feature: Two-Phased Interactive Sync
       # Source: ./test_source
       # Destination: ./test_dest
       # Mode: one-way
-      
+
       << file   src/main.js                    17B   2025-08-30T10:35:00  [new-in-source]
       # << file   config/app.yml              13B   2025-08-30T10:30:00  [update: newer-in-source]
       """
@@ -154,7 +154,7 @@ Feature: Two-Phased Interactive Sync
       """
       # Invalid plan file
       invalid-command file test.txt
-      << 
+      <<
       >> file missing-size
       """
     When I run sync-tools with arguments "sync --apply-plan invalid.plan"

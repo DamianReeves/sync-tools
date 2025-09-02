@@ -93,7 +93,7 @@ sync-tools sync --source ~/data --dest /backup/data --ignore-src '*.tmp' --repor
 - `--mode` — `one-way` (default) or `two-way` sync
 - `--dry-run` — Preview changes without executing
 - `--ignore-src PATTERN` — Exclude patterns from source
-- `--ignore-dest PATTERN` — Exclude patterns from destination  
+- `--ignore-dest PATTERN` — Exclude patterns from destination
 - `--only PATTERN` — Whitelist mode (only sync matching patterns)
 - `--use-source-gitignore` — Import .gitignore as exclusion patterns
 - `--exclude-hidden-dirs` — Skip hidden directories (.git, .svn, etc.)
@@ -105,7 +105,7 @@ sync-tools sync --source ~/data --dest /backup/data --ignore-src '*.tmp' --repor
 - `--interactive` — Two-phased sync with plan generation
 - `-v, --verbose` — Increase verbosity
 
-=== syncfile command  
+=== syncfile command
 
 Execute declarative sync configurations using SyncFile format:
 
@@ -160,7 +160,7 @@ sync-tools provides sophisticated filtering capabilities using rsync-compatible 
 === Pattern Syntax
 
 - `*` — Match any characters except `/`
-- `?` — Match any single character except `/`  
+- `?` — Match any single character except `/`
 - `**` — Match any characters including `/` (recursive)
 - `trailing /` — Match directories only
 - `!pattern` — Explicit include (unignore)
@@ -206,7 +206,7 @@ sync-tools sync --source project/ --dest backup/ --use-source-gitignore
 # Exclude logs but include important.log
 sync-tools sync --source app/ --dest backup/ --ignore-src '*.log' --ignore-src '!important.log'
 
-# Sync only source code files  
+# Sync only source code files
 sync-tools sync --source project/ --dest backup/ --only '*.go' --only '*.js' --only '*.py'
 
 # Complex patterns with recursion
@@ -216,7 +216,7 @@ sync-tools sync --source data/ --dest backup/ --ignore-src '**/temp/**' --ignore
 
 sync-tools provides multiple output formats for sync operations:
 
-=== Markdown Reports  
+=== Markdown Reports
 
 Generate comprehensive markdown reports:
 
@@ -260,7 +260,7 @@ sync-tools sync --source project/ --dest backup/ --interactive
 
 This creates an editable plan file showing all operations, then allows you to:
 - Review and modify the sync plan
-- Exclude specific operations  
+- Exclude specific operations
 - Apply conflict resolution strategies
 - Execute the plan after editing
 
@@ -273,7 +273,7 @@ sync-tools sync --source local/ --dest remote/ --mode two-way
 ----
 
 Conflict resolution strategies:
-- `newest-wins` — Use the most recently modified file (default)  
+- `newest-wins` — Use the most recently modified file (default)
 - `largest-wins` — Use the larger file
 - `source-wins` — Always prefer source
 - `dest-wins` — Always prefer destination
@@ -289,7 +289,7 @@ The project includes comprehensive Behavior-Driven Development tests:
 # Run all BDD tests (must pass 100%)
 go test ./test/bdd -tags bdd -v
 
-# Run specific feature tests  
+# Run specific feature tests
 go test ./test/bdd -tags bdd -run 'APPEND'
 
 # Verify current test status
@@ -303,7 +303,7 @@ Current status: **57/57 scenarios passing (100% success rate)**
 Test functionality with a simple sync:
 
 ----
-# Create test directories  
+# Create test directories
 mkdir -p /tmp/test_sync/{source,dest}
 echo "test content" > /tmp/test_sync/source/file.txt
 
@@ -335,7 +335,7 @@ go build -o sync-tools ./cmd/sync-tools
 
 **Test Failures:**
 ----
-# Run specific test suite  
+# Run specific test suite
 go test ./test/bdd -tags bdd -run 'BasicSync'
 
 # Verbose output for debugging
@@ -352,7 +352,7 @@ go test ./test/bdd -tags bdd -v -run 'APPEND'
 
 === Getting Started
 
-----  
+----
 # Clone repository
 git clone https://github.com/DamianReeves/sync-tools.git
 cd sync-tools
@@ -368,7 +368,7 @@ go test ./test/bdd -tags bdd -v
 
 The project follows clean architecture principles:
 - **BDD/TDD Mandatory**: All features start with failing Gherkin scenarios
-- **Composition Over Inheritance**: Flexible, reusable components  
+- **Composition Over Inheritance**: Flexible, reusable components
 - **Testability First**: All components designed for testing
 - **PostSyncAction Framework**: Extensible action system
 

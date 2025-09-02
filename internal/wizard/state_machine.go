@@ -17,36 +17,62 @@ type ValidTransition interface {
 }
 
 // Define valid transition types as concrete structs
-type InitialToSourceSelection struct{ StateTransition[InitialState, SourceSelectionState] }
-type SourceToDestination struct{ StateTransition[SourceSelectionState, DestinationSelectionState] }
-type DestinationToSyncOptions struct{ StateTransition[DestinationSelectionState, SyncOptionsState] }
-type SyncOptionsToExclusion struct{ StateTransition[SyncOptionsState, ExclusionPatternsState] }
-type ExclusionToDirectoryFilter struct{ StateTransition[ExclusionPatternsState, DirectoryFilterState] }
-type DirectoryFilterToProgress struct{ StateTransition[DirectoryFilterState, ProgressState] }
-type ProgressToComplete struct{ StateTransition[ProgressState, CompleteState] }
+type InitialToSourceSelection struct {
+	StateTransition[InitialState, SourceSelectionState]
+}
+type SourceToDestination struct {
+	StateTransition[SourceSelectionState, DestinationSelectionState]
+}
+type DestinationToSyncOptions struct {
+	StateTransition[DestinationSelectionState, SyncOptionsState]
+}
+type SyncOptionsToExclusion struct {
+	StateTransition[SyncOptionsState, ExclusionPatternsState]
+}
+type ExclusionToDirectoryFilter struct {
+	StateTransition[ExclusionPatternsState, DirectoryFilterState]
+}
+type DirectoryFilterToProgress struct {
+	StateTransition[DirectoryFilterState, ProgressState]
+}
+type ProgressToComplete struct {
+	StateTransition[ProgressState, CompleteState]
+}
 
 // Back transitions for navigation
-type SourceToInitial struct{ StateTransition[SourceSelectionState, InitialState] }
-type DestinationToSource struct{ StateTransition[DestinationSelectionState, SourceSelectionState] }
-type SyncOptionsToDestination struct{ StateTransition[SyncOptionsState, DestinationSelectionState] }
-type ExclusionToSyncOptions struct{ StateTransition[ExclusionPatternsState, SyncOptionsState] }
-type DirectoryFilterToExclusion struct{ StateTransition[DirectoryFilterState, ExclusionPatternsState] }
-type ProgressToDirectoryFilter struct{ StateTransition[ProgressState, DirectoryFilterState] }
+type SourceToInitial struct {
+	StateTransition[SourceSelectionState, InitialState]
+}
+type DestinationToSource struct {
+	StateTransition[DestinationSelectionState, SourceSelectionState]
+}
+type SyncOptionsToDestination struct {
+	StateTransition[SyncOptionsState, DestinationSelectionState]
+}
+type ExclusionToSyncOptions struct {
+	StateTransition[ExclusionPatternsState, SyncOptionsState]
+}
+type DirectoryFilterToExclusion struct {
+	StateTransition[DirectoryFilterState, ExclusionPatternsState]
+}
+type ProgressToDirectoryFilter struct {
+	StateTransition[ProgressState, DirectoryFilterState]
+}
 
 // Implement ValidTransition interface for all valid transitions
-func (InitialToSourceSelection) isValidTransition()       {}
-func (SourceToDestination) isValidTransition()           {}
-func (DestinationToSyncOptions) isValidTransition()      {}
-func (SyncOptionsToExclusion) isValidTransition()        {}
-func (ExclusionToDirectoryFilter) isValidTransition()    {}
-func (DirectoryFilterToProgress) isValidTransition()     {}
-func (ProgressToComplete) isValidTransition()            {}
-func (SourceToInitial) isValidTransition()               {}
-func (DestinationToSource) isValidTransition()           {}
-func (SyncOptionsToDestination) isValidTransition()      {}
-func (ExclusionToSyncOptions) isValidTransition()        {}
-func (DirectoryFilterToExclusion) isValidTransition()    {}
-func (ProgressToDirectoryFilter) isValidTransition()     {}
+func (InitialToSourceSelection) isValidTransition()   {}
+func (SourceToDestination) isValidTransition()        {}
+func (DestinationToSyncOptions) isValidTransition()   {}
+func (SyncOptionsToExclusion) isValidTransition()     {}
+func (ExclusionToDirectoryFilter) isValidTransition() {}
+func (DirectoryFilterToProgress) isValidTransition()  {}
+func (ProgressToComplete) isValidTransition()         {}
+func (SourceToInitial) isValidTransition()            {}
+func (DestinationToSource) isValidTransition()        {}
+func (SyncOptionsToDestination) isValidTransition()   {}
+func (ExclusionToSyncOptions) isValidTransition()     {}
+func (DirectoryFilterToExclusion) isValidTransition() {}
+func (ProgressToDirectoryFilter) isValidTransition()  {}
 
 // StateMachine provides type-safe state transitions for the wizard
 type StateMachine struct {
@@ -362,7 +388,7 @@ func (ops *SourceSelectionOperations) SelectSource(sourcePath string) error {
 		Directories: []DirectoryInfo{},
 		Browser:     browser,
 	}
-	// Use type-safe transition method  
+	// Use type-safe transition method
 	return ops.sm.FromSourceToDestination(newState)
 }
 

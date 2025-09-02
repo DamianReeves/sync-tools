@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
           # Fetch all history for GoReleaser changelog generation
-          
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -31,16 +31,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y rsync
-          
+
       # Run comprehensive test suite before release
       - name: Run BDD tests (mandatory 100% pass rate)
         run: |
           go test ./test/bdd -tags bdd -v
-          
+
       - name: Run full test suite
         run: |
           go test ./...
-          
+
       - name: Verify build works
         run: |
           go build -o sync-tools ./cmd/sync-tools
@@ -58,7 +58,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Token for updating homebrew tap - needs to be set in repository secrets
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          
+
       # Post-release verification
       - name: Verify release artifacts
         if: success()

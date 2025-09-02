@@ -290,6 +290,79 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I can toggle selection with Space$`, tc.iCanToggleSelectionWithSpace)
 	ctx.Step(`^I can see totals: "([^"]*)"$`, tc.iCanSeeTotals)
 
+	// Help Modal steps
+	ctx.Step(`^I am in the sync wizard$`, tc.iAmInTheSyncWizard)
+	ctx.Step(`^I am on the source selection screen$`, tc.iAmOnTheSourceSelectionScreen)
+	ctx.Step(`^I press "([^"]*)" to open help$`, tc.iPressToOpenHelp)
+	ctx.Step(`^I should see the help modal displayed$`, tc.iShouldSeeTheHelpModalDisplayed)
+	ctx.Step(`^I should see "([^"]*)" in the help text$`, tc.iShouldSeeInTheHelpText)
+	ctx.Step(`^I should see navigation instructions in the help text$`, tc.iShouldSeeNavigationInstructionsInTheHelpText)
+	ctx.Step(`^I press any key to close help$`, tc.iPressAnyKeyToCloseHelp)
+	ctx.Step(`^I press "([^"]*)" to close help$`, tc.iPressToCloseHelp)
+	ctx.Step(`^the help modal should be closed$`, tc.theHelpModalShouldBeClosed)
+	ctx.Step(`^I should return to the source selection screen$`, tc.iShouldReturnToTheSourceSelectionScreen)
+	ctx.Step(`^I should still be able to navigate directories$`, tc.iShouldStillBeAbleToNavigateDirectories)
+	ctx.Step(`^I should be able to press "([^"]*)" to navigate down$`, tc.iShouldBeAbleToPressToNavigateDown)
+	ctx.Step(`^I should be able to press "([^"]*)" to navigate up$`, tc.iShouldBeAbleToPressToNavigateUp)
+	ctx.Step(`^I should be able to press "([^"]*)" to open manual path entry$`, tc.iShouldBeAbleToPressToOpenManualPathEntry)
+	ctx.Step(`^I press "([^"]*)" to open help again$`, tc.iPressToOpenHelpAgain)
+
+	// Welcome Screen steps
+	ctx.Step(`^I am on the welcome screen$`, tc.iAmOnTheWelcomeScreen)
+	ctx.Step(`^I press "([^"]*)" to start$`, tc.iPressToStart)
+	ctx.Step(`^I should be on the source selection screen$`, tc.iShouldBeOnTheSourceSelectionScreen)
+
+	// Manual Path Entry Dialog steps
+	ctx.Step(`^I press "([^"]*)" to open manual path entry$`, tc.iPressToOpenManualPathEntry)
+	ctx.Step(`^I should see the manual path entry dialog displayed$`, tc.iShouldSeeTheManualPathEntryDialogDisplayed)
+	ctx.Step(`^I should see a path input field$`, tc.iShouldSeeAPathInputField)
+	ctx.Step(`^I press "([^"]*)" to close the dialog$`, tc.iPressToCloseTheDialog)
+	ctx.Step(`^the manual path entry dialog should be closed$`, tc.theManualPathEntryDialogShouldBeClosed)
+	ctx.Step(`^I type "([^"]*)" in the path field$`, tc.iTypeInThePathField)
+	ctx.Step(`^I press "([^"]*)" to confirm$`, tc.iPressToConfirm)
+	ctx.Step(`^the current path should be updated to "([^"]*)"$`, tc.theCurrentPathShouldBeUpdatedTo)
+	ctx.Step(`^I should see an error message about invalid path$`, tc.iShouldSeeAnErrorMessageAboutInvalidPath)
+	ctx.Step(`^the dialog should remain open$`, tc.theDialogShouldRemainOpen)
+	ctx.Step(`^I type a very long path$`, tc.iTypeAVeryLongPath)
+	ctx.Step(`^the path display should be properly formatted$`, tc.thePathDisplayShouldBeProperlyFormatted)
+	ctx.Step(`^should not span multiple lines$`, tc.shouldNotSpanMultipleLines)
+	ctx.Step(`^should show the end of the path clearly$`, tc.shouldShowTheEndOfThePathClearly)
+
+	// Escape Key Handling steps
+	ctx.Step(`^I press "([^"]*)" to open home navigation$`, tc.iPressToOpenHomeNavigation)
+	ctx.Step(`^I should see the home navigation modal displayed$`, tc.iShouldSeeTheHomeNavigationModalDisplayed)
+	ctx.Step(`^I press "([^"]*)" to cancel navigation$`, tc.iPressToCancelNavigation)
+	ctx.Step(`^the home navigation modal should be closed$`, tc.theHomeNavigationModalShouldBeClosed)
+	ctx.Step(`^I press "([^"]*)" to select bookmark$`, tc.iPressToSelectBookmark)
+	ctx.Step(`^the selected path should be applied$`, tc.theSelectedPathShouldBeApplied)
+
+	// Path Separator Support steps
+	ctx.Step(`^the path input should contain "([^"]*)"$`, tc.thePathInputShouldContain)
+	ctx.Step(`^I build path character by character "([^"]*)"$`, tc.iBuildPathCharacterByCharacter)
+	ctx.Step(`^I press "([^"]*)" for home directory$`, tc.iPressForHomeDirectory)
+	ctx.Step(`^the path input should be set to the home directory$`, tc.thePathInputShouldBeSetToTheHomeDirectory)
+	ctx.Step(`^the path should be extended with "([^"]*)"$`, tc.thePathShouldBeExtendedWith)
+
+	// Shortcut Character Conflict steps
+	ctx.Step(`^the path should be shortened$`, tc.thePathShouldBeShortened)
+	ctx.Step(`^I press "([^"]*)" to remove character$`, tc.iPressToRemoveCharacter)
+	ctx.Step(`^I press "([^"]*)" to clear path$`, tc.iPressToClearPath)
+	ctx.Step(`^the path input should be empty$`, tc.thePathInputShouldBeEmpty)
+
+	// Directory creation steps
+	ctx.Step(`^I should see a directory creation prompt$`, tc.iShouldSeeADirectoryCreationPrompt)
+	ctx.Step(`^I press "([^"]*)" to confirm directory creation$`, tc.iPressToConfirmDirectoryCreation)
+	ctx.Step(`^the directory should be created$`, tc.theDirectoryShouldBeCreated)
+	ctx.Step(`^I should proceed to the next step$`, tc.iShouldProceedToTheNextStep)
+	ctx.Step(`^I press "([^"]*)" to decline directory creation$`, tc.iPressToDeclineDirectoryCreation)
+	ctx.Step(`^I should be back in manual path entry$`, tc.iShouldBeBackInManualPathEntry)
+	ctx.Step(`^I should be back to directory selection$`, tc.iShouldBeBackToDirectorySelection)
+	ctx.Step(`^no directory should be created$`, tc.noDirectoryShouldBeCreated)
+	ctx.Step(`^I should see an error about directory creation failure$`, tc.iShouldSeeAnErrorAboutDirectoryCreationFailure)
+	ctx.Step(`^I should remain on the current screen$`, tc.iShouldRemainOnTheCurrentScreen)
+	ctx.Step(`^I press "([^"]*)" to cancel$`, tc.iPressToCancel)
+	ctx.Step(`^the path field should contain "([^"]*)"$`, tc.thePathFieldShouldContain)
+
 	// Setup and cleanup hooks
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return tc.beforeScenario(ctx, sc)

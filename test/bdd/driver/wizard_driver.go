@@ -29,22 +29,22 @@ type WizardScenarioBuilder interface {
 	// Source configuration
 	WithSource(path string) WizardScenarioBuilder
 	WithSourceFiles(files map[string]string) WizardScenarioBuilder
-	
+
 	// Destination configuration
 	WithDestination(path string) WizardScenarioBuilder
 	WithDestinationFiles(files map[string]string) WizardScenarioBuilder
-	
+
 	// Wizard configuration
 	WithMode(mode string) WizardScenarioBuilder
 	WithExclusionPatterns(patterns ...string) WizardScenarioBuilder
 	WithGitIgnoreEnabled() WizardScenarioBuilder
 	WithDryRun() WizardScenarioBuilder
-	
+
 	// Test expectations
 	ExpectSuccess() WizardScenarioBuilder
 	ExpectFailure(expectedError string) WizardScenarioBuilder
 	ExpectSyncFileContaining(content string) WizardScenarioBuilder
-	
+
 	// Execution
 	Execute() *WizardResult
 	ExecuteInTestMode() *WizardResult
@@ -101,9 +101,9 @@ func (d *wizardDriver) NewScenario() WizardScenarioBuilder {
 
 // wizardScenarioBuilder implements WizardScenarioBuilder
 type wizardScenarioBuilder struct {
-	driver            *wizardDriver
-	state             WizardTestState
-	
+	driver *wizardDriver
+	state  WizardTestState
+
 	// Configuration
 	sourcePath        string
 	destinationPath   string
@@ -111,11 +111,11 @@ type wizardScenarioBuilder struct {
 	exclusionPatterns []string
 	gitIgnoreEnabled  bool
 	dryRun            bool
-	
+
 	// File setup
 	sourceFiles      map[string]string
 	destinationFiles map[string]string
-	
+
 	// Expectations
 	expectations []expectation
 }
@@ -199,10 +199,10 @@ func (b *wizardScenarioBuilder) Execute() *WizardResult {
 		PrefilledSource: b.sourcePath,
 		PrefilledMode:   b.mode,
 	}
-	
+
 	result := b.driver.StartWizardWithConfig(config)
 	b.state = WizardTestStateExecuted
-	
+
 	// Validate expectations
 	for _, exp := range b.expectations {
 		switch exp.expectType {
@@ -223,7 +223,7 @@ func (b *wizardScenarioBuilder) Execute() *WizardResult {
 			}
 		}
 	}
-	
+
 	b.state = WizardTestStateValidated
 	return result
 }
@@ -238,10 +238,10 @@ func (b *wizardScenarioBuilder) ExecuteInTestMode() *WizardResult {
 		EnableGitIgnore:   b.gitIgnoreEnabled,
 		DryRun:            b.dryRun,
 	}
-	
+
 	result := b.driver.GenerateSyncFile(testOptions)
 	b.state = WizardTestStateExecuted
-	
+
 	// Validate expectations
 	for _, exp := range b.expectations {
 		switch exp.expectType {
@@ -262,7 +262,7 @@ func (b *wizardScenarioBuilder) ExecuteInTestMode() *WizardResult {
 			}
 		}
 	}
-	
+
 	b.state = WizardTestStateValidated
 	return result
 }

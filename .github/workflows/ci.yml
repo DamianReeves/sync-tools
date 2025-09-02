@@ -11,15 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.25'
-          
+
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y rsync
-        
+
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -27,64 +27,64 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-            
+
       - name: Download dependencies
         run: go mod download
-        
+
       - name: Verify dependencies
         run: go mod verify
-        
+
       - name: Run tests
         run: make test
-        
+
       - name: Run checks
         run: make check
-        
+
   build:
     runs-on: ubuntu-latest
     needs: test
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.25'
-          
-      - name: Install system dependencies  
+
+      - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y rsync
-        
+
       - name: Build binary
         run: make build
-        
+
       - name: Test basic functionality
         run: |
           mkdir -p test_src test_dst
           echo "Test file" > test_src/test.txt
           ./sync-tools sync --source test_src --dest test_dst --dry-run -v
-          
+
       - name: Test SyncFile functionality
         run: |
           echo "VAR SRC=test_src" > TestSyncFile
-          echo "VAR DST=test_dst" >> TestSyncFile  
+          echo "VAR DST=test_dst" >> TestSyncFile
           echo "SYNC \${SRC} \${DST}" >> TestSyncFile
           echo "DRYRUN true" >> TestSyncFile
           ./sync-tools syncfile TestSyncFile --list
-          
+
   cross-compile:
     runs-on: ubuntu-latest
     needs: test
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.25'
-          
+
       - name: Cross-compile for multiple platforms
         run: make build-all
-        
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:

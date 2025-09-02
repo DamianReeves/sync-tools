@@ -10,7 +10,7 @@ A powerful Go CLI wrapper around rsync that provides fast directory synchronizat
 
 ### 🎯 **Core Synchronization**
 - **Fast Directory Synchronization**: Built on rsync for efficient file transfers
-- **Advanced Filtering**: Support for `.syncignore` files, `.gitignore` import, and CLI overrides  
+- **Advanced Filtering**: Support for `.syncignore` files, `.gitignore` import, and CLI overrides
 - **Whitelist Mode**: Explicit path inclusion with "only" patterns for precise sync control
 - **Conflict Resolution**: Multiple strategies including newest-wins, oldest-wins, and interactive
 
@@ -56,7 +56,10 @@ go build -o sync-tools ./cmd/sync-tools
 
 ## Quick Start
 
-### Interactive Wizard (Recommended for New Users)
+### Interactive Wizard (Experimental)
+
+Note: The interactive wizard is experimental and disabled by default.
+Enable it by setting the environment variable `SYNC_TOOLS_ENABLE_WIZARD=1`.
 
 ```bash
 # Launch the interactive wizard
@@ -65,7 +68,7 @@ sync-tools wizard
 # Start wizard with a pre-filled source directory
 sync-tools wizard --source ./my-project
 
-# Quick test mode (non-interactive) 
+# Quick test mode (non-interactive)
 sync-tools wizard --source ./src --mode two-way --test
 ```
 
@@ -100,7 +103,7 @@ echo "*.tmp" > .syncignore
 echo "node_modules/" >> .syncignore
 sync-tools sync --source . --dest ../backup
 
-# Import .gitignore patterns  
+# Import .gitignore patterns
 sync-tools sync --source . --dest ../backup --gitignore
 
 # Whitelist mode - only sync specific patterns
@@ -155,7 +158,7 @@ node_modules/
 # Variables
 VAR NAME=value
 
-# Sync operations  
+# Sync operations
 SYNC source destination
 MODE one-way|two-way
 GITIGNORE true|false
@@ -186,7 +189,7 @@ PREPEND file content
 ### Sync Options
 
 - `--source, -s` - Source directory path
-- `--dest, -d` - Destination directory path  
+- `--dest, -d` - Destination directory path
 - `--mode` - Sync mode: one-way (default) or two-way
 - `--dry-run` - Preview changes without executing
 - `--interactive, -i` - Interactive mode with confirmations
@@ -265,7 +268,7 @@ make release-dry
 sync-tools is built with a modular architecture focusing on:
 
 - **Testability**: All components designed with testing as a first-class concern
-- **Composition**: Flexible, reusable components over complex hierarchies  
+- **Composition**: Flexible, reusable components over complex hierarchies
 - **BDD/TDD Discipline**: Comprehensive test coverage with executable specifications
 - **Integration Boundaries**: Clear separation between core logic and external systems
 
@@ -303,6 +306,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 **Target Users:**
 - **DevOps Engineers**: Automated deployment and backup workflows
-- **Developers**: Multi-environment file synchronization  
+- **Developers**: Multi-environment file synchronization
 - **System Administrators**: Large-scale directory management
 - **Data Managers**: Precise inclusion/exclusion control for data sync

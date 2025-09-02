@@ -221,7 +221,7 @@ func (c ComplianceScenarios) AuditSync(sourceDir, destDir string) *wizard.TestMo
 		WithSourceDir(sourceDir).
 		WithDestinationDir(destDir).
 		WithMode("one-way").
-		WithDryRun(true). // Compliance always requires dry-run first
+		WithDryRun(true).     // Compliance always requires dry-run first
 		WithGitIgnore(false). // Include all files for compliance
 		Build()
 }
@@ -332,7 +332,7 @@ func (s *stageConfigBuilder) Build() *wizard.TestModeOptions {
 		s.current = NewWizardConfig().(*wizardConfigBuilder)
 	}
 	result := s.current.Build()
-	
+
 	// Add to parent's stages
 	if len(s.parent.stages) <= s.stageIndex {
 		// Extend slice if needed
@@ -341,7 +341,7 @@ func (s *stageConfigBuilder) Build() *wizard.TestModeOptions {
 		}
 	}
 	s.parent.stages[s.stageIndex] = result
-	
+
 	return result
 }
 

@@ -21,16 +21,16 @@ This is a convenience command that automatically uses the current directory as t
 Examples:
   # Sync from a source to current directory
   sync-tools sync from ~/projects/myapp
-  
+
   # With dry-run to preview changes
   sync-tools sync from ~/backup --dry-run
-  
+
   # With markdown report
   sync-tools sync from ~/data --report sync_report.md
-  
+
   # With filters
   sync-tools sync from ~/source --only "*.go" --exclude-hidden-dirs
-  
+
   # Preview changes with colored diff
   sync-tools sync from ~/documents --preview`,
 	Args: cobra.ExactArgs(1),

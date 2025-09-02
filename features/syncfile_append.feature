@@ -15,7 +15,7 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       SYNC ../source ../dest
       APPEND config/app.yml:
-        
+
         # Production configuration
         production:
           debug: false
@@ -28,7 +28,7 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       app_name: myapp
       port: 8080
-      
+
       # Production configuration
       production:
         debug: false
@@ -38,7 +38,7 @@ Feature: SyncFile APPEND Post-Sync Action
   Scenario: Append content from external file
     Given I have a file "footer.yml" containing:
       """
-      
+
       # Auto-generated footer
       build_time: ${BUILD_TIME}
       version: ${APP_VERSION}
@@ -54,7 +54,7 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       app_name: myapp
       port: 8080
-      
+
       # Auto-generated footer
       build_time: ${BUILD_TIME}
       version: ${APP_VERSION}
@@ -65,11 +65,11 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       SYNC ../source ../dest
       APPEND config/app.yml:
-        
+
         environment: production
       END APPEND
       APPEND src/main.js:
-        
+
         module.exports = app;
       END APPEND
       """
@@ -79,13 +79,13 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       app_name: myapp
       port: 8080
-      
+
       environment: production
       """
     And the destination directory should contain "src/main.js" with content:
       """
       console.log('hello');
-      
+
       module.exports = app;
       """
 
@@ -94,7 +94,7 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       SYNC ../source ../dest
       APPEND --backup config/app.yml:
-        
+
         backup_test: true
       END APPEND
       """
@@ -104,7 +104,7 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       app_name: myapp
       port: 8080
-      
+
       backup_test: true
       """
     And a backup file matching pattern "config/app.yml.backup*" should exist in destination
@@ -114,7 +114,7 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       SYNC ../source ../dest
       APPEND nonexistent/config.yml:
-        
+
         test: value
       END APPEND
       """
@@ -127,12 +127,12 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       SYNC ../source ../dest
       APPEND config/app.yml:
-        
+
         # First append
         stage: development
       END APPEND
       APPEND config/app.yml:
-        
+
         # Second append
         debug: true
       END APPEND
@@ -143,10 +143,10 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       app_name: myapp
       port: 8080
-      
+
       # First append
       stage: development
-      
+
       # Second append
       debug: true
       """
@@ -156,7 +156,7 @@ Feature: SyncFile APPEND Post-Sync Action
       """
       SYNC ../source ../dest
       APPEND --dry-run config/app.yml:
-        
+
         dry_run_test: true
       END APPEND
       """

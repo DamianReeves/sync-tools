@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/DamianReeves/sync-tools/internal/wizard"
 	"github.com/spf13/cobra"
@@ -30,6 +32,8 @@ var (
 )
 
 func init() {
+	// Hide command from help unless explicitly enabled via env var
+	wizardCmd.Hidden = !isWizardEnabled()
 	rootCmd.AddCommand(wizardCmd)
 
 	// Optional pre-fill flags
@@ -39,6 +43,10 @@ func init() {
 }
 
 func runWizard(cmd *cobra.Command, args []string) error {
+	// Gate interactive execution behind feature flag. Allow --test regardless.
+	if !flagWizardTest && !isWizardEnabled() {
+		return fmt.Errorf("wizard is disabled by default. Set SYNC_TOOLS_ENABLE_WIZARD=1 to enable.")
+	}
 	// Create wizard configuration
 	config := &wizard.Config{
 		PrefilledSource: flagWizardSource,
@@ -74,4 +82,16 @@ func runWizard(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// isWizardEnabled returns true if the wizard feature flag is enabled.
+func isWizardEnabled() bool {
+	v := strings.TrimSpace(os.Getenv("SYNC_TOOLS_ENABLE_WIZARD"))
+	v = strings.ToLower(v)
+	switch v {
+	case "1", "true", "yes", "on", "enabled":
+		return true
+	default:
+		return false
+	}
 }

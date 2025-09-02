@@ -2,6 +2,7 @@ package wizard
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -33,9 +34,10 @@ var (
 			Foreground(lipgloss.Color("#626262"))
 )
 
-// BubbleTeaModel wraps StateMachine for Bubble Tea
+// BubbleTeaModel wraps StateMachine and UI state for Bubble Tea
 type BubbleTeaModel struct {
 	StateMachine *StateMachine
+	UIState      *WizardUIState
 	Config       *Config
 	Error        string
 	quitting     bool
@@ -45,7 +47,11 @@ type BubbleTeaModel struct {
 func NewBubbleTeaModel(stateMachine *StateMachine, config *Config) *BubbleTeaModel {
 	return &BubbleTeaModel{
 		StateMachine: stateMachine,
-		Config:       config,
+		UIState: &WizardUIState{
+			DomainState: stateMachine.CurrentState(),
+			ModalStack:  []Modal{},
+		},
+		Config: config,
 	}
 }
 
@@ -64,10 +70,53 @@ func (m *BubbleTeaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "?", "h":
-			// TODO: Show help screen
+			// Show context-specific help modal
+			helpModal := NewHelpModal(m.UIState.DomainState)
+			m.UIState.PushModal(helpModal)
 			return m, nil
 
 		default:
+			// Check if we have active modals
+			if activeModal := m.UIState.ActiveModal(); activeModal != nil {
+				newModal, cmd, handled := activeModal.HandleInput(msg)
+				if handled {
+					if newModal == activeModal {
+						// Modal handled input but is still active
+						return m, cmd
+					} else {
+						// Modal completed or changed - pop it and update domain state
+						poppedModal := m.UIState.PopModal()
+						if poppedModal != nil {
+							// Check if this was a DirectoryCreationModal that confirmed creation
+							if creationModal, ok := poppedModal.(*DirectoryCreationModal); ok && creationModal.ShouldCreateDirectory() {
+								// Create the directory
+								targetPath := creationModal.GetTargetPath()
+								if err := m.createDirectory(targetPath); err != nil {
+									m.Error = fmt.Sprintf("Failed to create directory: %v", err)
+									return m, nil
+								}
+								// Successfully created - update the state with the new path
+								if err := m.selectPath(targetPath); err != nil {
+									m.Error = fmt.Sprintf("Failed to select created directory: %v", err)
+									return m, nil
+								}
+							} else {
+								// Update domain state with modal's base state for other modals
+								m.UIState.DomainState = poppedModal.BaseState()
+								m.StateMachine.currentState = m.UIState.DomainState
+							}
+
+							// If we have a new modal to show, push it
+							if newModal != nil {
+								m.UIState.PushModal(newModal)
+							}
+						}
+						return m, cmd
+					}
+				}
+			}
+
+			// No modal handled it, pass to state-specific handling
 			return m.handleStateSpecificKeys(msg)
 		}
 
@@ -98,17 +147,27 @@ func (m *BubbleTeaModel) View() string {
 	}
 
 	// Render state-specific content
-	content.WriteString(m.renderCurrentState())
+	baseContent := m.renderCurrentState()
+	content.WriteString(baseContent)
 
-	// Help text
-	content.WriteString("\n" + helpStyle.Render("Press 'q' to quit, '?' for help"))
+	// Help text (only show if no modals are active)
+	if !m.UIState.HasModals() {
+		content.WriteString("\n" + helpStyle.Render("Press 'q' to quit, '?' for help"))
+	}
 
-	return content.String()
+	finalContent := content.String()
+
+	// Render active modal on top
+	if activeModal := m.UIState.ActiveModal(); activeModal != nil {
+		finalContent = activeModal.Render(finalContent)
+	}
+
+	return finalContent
 }
 
 // renderCurrentState renders the UI for the current state
 func (m *BubbleTeaModel) renderCurrentState() string {
-	currentState := m.StateMachine.CurrentState()
+	currentState := m.UIState.DomainState
 	switch state := currentState.(type) {
 	case InitialState:
 		return m.renderInitialState()
@@ -133,7 +192,7 @@ func (m *BubbleTeaModel) renderCurrentState() string {
 
 // handleStateSpecificKeys handles keyboard input based on current state
 func (m *BubbleTeaModel) handleStateSpecificKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	currentState := m.StateMachine.CurrentState()
+	currentState := m.UIState.DomainState
 	switch state := currentState.(type) {
 	case InitialState:
 		return m.handleInitialStateKeys(msg)
@@ -172,22 +231,26 @@ func (m *BubbleTeaModel) renderSourceSelectionState(state SourceSelectionState) 
 	content.WriteString(headerStyle.Render("Select source directory"))
 	content.WriteString("\n\n")
 
-	// Initialize directory browser if not exists
+	// Browser mode
 	if state.Browser == nil {
-		// This should be handled in the state initialization
 		content.WriteString("Initializing directory browser...\n")
 		return content.String()
 	}
 
 	content.WriteString(fmt.Sprintf("Current path: %s\n\n", state.Browser.GetCurrentPath()))
 
-	// Render directory entries
-	entries := state.Browser.GetEntries()
-	selectedIndex := state.Browser.GetSelectedIndex()
+	// Show scroll indicators
+	if state.Browser.HasMoreAbove() {
+		content.WriteString(helpStyle.Render("    ↑ More entries above...\n"))
+	}
 
-	for i, entry := range entries {
+	// Render visible directory entries only
+	visibleEntries := state.Browser.GetVisibleEntries()
+	visibleSelectedIndex := state.Browser.GetVisibleSelectedIndex()
+
+	for i, entry := range visibleEntries {
 		prefix := "  "
-		if i == selectedIndex {
+		if i == visibleSelectedIndex {
 			prefix = "▶ "
 		}
 
@@ -206,8 +269,13 @@ func (m *BubbleTeaModel) renderSourceSelectionState(state SourceSelectionState) 
 		content.WriteString(fmt.Sprintf("%s%s %s%s\n", prefix, icon, entry.Name, sizeInfo))
 	}
 
+	// Show scroll indicators
+	if state.Browser.HasMoreBelow() {
+		content.WriteString(helpStyle.Render("    ↓ More entries below...\n"))
+	}
+
 	content.WriteString("\n")
-	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter directory, ←: Go up, Enter: Select, Esc: Cancel"))
+	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter, ←: Up, Enter: Select, t: Type path, ~: Home, 1-9: Quick nav"))
 	return content.String()
 }
 
@@ -219,7 +287,7 @@ func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelect
 
 	content.WriteString(fmt.Sprintf("Source: %s\n", state.SourcePath))
 
-	// Initialize directory browser if not exists
+	// Browser mode
 	if state.Browser == nil {
 		content.WriteString("Initializing directory browser...\n")
 		return content.String()
@@ -227,13 +295,18 @@ func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelect
 
 	content.WriteString(fmt.Sprintf("Current path: %s\n\n", state.Browser.GetCurrentPath()))
 
-	// Render directory entries
-	entries := state.Browser.GetEntries()
-	selectedIndex := state.Browser.GetSelectedIndex()
+	// Show scroll indicators
+	if state.Browser.HasMoreAbove() {
+		content.WriteString(helpStyle.Render("    ↑ More entries above...\n"))
+	}
 
-	for i, entry := range entries {
+	// Render visible directory entries only
+	visibleEntries := state.Browser.GetVisibleEntries()
+	visibleSelectedIndex := state.Browser.GetVisibleSelectedIndex()
+
+	for i, entry := range visibleEntries {
 		prefix := "  "
-		if i == selectedIndex {
+		if i == visibleSelectedIndex {
 			prefix = "▶ "
 		}
 
@@ -252,8 +325,13 @@ func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelect
 		content.WriteString(fmt.Sprintf("%s%s %s%s\n", prefix, icon, entry.Name, sizeInfo))
 	}
 
+	// Show scroll indicators
+	if state.Browser.HasMoreBelow() {
+		content.WriteString(helpStyle.Render("    ↓ More entries below...\n"))
+	}
+
 	content.WriteString("\n")
-	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter directory, ←: Go up, Enter: Select, Esc: Back"))
+	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter, ←: Up, Enter: Select, t: Type path, ~: Home, 1-9: Quick nav"))
 	return content.String()
 }
 
@@ -385,6 +463,9 @@ func (m *BubbleTeaModel) handleInitialStateKeys(msg tea.KeyMsg) (tea.Model, tea.
 		if ops, err := m.StateMachine.GetInitialOperations(); err == nil {
 			if err := ops.StartSourceSelection(); err != nil {
 				m.Error = fmt.Sprintf("Failed to start source selection: %v", err)
+			} else {
+				// Sync the state machine's current state to the UI state
+				m.UIState.DomainState = m.StateMachine.CurrentState()
 			}
 		}
 	}
@@ -395,31 +476,54 @@ func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceS
 	if state.Browser == nil {
 		// Initialize browser if missing
 		state.Browser = NewDirectoryBrowser(state.CurrentPath)
-		// Update the state in the state machine
-		_ = m.StateMachine.TransitionTo(state)
+		m.UIState.DomainState = state
+		m.StateMachine.currentState = state
 		return m, nil
 	}
 
 	switch msg.String() {
 	case "up", "k":
 		state.Browser.MoveUp()
-		_ = m.StateMachine.TransitionTo(state)
+		m.UIState.DomainState = state
+		m.StateMachine.currentState = state
 
 	case "down", "j":
 		state.Browser.MoveDown()
-		_ = m.StateMachine.TransitionTo(state)
+		m.UIState.DomainState = state
+		m.StateMachine.currentState = state
 
 	case "right", "l":
 		// Enter selected directory
 		if state.Browser.EnterDirectory() {
-			_ = m.StateMachine.TransitionTo(state)
+			state.CurrentPath = state.Browser.GetCurrentPath()
+			m.UIState.DomainState = state
+			m.StateMachine.currentState = state
 		}
 
 	case "left", "h":
 		// Go to parent directory
 		if state.Browser.GoUp() {
-			_ = m.StateMachine.TransitionTo(state)
+			state.CurrentPath = state.Browser.GetCurrentPath()
+			m.UIState.DomainState = state
+			m.StateMachine.currentState = state
 		}
+
+	case "t":
+		// Open manual path entry modal
+		pathModal := NewManualPathEntryModal(state, state.Browser.GetCurrentPath())
+		m.UIState.PushModal(pathModal)
+
+	case "~":
+		// Open home navigation modal
+		homeModal := NewHomeNavigationModal(state)
+		m.UIState.PushModal(homeModal)
+
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		// Quick home navigation modal with number selection
+		homeModal := NewHomeNavigationModal(state)
+		// Simulate the number key press in the modal
+		homeModal.HandleInput(msg)
+		m.UIState.PushModal(homeModal)
 
 	case "enter":
 		// Select current directory as source using type-safe operations
@@ -427,6 +531,9 @@ func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceS
 		if ops, err := m.StateMachine.GetSourceSelectionOperations(); err == nil {
 			if err := ops.SelectSource(selectedPath); err != nil {
 				m.Error = fmt.Sprintf("Failed to select source: %v", err)
+			} else {
+				// Update UI state with new domain state
+				m.UIState.DomainState = m.StateMachine.CurrentState()
 			}
 		}
 
@@ -434,6 +541,7 @@ func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceS
 		// Navigate back using state machine
 		if m.StateMachine.CanGoBack() {
 			_ = m.StateMachine.GoBack()
+			m.UIState.DomainState = m.StateMachine.CurrentState()
 		}
 	}
 	return m, nil
@@ -443,30 +551,54 @@ func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state De
 	if state.Browser == nil {
 		// Initialize browser if missing
 		state.Browser = NewDirectoryBrowser(state.CurrentPath)
-		_ = m.StateMachine.TransitionTo(state)
+		m.UIState.DomainState = state
+		m.StateMachine.currentState = state
 		return m, nil
 	}
 
 	switch msg.String() {
 	case "up", "k":
 		state.Browser.MoveUp()
-		_ = m.StateMachine.TransitionTo(state)
+		m.UIState.DomainState = state
+		m.StateMachine.currentState = state
 
 	case "down", "j":
 		state.Browser.MoveDown()
-		_ = m.StateMachine.TransitionTo(state)
+		m.UIState.DomainState = state
+		m.StateMachine.currentState = state
 
 	case "right", "l":
 		// Enter selected directory
 		if state.Browser.EnterDirectory() {
-			_ = m.StateMachine.TransitionTo(state)
+			state.CurrentPath = state.Browser.GetCurrentPath()
+			m.UIState.DomainState = state
+			m.StateMachine.currentState = state
 		}
 
 	case "left", "h":
 		// Go to parent directory
 		if state.Browser.GoUp() {
-			_ = m.StateMachine.TransitionTo(state)
+			state.CurrentPath = state.Browser.GetCurrentPath()
+			m.UIState.DomainState = state
+			m.StateMachine.currentState = state
 		}
+
+	case "t":
+		// Open manual path entry modal
+		pathModal := NewManualPathEntryModal(state, state.Browser.GetCurrentPath())
+		m.UIState.PushModal(pathModal)
+
+	case "~":
+		// Open home navigation modal
+		homeModal := NewHomeNavigationModal(state)
+		m.UIState.PushModal(homeModal)
+
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		// Quick home navigation modal with number selection
+		homeModal := NewHomeNavigationModal(state)
+		// Simulate the number key press in the modal
+		homeModal.HandleInput(msg)
+		m.UIState.PushModal(homeModal)
 
 	case "enter":
 		// Select current directory as destination using type-safe operations
@@ -474,6 +606,9 @@ func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state De
 		if ops, err := m.StateMachine.GetDestinationSelectionOperations(); err == nil {
 			if err := ops.SelectDestination(selectedPath); err != nil {
 				m.Error = fmt.Sprintf("Failed to select destination: %v", err)
+			} else {
+				// Update UI state with new domain state
+				m.UIState.DomainState = m.StateMachine.CurrentState()
 			}
 		}
 
@@ -481,6 +616,7 @@ func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state De
 		// Navigate back using state machine
 		if m.StateMachine.CanGoBack() {
 			_ = m.StateMachine.GoBack()
+			m.UIState.DomainState = m.StateMachine.CurrentState()
 		}
 	}
 	return m, nil
@@ -616,11 +752,48 @@ func (m *BubbleTeaModel) handleProgressKeys(msg tea.KeyMsg, state ProgressState)
 	return m, nil
 }
 
-func (m *BubbleTeaModel) handleCompleteKeys(msg tea.KeyMsg, state CompleteState) (tea.Model, tea.Cmd) {
+func (m *BubbleTeaModel) handleCompleteKeys(msg tea.KeyMsg, _ CompleteState) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.quitting = true
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+// createDirectory creates the specified directory and all parent directories
+func (m *BubbleTeaModel) createDirectory(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+// selectPath selects the given path as the current selection for the active state
+func (m *BubbleTeaModel) selectPath(path string) error {
+	switch m.UIState.DomainState.(type) {
+	case SourceSelectionState:
+		// Select as source
+		if ops, err := m.StateMachine.GetSourceSelectionOperations(); err == nil {
+			if err := ops.SelectSource(path); err != nil {
+				return fmt.Errorf("failed to select source: %v", err)
+			}
+			// Update UI state with new domain state
+			m.UIState.DomainState = m.StateMachine.CurrentState()
+			return nil
+		}
+		return fmt.Errorf("failed to get source selection operations")
+
+	case DestinationSelectionState:
+		// Select as destination
+		if ops, err := m.StateMachine.GetDestinationSelectionOperations(); err == nil {
+			if err := ops.SelectDestination(path); err != nil {
+				return fmt.Errorf("failed to select destination: %v", err)
+			}
+			// Update UI state with new domain state
+			m.UIState.DomainState = m.StateMachine.CurrentState()
+			return nil
+		}
+		return fmt.Errorf("failed to get destination selection operations")
+
+	default:
+		return fmt.Errorf("directory selection not supported in current state")
+	}
 }

@@ -66,7 +66,7 @@ Feature: Interactive Wizard
 
   Scenario: Directory filter selection with statistics
     Given I start the interactive wizard
-    And I have selected source and destination directories  
+    And I have selected source and destination directories
     When I navigate to the directory filter screen
     Then I should see directory list:
       | directory | files | size | selected |
@@ -95,7 +95,7 @@ Feature: Interactive Wizard
   Scenario: Complete wizard flow generates SyncFile
     Given I start the interactive wizard
     And I select source directory "./test_source"
-    And I select destination directory "./test_dest"  
+    And I select destination directory "./test_dest"
     And I configure sync mode as "two-way"
     And I add exclusion pattern "*.tmp"
     And I enable "Use Git Ignore"
@@ -120,7 +120,7 @@ Feature: Interactive Wizard
     Then the sync mode should still be "two-way"
     And all previously configured options should be preserved
 
-  Scenario: Wizard handles errors gracefully  
+  Scenario: Wizard handles errors gracefully
     Given I start the interactive wizard
     When I select a non-existent source directory "/nonexistent/path"
     Then I should see error message "Directory does not exist: /nonexistent/path"
