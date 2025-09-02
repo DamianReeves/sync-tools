@@ -56,7 +56,10 @@ go build -o sync-tools ./cmd/sync-tools
 
 ## Quick Start
 
-### Interactive Wizard (Recommended for New Users)
+### Interactive Wizard (Experimental)
+
+Note: The interactive wizard is experimental and disabled by default.
+Enable it by setting the environment variable `SYNC_TOOLS_ENABLE_WIZARD=1`.
 
 ```bash
 # Launch the interactive wizard
