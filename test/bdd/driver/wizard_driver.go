@@ -19,7 +19,46 @@ type WizardDriver interface {
 	// Configuration helpers
 	SetWorkingDir(dir string)
 	LastResult() *WizardResult
+
+	// Fluent API builders
+	NewScenario() WizardScenarioBuilder
 }
+
+// WizardScenarioBuilder provides a fluent API for building complex wizard test scenarios
+type WizardScenarioBuilder interface {
+	// Source configuration
+	WithSource(path string) WizardScenarioBuilder
+	WithSourceFiles(files map[string]string) WizardScenarioBuilder
+	
+	// Destination configuration
+	WithDestination(path string) WizardScenarioBuilder
+	WithDestinationFiles(files map[string]string) WizardScenarioBuilder
+	
+	// Wizard configuration
+	WithMode(mode string) WizardScenarioBuilder
+	WithExclusionPatterns(patterns ...string) WizardScenarioBuilder
+	WithGitIgnoreEnabled() WizardScenarioBuilder
+	WithDryRun() WizardScenarioBuilder
+	
+	// Test expectations
+	ExpectSuccess() WizardScenarioBuilder
+	ExpectFailure(expectedError string) WizardScenarioBuilder
+	ExpectSyncFileContaining(content string) WizardScenarioBuilder
+	
+	// Execution
+	Execute() *WizardResult
+	ExecuteInTestMode() *WizardResult
+}
+
+// Type-safe wizard states for better testing
+type WizardTestState int
+
+const (
+	WizardTestStateInitial WizardTestState = iota
+	WizardTestStateConfigured
+	WizardTestStateExecuted
+	WizardTestStateValidated
+)
 
 // WizardResult represents the result of a wizard operation
 type WizardResult struct {
@@ -46,6 +85,186 @@ func (d *wizardDriver) SetWorkingDir(dir string) {
 
 func (d *wizardDriver) LastResult() *WizardResult {
 	return d.lastResult
+}
+
+func (d *wizardDriver) NewScenario() WizardScenarioBuilder {
+	return &wizardScenarioBuilder{
+		driver:            d,
+		state:             WizardTestStateInitial,
+		mode:              "one-way", // default
+		exclusionPatterns: make([]string, 0),
+		sourceFiles:       make(map[string]string),
+		destinationFiles:  make(map[string]string),
+		expectations:      make([]expectation, 0),
+	}
+}
+
+// wizardScenarioBuilder implements WizardScenarioBuilder
+type wizardScenarioBuilder struct {
+	driver            *wizardDriver
+	state             WizardTestState
+	
+	// Configuration
+	sourcePath        string
+	destinationPath   string
+	mode              string
+	exclusionPatterns []string
+	gitIgnoreEnabled  bool
+	dryRun            bool
+	
+	// File setup
+	sourceFiles      map[string]string
+	destinationFiles map[string]string
+	
+	// Expectations
+	expectations []expectation
+}
+
+type expectation struct {
+	expectType    string // "success", "failure", "syncfile_contains"
+	expectedValue string
+}
+
+// Source configuration methods
+func (b *wizardScenarioBuilder) WithSource(path string) WizardScenarioBuilder {
+	b.sourcePath = path
+	return b
+}
+
+func (b *wizardScenarioBuilder) WithSourceFiles(files map[string]string) WizardScenarioBuilder {
+	b.sourceFiles = files
+	return b
+}
+
+// Destination configuration methods
+func (b *wizardScenarioBuilder) WithDestination(path string) WizardScenarioBuilder {
+	b.destinationPath = path
+	return b
+}
+
+func (b *wizardScenarioBuilder) WithDestinationFiles(files map[string]string) WizardScenarioBuilder {
+	b.destinationFiles = files
+	return b
+}
+
+// Wizard configuration methods
+func (b *wizardScenarioBuilder) WithMode(mode string) WizardScenarioBuilder {
+	b.mode = mode
+	return b
+}
+
+func (b *wizardScenarioBuilder) WithExclusionPatterns(patterns ...string) WizardScenarioBuilder {
+	b.exclusionPatterns = append(b.exclusionPatterns, patterns...)
+	return b
+}
+
+func (b *wizardScenarioBuilder) WithGitIgnoreEnabled() WizardScenarioBuilder {
+	b.gitIgnoreEnabled = true
+	return b
+}
+
+func (b *wizardScenarioBuilder) WithDryRun() WizardScenarioBuilder {
+	b.dryRun = true
+	return b
+}
+
+// Expectation methods
+func (b *wizardScenarioBuilder) ExpectSuccess() WizardScenarioBuilder {
+	b.expectations = append(b.expectations, expectation{
+		expectType: "success",
+	})
+	return b
+}
+
+func (b *wizardScenarioBuilder) ExpectFailure(expectedError string) WizardScenarioBuilder {
+	b.expectations = append(b.expectations, expectation{
+		expectType:    "failure",
+		expectedValue: expectedError,
+	})
+	return b
+}
+
+func (b *wizardScenarioBuilder) ExpectSyncFileContaining(content string) WizardScenarioBuilder {
+	b.expectations = append(b.expectations, expectation{
+		expectType:    "syncfile_contains",
+		expectedValue: content,
+	})
+	return b
+}
+
+// Execution methods
+func (b *wizardScenarioBuilder) Execute() *WizardResult {
+	// Create wizard configuration
+	config := &wizard.Config{
+		PrefilledSource: b.sourcePath,
+		PrefilledMode:   b.mode,
+	}
+	
+	result := b.driver.StartWizardWithConfig(config)
+	b.state = WizardTestStateExecuted
+	
+	// Validate expectations
+	for _, exp := range b.expectations {
+		switch exp.expectType {
+		case "success":
+			if !result.Success {
+				result.Success = false
+				result.Error = fmt.Sprintf("Expected success but wizard failed: %s", result.Error)
+			}
+		case "failure":
+			if result.Success {
+				result.Success = false
+				result.Error = fmt.Sprintf("Expected failure with '%s' but wizard succeeded", exp.expectedValue)
+			}
+		case "syncfile_contains":
+			if !strings.Contains(result.SyncFileContent, exp.expectedValue) {
+				result.Success = false
+				result.Error = fmt.Sprintf("Expected SyncFile to contain '%s' but got: %s", exp.expectedValue, result.SyncFileContent)
+			}
+		}
+	}
+	
+	b.state = WizardTestStateValidated
+	return result
+}
+
+func (b *wizardScenarioBuilder) ExecuteInTestMode() *WizardResult {
+	// Create test mode configuration
+	testOptions := &wizard.TestModeOptions{
+		SourceDir:         b.sourcePath,
+		DestinationDir:    b.destinationPath,
+		Mode:              b.mode,
+		ExclusionPatterns: b.exclusionPatterns,
+		EnableGitIgnore:   b.gitIgnoreEnabled,
+		DryRun:            b.dryRun,
+	}
+	
+	result := b.driver.GenerateSyncFile(testOptions)
+	b.state = WizardTestStateExecuted
+	
+	// Validate expectations
+	for _, exp := range b.expectations {
+		switch exp.expectType {
+		case "success":
+			if !result.Success {
+				result.Success = false
+				result.Error = fmt.Sprintf("Expected success but wizard failed: %s", result.Error)
+			}
+		case "failure":
+			if result.Success {
+				result.Success = false
+				result.Error = fmt.Sprintf("Expected failure with '%s' but wizard succeeded", exp.expectedValue)
+			}
+		case "syncfile_contains":
+			if !strings.Contains(result.SyncFileContent, exp.expectedValue) {
+				result.Success = false
+				result.Error = fmt.Sprintf("Expected SyncFile to contain '%s' but got: %s", exp.expectedValue, result.SyncFileContent)
+			}
+		}
+	}
+	
+	b.state = WizardTestStateValidated
+	return result
 }
 
 func (d *wizardDriver) StartInteractiveWizard(options ...WizardOption) *WizardResult {

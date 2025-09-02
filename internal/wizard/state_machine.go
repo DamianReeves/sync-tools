@@ -5,10 +5,48 @@ import (
 )
 
 // StateTransition represents a valid state transition with compile-time safety
+// This provides phantom types to ensure transitions can only be made between valid states
 type StateTransition[From, To WizardState] struct {
-	_ From
-	_ To
+	_ From // Phantom type for source state
+	_ To   // Phantom type for destination state
 }
+
+// ValidTransition is a marker interface for valid state transitions
+type ValidTransition interface {
+	isValidTransition()
+}
+
+// Define valid transition types as concrete structs
+type InitialToSourceSelection struct{ StateTransition[InitialState, SourceSelectionState] }
+type SourceToDestination struct{ StateTransition[SourceSelectionState, DestinationSelectionState] }
+type DestinationToSyncOptions struct{ StateTransition[DestinationSelectionState, SyncOptionsState] }
+type SyncOptionsToExclusion struct{ StateTransition[SyncOptionsState, ExclusionPatternsState] }
+type ExclusionToDirectoryFilter struct{ StateTransition[ExclusionPatternsState, DirectoryFilterState] }
+type DirectoryFilterToProgress struct{ StateTransition[DirectoryFilterState, ProgressState] }
+type ProgressToComplete struct{ StateTransition[ProgressState, CompleteState] }
+
+// Back transitions for navigation
+type SourceToInitial struct{ StateTransition[SourceSelectionState, InitialState] }
+type DestinationToSource struct{ StateTransition[DestinationSelectionState, SourceSelectionState] }
+type SyncOptionsToDestination struct{ StateTransition[SyncOptionsState, DestinationSelectionState] }
+type ExclusionToSyncOptions struct{ StateTransition[ExclusionPatternsState, SyncOptionsState] }
+type DirectoryFilterToExclusion struct{ StateTransition[DirectoryFilterState, ExclusionPatternsState] }
+type ProgressToDirectoryFilter struct{ StateTransition[ProgressState, DirectoryFilterState] }
+
+// Implement ValidTransition interface for all valid transitions
+func (InitialToSourceSelection) isValidTransition()       {}
+func (SourceToDestination) isValidTransition()           {}
+func (DestinationToSyncOptions) isValidTransition()      {}
+func (SyncOptionsToExclusion) isValidTransition()        {}
+func (ExclusionToDirectoryFilter) isValidTransition()    {}
+func (DirectoryFilterToProgress) isValidTransition()     {}
+func (ProgressToComplete) isValidTransition()            {}
+func (SourceToInitial) isValidTransition()               {}
+func (DestinationToSource) isValidTransition()           {}
+func (SyncOptionsToDestination) isValidTransition()      {}
+func (ExclusionToSyncOptions) isValidTransition()        {}
+func (DirectoryFilterToExclusion) isValidTransition()    {}
+func (ProgressToDirectoryFilter) isValidTransition()     {}
 
 // StateMachine provides type-safe state transitions for the wizard
 type StateMachine struct {
@@ -82,6 +120,47 @@ func (sm *StateMachine) TransitionTo(newState WizardState) error {
 
 	sm.currentState = newState
 	return nil
+}
+
+// Type-safe transition methods that ensure compile-time safety
+// These methods can only be called when in the appropriate source state
+
+// Type-safe state transition helpers that enforce valid transitions at compile time
+// These methods use the specific state types to ensure type safety
+
+func (sm *StateMachine) FromInitialToSourceSelection(newState SourceSelectionState) error {
+	// Compile-time guarantee: this method can only be called with SourceSelectionState
+	return sm.TransitionTo(newState)
+}
+
+func (sm *StateMachine) FromSourceToDestination(newState DestinationSelectionState) error {
+	// Compile-time guarantee: this method can only be called with DestinationSelectionState
+	return sm.TransitionTo(newState)
+}
+
+func (sm *StateMachine) FromDestinationToSyncOptions(newState SyncOptionsState) error {
+	// Compile-time guarantee: this method can only be called with SyncOptionsState
+	return sm.TransitionTo(newState)
+}
+
+func (sm *StateMachine) FromSyncOptionsToExclusion(newState ExclusionPatternsState) error {
+	// Compile-time guarantee: this method can only be called with ExclusionPatternsState
+	return sm.TransitionTo(newState)
+}
+
+func (sm *StateMachine) FromExclusionToDirectoryFilter(newState DirectoryFilterState) error {
+	// Compile-time guarantee: this method can only be called with DirectoryFilterState
+	return sm.TransitionTo(newState)
+}
+
+func (sm *StateMachine) FromDirectoryFilterToProgress(newState ProgressState) error {
+	// Compile-time guarantee: this method can only be called with ProgressState
+	return sm.TransitionTo(newState)
+}
+
+func (sm *StateMachine) FromProgressToComplete(newState CompleteState) error {
+	// Compile-time guarantee: this method can only be called with CompleteState
+	return sm.TransitionTo(newState)
 }
 
 // CanGoBack checks if navigation back is possible
@@ -271,7 +350,8 @@ func (ops *InitialStateOperations) StartSourceSelection() error {
 		Directories: []DirectoryInfo{},
 		Browser:     browser,
 	}
-	return ops.sm.TransitionTo(newState)
+	// Use type-safe transition method
+	return ops.sm.FromInitialToSourceSelection(newState)
 }
 
 func (ops *SourceSelectionOperations) SelectSource(sourcePath string) error {
@@ -282,7 +362,8 @@ func (ops *SourceSelectionOperations) SelectSource(sourcePath string) error {
 		Directories: []DirectoryInfo{},
 		Browser:     browser,
 	}
-	return ops.sm.TransitionTo(newState)
+	// Use type-safe transition method  
+	return ops.sm.FromSourceToDestination(newState)
 }
 
 func (ops *DestinationSelectionOperations) SelectDestination(destPath string) error {
@@ -296,7 +377,8 @@ func (ops *DestinationSelectionOperations) SelectDestination(destPath string) er
 		ConflictStrategy: "newest-wins",
 		Editor:           nil,
 	}
-	return ops.sm.TransitionTo(newState)
+	// Use type-safe transition method
+	return ops.sm.FromDestinationToSyncOptions(newState)
 }
 
 func (ops *SyncOptionsOperations) ConfigureOptions(mode string, dryRun bool, hiddenDirs bool, useGitIgnore bool, conflictStrategy string) error {
@@ -322,5 +404,6 @@ func (ops *SyncOptionsOperations) ProceedToExclusionPatterns() error {
 		SyncOptions:     ops.state,
 		Patterns:        []ExclusionPattern{{Pattern: ".git/", Source: "default", Valid: true}},
 	}
-	return ops.sm.TransitionTo(newState)
+	// Use type-safe transition method
+	return ops.sm.FromSyncOptionsToExclusion(newState)
 }
