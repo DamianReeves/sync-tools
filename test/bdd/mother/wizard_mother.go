@@ -77,7 +77,7 @@ func (b *wizardConfigBuilder) Build() *wizard.TestModeOptions {
 		Mode:              b.mode,
 		ExclusionPatterns: b.exclusionPatterns,
 		EnableGitIgnore:   b.enableGitIgnore,
-		DryRun:           b.dryRun,
+		DryRun:            b.dryRun,
 	}
 }
 

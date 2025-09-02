@@ -36,7 +36,7 @@ func NewSyncOptionsEditor(state *SyncOptionsState) *SyncOptionsEditor {
 		options:       state,
 		selectedField: 0,
 	}
-	
+
 	editor.initializeFields()
 	return editor
 }
@@ -106,16 +106,16 @@ func (e *SyncOptionsEditor) MoveDown() {
 // ToggleValue toggles checkbox or cycles through options for current field
 func (e *SyncOptionsEditor) ToggleValue() {
 	field := &e.fields[e.selectedField]
-	
+
 	switch field.Type {
 	case FieldTypeCheckbox:
 		field.Value = !field.Value.(bool)
 		e.updateOptionsState()
-		
+
 	case FieldTypeRadio, FieldTypeSelect:
 		currentValue := field.Value.(string)
 		currentIndex := -1
-		
+
 		// Find current value index
 		for i, option := range field.Options {
 			if option == currentValue {
@@ -123,7 +123,7 @@ func (e *SyncOptionsEditor) ToggleValue() {
 				break
 			}
 		}
-		
+
 		// Cycle to next option
 		nextIndex := (currentIndex + 1) % len(field.Options)
 		field.Value = field.Options[nextIndex]
@@ -134,12 +134,12 @@ func (e *SyncOptionsEditor) ToggleValue() {
 // ChangeValue changes value using left/right arrow keys
 func (e *SyncOptionsEditor) ChangeValue(direction int) {
 	field := &e.fields[e.selectedField]
-	
+
 	switch field.Type {
 	case FieldTypeRadio, FieldTypeSelect:
 		currentValue := field.Value.(string)
 		currentIndex := -1
-		
+
 		// Find current value index
 		for i, option := range field.Options {
 			if option == currentValue {
@@ -147,7 +147,7 @@ func (e *SyncOptionsEditor) ChangeValue(direction int) {
 				break
 			}
 		}
-		
+
 		// Move in specified direction
 		newIndex := currentIndex + direction
 		if newIndex < 0 {
@@ -155,7 +155,7 @@ func (e *SyncOptionsEditor) ChangeValue(direction int) {
 		} else if newIndex >= len(field.Options) {
 			newIndex = 0
 		}
-		
+
 		field.Value = field.Options[newIndex]
 		e.updateOptionsState()
 	}
@@ -182,13 +182,13 @@ func (e *SyncOptionsEditor) updateOptionsState() {
 // RenderField renders a single option field
 func (e *SyncOptionsEditor) RenderField(fieldIndex int, isSelected bool) string {
 	field := e.fields[fieldIndex]
-	
+
 	// Selection indicator
 	prefix := "  "
 	if isSelected {
 		prefix = "▶ "
 	}
-	
+
 	// Field value display
 	var valueDisplay string
 	switch field.Type {
@@ -199,7 +199,7 @@ func (e *SyncOptionsEditor) RenderField(fieldIndex int, isSelected bool) string 
 		} else {
 			valueDisplay = "[ ]"
 		}
-		
+
 	case FieldTypeRadio:
 		currentValue := field.Value.(string)
 		var options []string
@@ -211,31 +211,31 @@ func (e *SyncOptionsEditor) RenderField(fieldIndex int, isSelected bool) string 
 			}
 		}
 		valueDisplay = strings.Join(options, " ")
-		
+
 	case FieldTypeSelect:
 		valueDisplay = fmt.Sprintf("<%s>", field.Value.(string))
-		
+
 	default:
 		valueDisplay = fmt.Sprintf("%v", field.Value)
 	}
-	
+
 	return fmt.Sprintf("%s%-20s %s", prefix, field.Name+":", valueDisplay)
 }
 
 // RenderAllFields renders all option fields
 func (e *SyncOptionsEditor) RenderAllFields() string {
 	var content strings.Builder
-	
+
 	for i, field := range e.fields {
 		isSelected := i == e.selectedField
 		content.WriteString(e.RenderField(i, isSelected))
 		content.WriteString("\n")
-		
+
 		// Add description for selected field
 		if isSelected {
 			content.WriteString(fmt.Sprintf("    %s\n", field.Description))
 		}
 	}
-	
+
 	return content.String()
 }

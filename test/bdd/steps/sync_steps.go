@@ -258,7 +258,7 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I should see:$`, tc.iShouldSeeProgressTable)
 	ctx.Step(`^the progress bar should update in real-time$`, tc.theProgressBarShouldUpdateInRealTime)
 	ctx.Step(`^I can cancel with Ctrl\+C$`, tc.iCanCancelWithCtrlC)
-	
+
 	// Additional wizard step definitions
 	ctx.Step(`^I have a source directory with nested files:$`, tc.iHaveASourceDirectoryWithNestedFiles)
 	ctx.Step(`^I select source directory "([^"]*)"$`, tc.iSelectSourceDirectory)
@@ -1849,7 +1849,7 @@ func (tc *TestContext) iStartTheInteractiveWizard() error {
 	tc.lastOutput = "🧙 Sync Wizard\n\nWelcome to the Sync Wizard\n\nThis wizard will help you configure a sync operation.\n\nPress [Enter] to start by selecting a source directory\nPress 'q' to quit, '?' for help"
 	tc.lastExitCode = 0
 	tc.lastError = ""
-	
+
 	// Initialize wizard test configuration for state tracking
 	tc.wizardTestConfig = &WizardTestConfig{
 		SourceDir:         "",
@@ -1859,7 +1859,7 @@ func (tc *TestContext) iStartTheInteractiveWizard() error {
 		EnableGitIgnore:   false,
 		DryRun:            false,
 	}
-	
+
 	return nil
 }
 
@@ -1870,7 +1870,7 @@ func (tc *TestContext) iShouldSeeTheSourceDirectorySelectionScreen() error {
 			return fmt.Errorf("expected to see '%s' in output, but got: %s", expectedText, tc.lastOutput)
 		}
 	}
-	// Update output to simulate moving to source selection screen  
+	// Update output to simulate moving to source selection screen
 	tc.lastOutput = "📁 Source Directory Selection\n\nSelect source directory\n\nUse arrow keys to navigate, Enter to select, 'q' to quit"
 	return nil
 }
@@ -1897,7 +1897,7 @@ func (tc *TestContext) theDirectoryTreeShouldShow(table *godog.Table) error {
 		path := row.Cells[0].Value
 		files := row.Cells[1].Value
 		size := row.Cells[2].Value
-		
+
 		expectedEntry := fmt.Sprintf("%s %s files %s", path, files, size)
 		if !strings.Contains(tc.lastOutput, expectedEntry) {
 			// For placeholder, just log what we expected
@@ -1936,7 +1936,7 @@ func (tc *TestContext) iShouldSeeCurrentPatterns(table *godog.Table) error {
 	for _, row := range table.Rows[1:] { // Skip header
 		pattern := row.Cells[0].Value
 		source := row.Cells[1].Value
-		
+
 		expectedEntry := fmt.Sprintf("%s (source: %s)", pattern, source)
 		if !strings.Contains(tc.lastOutput, expectedEntry) {
 			tc.lastOutput += fmt.Sprintf("\n[Pattern] %s", expectedEntry)
@@ -1980,7 +1980,7 @@ func (tc *TestContext) iShouldSeeProgressTable(table *godog.Table) error {
 	for _, row := range table.Rows[1:] { // Skip header
 		element := row.Cells[0].Value
 		value := row.Cells[1].Value
-		
+
 		expectedEntry := fmt.Sprintf("%s: %s", element, value)
 		tc.lastOutput += fmt.Sprintf("\n[Progress] %s", expectedEntry)
 	}
@@ -2005,19 +2005,19 @@ func (tc *TestContext) iHaveASourceDirectoryWithNestedFiles(table *godog.Table) 
 		path := row.Cells[0].Value
 		content := row.Cells[1].Value
 		size := row.Cells[2].Value
-		
+
 		fullPath := filepath.Join(tc.sourceDir, path)
-		
+
 		// Create directory if needed
 		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 			return fmt.Errorf("failed to create directory for %s: %w", path, err)
 		}
-		
+
 		// Write file with specified content
 		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
 			return fmt.Errorf("failed to create nested file %s: %w", path, err)
 		}
-		
+
 		tc.lastOutput += fmt.Sprintf("\nCreated nested file: %s (%s)", path, size)
 	}
 	return nil
@@ -2074,9 +2074,9 @@ func (tc *TestContext) iCompleteTheWizard() error {
 	if tc.wizardTestConfig == nil {
 		return fmt.Errorf("wizard not started - call 'I start the interactive wizard' first")
 	}
-	
+
 	tc.lastOutput += "\nWizard completed successfully"
-	
+
 	// Use ObjectMother pattern to create wizard configuration
 	wizardConfig := mother.NewWizardConfig().
 		WithSourceDir(tc.wizardTestConfig.SourceDir).
@@ -2086,17 +2086,17 @@ func (tc *TestContext) iCompleteTheWizard() error {
 		WithGitIgnore(tc.wizardTestConfig.EnableGitIgnore).
 		WithDryRun(tc.wizardTestConfig.DryRun).
 		Build()
-	
+
 	// Use TestEnvironment's wizard driver
 	result := tc.env.GenerateWizardSyncFile(wizardConfig)
-	
+
 	if result.Error != "" {
 		return fmt.Errorf("wizard execution failed: %s", result.Error)
 	}
-	
+
 	// Add the generated SyncFile content to the test output
 	tc.lastOutput += fmt.Sprintf("\nSyncFile generated:\n%s", result.SyncFileContent)
-	
+
 	return nil
 }
 
@@ -2105,7 +2105,7 @@ func (tc *TestContext) aSyncFileShouldBeGeneratedWith(expectedContent *godog.Doc
 	if err := tc.env.AssertLastWizardSucceeded(); err != nil {
 		return err
 	}
-	
+
 	// Check that expected content patterns are in the SyncFile
 	expectedLines := strings.Split(expectedContent.Content, "\n")
 	for _, line := range expectedLines {
@@ -2175,7 +2175,7 @@ func (tc *TestContext) theWizardShouldStartWithSourceDirectoryPreselectedAs(sour
 	if !strings.Contains(tc.lastOutput, "SYNC") {
 		return fmt.Errorf("expected wizard output to contain SYNC command, but got: %s", tc.lastOutput)
 	}
-	
+
 	// For this test, we just verify the wizard ran successfully and generated a SyncFile
 	// The path replacement is handled by the test framework, which is correct behavior
 	return nil
@@ -2206,7 +2206,7 @@ func (tc *TestContext) iShouldSeeConfigurableOptions(table *godog.Table) error {
 		option := row.Cells[0].Value
 		optionType := row.Cells[1].Value
 		value := row.Cells[2].Value
-		
+
 		expectedEntry := fmt.Sprintf("%s (%s): %s", option, optionType, value)
 		tc.lastOutput += fmt.Sprintf("\n[Option] %s", expectedEntry)
 	}
@@ -2240,7 +2240,7 @@ func (tc *TestContext) iShouldSeeDirectoryList(table *godog.Table) error {
 		files := row.Cells[1].Value
 		size := row.Cells[2].Value
 		selected := row.Cells[3].Value
-		
+
 		expectedEntry := fmt.Sprintf("%s: %s files, %s, selected=%s", directory, files, size, selected)
 		tc.lastOutput += fmt.Sprintf("\n[Directory] %s", expectedEntry)
 	}

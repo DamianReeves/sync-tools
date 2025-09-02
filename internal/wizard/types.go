@@ -112,31 +112,31 @@ type SelectableDirectory struct {
 
 // ProgressInfo represents current sync progress
 type ProgressInfo struct {
-	CurrentFile     string
-	FilesProcessed  int
-	TotalFiles      int
-	TransferSpeed   string
-	ProgressPercent int
+	CurrentFile      string
+	FilesProcessed   int
+	TotalFiles       int
+	TransferSpeed    string
+	ProgressPercent  int
 	BytesTransferred int64
-	TotalBytes      int64
+	TotalBytes       int64
 }
 
 // Config represents wizard configuration
 type Config struct {
 	PrefilledSource string
 	PrefilledMode   string
-	TestMode        bool   // When true, runs non-interactively for testing
+	TestMode        bool             // When true, runs non-interactively for testing
 	TestOptions     *TestModeOptions // Test mode configuration
 }
 
 // TestModeOptions configures how the wizard behaves in test mode
 type TestModeOptions struct {
-	SourceDir        string
-	DestinationDir   string
-	Mode             string
+	SourceDir         string
+	DestinationDir    string
+	Mode              string
 	ExclusionPatterns []string
-	EnableGitIgnore  bool
-	DryRun           bool
+	EnableGitIgnore   bool
+	DryRun            bool
 }
 
 // WizardModel represents the complete wizard state machine

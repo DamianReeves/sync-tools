@@ -17,10 +17,10 @@ type DirectoryBrowser struct {
 
 // DirectoryEntry represents a filesystem entry
 type DirectoryEntry struct {
-	Name     string
-	Path     string
-	IsDir    bool
-	Size     int64
+	Name      string
+	Path      string
+	IsDir     bool
+	Size      int64
 	FileCount int
 }
 
@@ -136,7 +136,7 @@ func (db *DirectoryBrowser) refreshEntries() {
 
 	for _, file := range files {
 		fullPath := filepath.Join(db.currentPath, file.Name())
-		
+
 		entry := DirectoryEntry{
 			Name:  file.Name(),
 			Path:  fullPath,
@@ -170,11 +170,11 @@ func (db *DirectoryBrowser) refreshEntries() {
 
 // getDirectoryStats calculates file count and total size for a directory
 func (db *DirectoryBrowser) getDirectoryStats(dirPath string) (fileCount int, totalSize int64) {
-	filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil // Skip errors
 		}
-		
+
 		if !d.IsDir() {
 			fileCount++
 			if info, err := d.Info(); err == nil {

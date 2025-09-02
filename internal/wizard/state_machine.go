@@ -6,8 +6,8 @@ import (
 
 // StateTransition represents a valid state transition with compile-time safety
 type StateTransition[From, To WizardState] struct {
-	from From
-	to   To
+	_ From
+	_ To
 }
 
 // StateMachine provides type-safe state transitions for the wizard

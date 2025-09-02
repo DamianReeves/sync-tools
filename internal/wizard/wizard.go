@@ -45,13 +45,13 @@ func (w *Wizard) Run() error {
 	if w.config.TestMode && w.config.TestOptions != nil {
 		return w.runTestMode()
 	}
-	
+
 	// Create the Bubble Tea model using the state machine
 	teaModel := NewBubbleTeaModel(w.stateMachine, w.config)
-	
+
 	// Start the Bubble Tea program
 	p := tea.NewProgram(teaModel, tea.WithAltScreen())
-	
+
 	finalModel, err := p.Run()
 	if err != nil {
 		return fmt.Errorf("failed to run wizard: %w", err)
@@ -62,7 +62,7 @@ func (w *Wizard) Run() error {
 		if wizModel.Error != "" {
 			return fmt.Errorf("wizard error: %s", wizModel.Error)
 		}
-		
+
 		// Check if we reached the complete state
 		if wizModel.StateMachine.IsInState(CompleteState{}) {
 			return nil
@@ -75,7 +75,7 @@ func (w *Wizard) Run() error {
 // runTestMode executes the wizard in non-interactive test mode
 func (w *Wizard) runTestMode() error {
 	testOpts := w.config.TestOptions
-	
+
 	// Create a progress state with the test configuration
 	progressState := &ProgressState{
 		SourcePath:      testOpts.SourceDir,
@@ -89,7 +89,7 @@ func (w *Wizard) runTestMode() error {
 		},
 		Patterns: make([]ExclusionPattern, 0),
 	}
-	
+
 	// Add exclusion patterns
 	for _, pattern := range testOpts.ExclusionPatterns {
 		progressState.Patterns = append(progressState.Patterns, ExclusionPattern{
@@ -98,15 +98,15 @@ func (w *Wizard) runTestMode() error {
 			Source:  "test",
 		})
 	}
-	
+
 	// Generate SyncFile content
 	syncFileContent, err := GenerateSyncFile(progressState)
 	if err != nil {
 		return fmt.Errorf("failed to generate SyncFile: %w", err)
 	}
-	
+
 	// Output the generated SyncFile content for the BDD test to capture
 	fmt.Print(syncFileContent)
-	
+
 	return nil
 }

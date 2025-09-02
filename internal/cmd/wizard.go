@@ -45,7 +45,7 @@ func runWizard(cmd *cobra.Command, args []string) error {
 		PrefilledMode:   flagWizardMode,
 		TestMode:        flagWizardTest,
 	}
-	
+
 	// For test mode, add basic test options
 	if flagWizardTest {
 		testSourceDir := flagWizardSource
@@ -53,14 +53,14 @@ func runWizard(cmd *cobra.Command, args []string) error {
 		if testSourceDir == "" {
 			testSourceDir = "test_source"
 		}
-		
+
 		config.TestOptions = &wizard.TestModeOptions{
 			SourceDir:      testSourceDir,
 			DestinationDir: "test_dest", // default for test mode
 			Mode:           flagWizardMode,
 			DryRun:         true,
 		}
-		
+
 		// Set default mode if not provided
 		if config.TestOptions.Mode == "" {
 			config.TestOptions.Mode = "one-way"

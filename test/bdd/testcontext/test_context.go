@@ -27,7 +27,7 @@ type TestEnvironment struct {
 
 	// Last command result for assertions
 	LastResult *driver.SyncResult
-	
+
 	// Last wizard result for assertions
 	LastWizardResult *driver.WizardResult
 }
@@ -270,12 +270,12 @@ func (env *TestEnvironment) AssertWizardSyncFileContains(expectedContent string)
 	if env.LastWizardResult == nil {
 		return fmt.Errorf("no wizard operation has been executed")
 	}
-	
+
 	if !contains(env.LastWizardResult.SyncFileContent, expectedContent) {
 		return fmt.Errorf("expected wizard SyncFile to contain '%s', but got: %s",
 			expectedContent, env.LastWizardResult.SyncFileContent)
 	}
-	
+
 	return nil
 }
 
