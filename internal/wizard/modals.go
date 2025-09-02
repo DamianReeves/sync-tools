@@ -26,7 +26,8 @@ var (
 	inputStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("#874BFD")).
-			Padding(0, 1)
+			Padding(0, 1).
+			Width(60)
 
 	errorModalStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FF0000")).
@@ -77,6 +78,9 @@ func (m *ManualPathEntryModal) Render(baseContent string) string {
 	pathDisplay := m.pathInput
 	if pathDisplay == "" {
 		pathDisplay = "(type path here)"
+	} else if len(pathDisplay) > 55 {
+		// Truncate long paths from the beginning, keeping the end visible
+		pathDisplay = "..." + pathDisplay[len(pathDisplay)-52:]
 	}
 	content.WriteString("Path: ")
 	content.WriteString(inputStyle.Render(pathDisplay))
@@ -127,12 +131,12 @@ func (m *ManualPathEntryModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool
 		// Update base state with the selected path
 		m.updateBaseStateWithPath(expandedPath)
 
-		// Signal completion
-		return m, nil, true // Modal will be popped by caller
+		// Signal completion by returning nil - modal should be closed
+		return nil, nil, true
 
 	case "escape":
-		// Cancel path entry
-		return m, nil, true // Signal handled, modal will be popped
+		// Cancel path entry - close modal without applying changes
+		return nil, nil, true
 
 	case "backspace":
 		// Remove last character
@@ -169,19 +173,21 @@ func (m *ManualPathEntryModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool
 		// Handle character input and special keys
 		switch msg.String() {
 		case "~":
-			// Home directory shortcut
-			if homeDir, err := os.UserHomeDir(); err == nil {
-				m.pathInput = homeDir
+			// Home directory shortcut (only if path is empty or starts with ~)
+			if m.pathInput == "" || strings.HasPrefix(m.pathInput, "~") {
+				if homeDir, err := os.UserHomeDir(); err == nil {
+					m.pathInput = homeDir
+					m.pathError = ""
+					m.updateSuggestions()
+				}
+			} else {
+				// Treat as regular character if not at start
+				m.pathInput += msg.String()
 				m.pathError = ""
 				m.updateSuggestions()
 			}
-		case "/":
-			// Root directory shortcut
-			m.pathInput = "/"
-			m.pathError = ""
-			m.updateSuggestions()
 		default:
-			// Regular character input
+			// Regular character input (including path separators like "/")
 			if len(msg.String()) == 1 {
 				m.pathInput += msg.String()
 				m.pathError = ""
@@ -549,11 +555,12 @@ func (h *HomeNavigationModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool)
 			bookmark := h.bookmarks[h.selectedIndex]
 			h.updateBaseStateWithBookmark(bookmark)
 		}
-		return h, nil, true
+		// Close modal after selection
+		return nil, nil, true
 
 	case "escape":
-		// Cancel navigation
-		return h, nil, true
+		// Cancel navigation - close modal without applying changes
+		return nil, nil, true
 
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		// Quick number selection

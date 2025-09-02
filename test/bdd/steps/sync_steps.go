@@ -312,6 +312,37 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I press "([^"]*)" to start$`, tc.iPressToStart)
 	ctx.Step(`^I should be on the source selection screen$`, tc.iShouldBeOnTheSourceSelectionScreen)
 
+	// Manual Path Entry Dialog steps
+	ctx.Step(`^I press "([^"]*)" to open manual path entry$`, tc.iPressToOpenManualPathEntry)
+	ctx.Step(`^I should see the manual path entry dialog displayed$`, tc.iShouldSeeTheManualPathEntryDialogDisplayed)
+	ctx.Step(`^I should see a path input field$`, tc.iShouldSeeAPathInputField)
+	ctx.Step(`^I press "([^"]*)" to close the dialog$`, tc.iPressToCloseTheDialog)
+	ctx.Step(`^the manual path entry dialog should be closed$`, tc.theManualPathEntryDialogShouldBeClosed)
+	ctx.Step(`^I type "([^"]*)" in the path field$`, tc.iTypeInThePathField)
+	ctx.Step(`^I press "([^"]*)" to confirm$`, tc.iPressToConfirm)
+	ctx.Step(`^the current path should be updated to "([^"]*)"$`, tc.theCurrentPathShouldBeUpdatedTo)
+	ctx.Step(`^I should see an error message about invalid path$`, tc.iShouldSeeAnErrorMessageAboutInvalidPath)
+	ctx.Step(`^the dialog should remain open$`, tc.theDialogShouldRemainOpen)
+	ctx.Step(`^I type a very long path$`, tc.iTypeAVeryLongPath)
+	ctx.Step(`^the path display should be properly formatted$`, tc.thePathDisplayShouldBeProperlyFormatted)
+	ctx.Step(`^should not span multiple lines$`, tc.shouldNotSpanMultipleLines)
+	ctx.Step(`^should show the end of the path clearly$`, tc.shouldShowTheEndOfThePathClearly)
+
+	// Escape Key Handling steps
+	ctx.Step(`^I press "([^"]*)" to open home navigation$`, tc.iPressToOpenHomeNavigation)
+	ctx.Step(`^I should see the home navigation modal displayed$`, tc.iShouldSeeTheHomeNavigationModalDisplayed)
+	ctx.Step(`^I press "([^"]*)" to cancel navigation$`, tc.iPressToCancelNavigation)
+	ctx.Step(`^the home navigation modal should be closed$`, tc.theHomeNavigationModalShouldBeClosed)
+	ctx.Step(`^I press "([^"]*)" to select bookmark$`, tc.iPressToSelectBookmark)
+	ctx.Step(`^the selected path should be applied$`, tc.theSelectedPathShouldBeApplied)
+
+	// Path Separator Support steps
+	ctx.Step(`^the path input should contain "([^"]*)"$`, tc.thePathInputShouldContain)
+	ctx.Step(`^I build path character by character "([^"]*)"$`, tc.iBuildPathCharacterByCharacter)
+	ctx.Step(`^I press "([^"]*)" for home directory$`, tc.iPressForHomeDirectory)
+	ctx.Step(`^the path input should be set to the home directory$`, tc.thePathInputShouldBeSetToTheHomeDirectory)
+	ctx.Step(`^the path should be extended with "([^"]*)"$`, tc.thePathShouldBeExtendedWith)
+
 	// Setup and cleanup hooks
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return tc.beforeScenario(ctx, sc)
