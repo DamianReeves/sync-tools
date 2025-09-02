@@ -54,7 +54,7 @@ Feature: Plan Generation and Execution
       # Source: ./source
       # Destination: ./dest
       # Mode: one-way
-      
+
       << file file1.txt 17B 2025-08-30T10:30:00 [new-in-source]
       << file file2.txt 17B 2025-08-30T10:35:00 [new-in-source]
       """
@@ -69,7 +69,7 @@ Feature: Plan Generation and Execution
       # Source: ./source
       # Destination: ./dest
       # Mode: one-way
-      
+
       >> file dest-only.txt 18B 2025-08-30T10:25:00 [new-in-dest]
       """
     When I run sync-tools with arguments "sync --apply-plan d2s.plan"
@@ -84,7 +84,7 @@ Feature: Plan Generation and Execution
       # Source: ./source
       # Destination: ./dest
       # Mode: two-way
-      
+
       <> file conflict.txt 14B 2025-08-30T10:50:00 [CONFLICT: both-modified]
       """
     When I run sync-tools with arguments "sync --apply-plan bidir.plan"
@@ -107,7 +107,7 @@ Feature: Plan Generation and Execution
       """
       # Source: ./source
       # Destination: ./dest
-      
+
       invalid-op file test.txt
       << file
       """
@@ -140,7 +140,7 @@ Feature: Plan Generation and Execution
       # Source: ./source
       # Destination: ./dest
       # Mode: two-way
-      
+
       <> file shared.txt 12B 2025-08-30T10:40:00 [CONFLICT: both-modified, auto:backup]
       """
     When I run sync-tools with arguments "sync --apply-plan backup.plan"
@@ -166,7 +166,7 @@ Feature: Plan Generation and Execution
       """
       # Source: ./source
       # Destination: ./dest
-      
+
       << file file1.txt 17B 2025-08-30T10:30:00 [new-in-source]
       """
     When I run sync-tools with arguments "sync --apply-plan dry.plan --dry-run"

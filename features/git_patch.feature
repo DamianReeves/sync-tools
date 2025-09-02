@@ -16,7 +16,7 @@ Feature: Git Patch Generation
     Given I have a source directory with files
     And I have an empty destination directory
     When I run sync-tools with patch generation to "new-files.patch"
-    Then a git patch file should be created at "new-files.patch" 
+    Then a git patch file should be created at "new-files.patch"
     And the patch file should contain all new files from source
     And the patch should show files as new additions
     And the exit code should be 0

@@ -58,7 +58,7 @@ Go CLI wrapper around rsync with advanced filtering and SyncFile post-sync actio
 
 **Features:**
 - Advanced directory synchronization with conflict resolution
-- .syncignore files and gitignore integration  
+- .syncignore files and gitignore integration
 - Whitelist mode with sophisticated pattern matching
 - SyncFile format with APPEND/PREPEND post-sync actions
 - Git patch generation and application
@@ -146,35 +146,35 @@ brews:
     description: "Go CLI wrapper around rsync with advanced filtering and SyncFile post-sync actions"
     homepage: "https://github.com/DamianReeves/sync-tools"
     license: "Apache-2.0"
-    
+
     repository:
       owner: DamianReeves
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    
+
     commit_author:
       name: "Damian Reeves"
       email: "damian@reevescodes.me"
-    
+
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    
+
     directory: Formula
-    
+
     dependencies:
       - name: rsync
         type: runtime
-    
+
     install: |
       bin.install "sync-tools"
-      
+
       # Generate and install shell completions if available
       if File.exist?(buildpath/"completions")
         bash_completion.install "completions/sync-tools.bash" => "sync-tools"
         zsh_completion.install "completions/_sync-tools"
         fish_completion.install "completions/sync-tools.fish"
       end
-    
+
     test: |
       assert_match version.to_s, shell_output("#{bin}/sync-tools --version 2>&1")
       assert_match "Advanced directory synchronization", shell_output("#{bin}/sync-tools --help")
@@ -387,7 +387,7 @@ A successful setup will show:
 ## Repository Links
 
 - **Main Project**: https://github.com/DamianReeves/sync-tools
-- **Homebrew Tap**: https://github.com/DamianReeves/homebrew-tap  
+- **Homebrew Tap**: https://github.com/DamianReeves/homebrew-tap
 - **Latest Releases**: https://github.com/DamianReeves/sync-tools/releases
 - **Installation Guide**: https://github.com/DamianReeves/sync-tools/blob/main/docs/user_guide.adoc
 

@@ -57,7 +57,7 @@ Feature: Sync From Subcommand
     Given the source directory contains:
       | path          | content      |
       | preview.txt   | Preview this |
-    And the destination directory is empty  
+    And the destination directory is empty
     And I am in the destination directory
     When I run sync-tools with arguments "sync from ../source --preview"
     Then the command should succeed

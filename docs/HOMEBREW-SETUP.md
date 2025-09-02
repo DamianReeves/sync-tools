@@ -11,7 +11,7 @@ This document provides step-by-step instructions for setting up the `DamianReeve
 ## Step 1: Create homebrew-tap Repository
 
 1. Go to GitHub and create a new repository:
-   - **Name**: `homebrew-tap` 
+   - **Name**: `homebrew-tap`
    - **Full name**: `DamianReeves/homebrew-tap`
    - **Description**: "Homebrew tap for DamianReeves projects"
    - **Visibility**: Public (required for Homebrew taps)

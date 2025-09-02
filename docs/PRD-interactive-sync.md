@@ -58,7 +58,7 @@ The sync plan uses a line-based format similar to git rebase:
 #
 # Commands:
 #   s2d, sync-to-dest, <<    - Sync from source to destination (source >> dest)
-#   d2s, dest-to-source, >>  - Sync from destination to source (dest >> source)  
+#   d2s, dest-to-source, >>  - Sync from destination to source (dest >> source)
 #   bid, bidirectional, <>   - Sync in both directions (bidirectional)
 #   skip                     - Skip this item (commented out)
 #
@@ -68,7 +68,7 @@ The sync plan uses a line-based format similar to git rebase:
 # Format: <command> <item-type> <path> [size] [modified] [flags]
 #
 # Visual aliases make direction intuitive:
-#   << = source flows to dest (like << redirection) 
+#   << = source flows to dest (like << redirection)
 #   >> = dest flows to source (like >> redirection)
 #   <> = bidirectional flow (like <-> but shorter)
 
@@ -78,7 +78,7 @@ The sync plan uses a line-based format similar to git rebase:
 
 # Filtered out (not included due to --include-changes updates,conflicts):
 # << file   src/main.js                  15.7K  [new-in-source]
-# >> file   docs/README.md               4.5K   [new-in-dest] 
+# >> file   docs/README.md               4.5K   [new-in-dest]
 # skip file  logs/debug.log               2.1G   [deletion]
 
 # Summary:
@@ -107,7 +107,7 @@ When generating plans from SyncFiles with multiple `SYNC` operations, the plan f
 << file   js/bundle.min.js               890K  2025-08-30T10:32:00  [newer]
 << dir    images/                        12.4M 2025-08-30T10:25:00  [modified]
 
-# === Operation 2: Configuration Sync ===  
+# === Operation 2: Configuration Sync ===
 # Source: ./config
 # Destination: /etc/myapp
 # Mode: two-way
@@ -137,19 +137,19 @@ When generating plans from SyncFiles with multiple `SYNC` operations, the plan f
    - Conflicts are marked with `<>` but left uncommented for user decision
 
 3. **Command Syntax and Aliases**
-   
+
    | Command | Aliases | Visual | Meaning | Use Case |
    |---------|---------|--------|---------|----------|
    | `s2d`, `sync-to-dest` | `<<` | Source → Dest | Push to destination | Deployments, backups |
    | `d2s`, `dest-to-source` | `>>` | Source ← Dest | Pull from destination | Config retrieval, downloads |
    | `bid`, `bidirectional` | `<>` | Source ↔ Dest | Sync both ways | Development environments |
    | `skip` | `# <any command>` | Commented | Ignore this item | Temporary files, large assets |
-   
+
    The visual aliases (`<<`, `>>`, `<>`) are recommended for their clarity and editing convenience.
 
 4. **Metadata Collection**
    - File/directory type
-   - Size (human-readable) 
+   - Size (human-readable)
    - Modification timestamp
    - Status flags: [new], [modified], [deleted], [newer], [older], [conflict], [large]
 
@@ -213,7 +213,7 @@ sync-tools sync --interactive --source ./src --dest ./backup
 - **Syntax highlighting rules** (for vim, emacs, VS Code)
 - **Visual direction indicators**: `<<`, `>>`, `<>` are immediately recognizable
 - **Comment/uncomment shortcuts**: Toggle lines with `#`
-- **Bulk operations**: 
+- **Bulk operations**:
   - Comment all: `:%s/^/<#/g` (vim)
   - Change all to source→dest: `:%s/^>>/<</ g` (vim)
   - Change all to bidirectional: `:%s/^<</</g` (vim)
@@ -253,7 +253,7 @@ sync-tools sync --apply-plan conflicts.plan --merge-tool meld    # GUI merge too
 | Tool | Command Template | Description |
 |------|------------------|-------------|
 | `vimdiff` | `vim -d {source} {dest}` | Vim's built-in diff mode |
-| `nvim` | `nvim -d {source} {dest}` | Neovim diff mode |  
+| `nvim` | `nvim -d {source} {dest}` | Neovim diff mode |
 | `vscode` | `code --diff {source} {dest}` | VS Code merge editor |
 | `meld` | `meld {source} {dest}` | Cross-platform GUI merge tool |
 | `kdiff3` | `kdiff3 {source} {dest}` | KDE merge tool |
@@ -269,7 +269,7 @@ Conflicts can specify preferred resolution methods:
 # Standard conflict - will prompt for merge tool
 <> file   config/settings.json          2.1K  2025-08-30T10:25:00  [CONFLICT: both-modified]
 
-# Auto-resolve with newest-wins strategy  
+# Auto-resolve with newest-wins strategy
 <> file   logs/debug.log                15.2M 2025-08-30T10:30:00  [CONFLICT: both-modified, auto:newest]
 
 # Force specific merge tool for this conflict
@@ -347,7 +347,7 @@ sync-tools sync --plan review.plan --exclude-changes new-in-dest  # Skip files o
 
 # Available change types:
 #   new-in-source    - Files that exist in source but not in destination
-#   new-in-dest      - Files that exist in destination but not in source  
+#   new-in-dest      - Files that exist in destination but not in source
 #   updates          - Files that exist in both but differ (newer/modified)
 #   conflicts        - Files with bidirectional conflicts (both modified)
 #   deletions        - Files deleted from source (for cleanup review)
@@ -384,7 +384,7 @@ sync-tools syncfile MultiOpSyncFile --plan multi.plan
 ##### Configuration Layering
 The feature respects sync-tools' configuration hierarchy:
 1. **Built-in defaults**
-2. **Config file settings** (`--config file.toml`)  
+2. **Config file settings** (`--config file.toml`)
 3. **SyncFile instructions** (`EXCLUDE`, `MODE`, `GITIGNORE`, etc.)
 4. **Command-line overrides** (`--exclude`, `--mode`, `--only`, etc.)
 
@@ -408,7 +408,7 @@ sync-tools sync --plan resolve.plan --include-changes conflicts
 # Result: Focused plan with only bidirectional conflicts requiring manual resolution
 ```
 
-##### Cleanup Review Plans  
+##### Cleanup Review Plans
 ```bash
 # Review what will be removed from destination
 sync-tools sync --plan cleanup.plan --include-changes new-in-dest,deletions
@@ -515,10 +515,10 @@ sync-tools sync --apply-plan sync.plan --audit-log sync-audit.log
    ```
    Ready to execute sync plan:
    - 45 files to sync source → dest
-   - 12 files to sync dest → source  
+   - 12 files to sync dest → source
    - 8 files bidirectional
    - 23 files skipped
-   
+
    Continue? [y/N]
    ```
 
@@ -577,7 +577,7 @@ DevOps engineer uses SyncFile as deployment template, then reviews with plan:
 ```
 # Production deployment base
 SYNC ./app /var/www/myapp
-MODE one-way  
+MODE one-way
 EXCLUDE logs/
 EXCLUDE *.local
 GITIGNORE true
@@ -628,11 +628,11 @@ sync-tools sync --config dev-sync.toml --source ~/laptop/project --dest ~/workst
   --include-changes conflicts --plan dev-conflicts.plan
 
 # Review dev-review.plan and selectively sync:
-# - Most files: bidirectional  
+# - Most files: bidirectional
 # - IDE configs: skip (OS-specific)
 # - Database dumps: pull from workstation only (d2s)
 
-# Handle conflicts with interactive merge tools  
+# Handle conflicts with interactive merge tools
 sync-tools sync --apply-plan dev-conflicts.plan --interactive-merge --merge-tool vscode
 
 # Alternative: Edit conflict plan to specify per-file merge tools
@@ -649,14 +649,14 @@ System admin uses complex SyncFile for different backup strategies:
 SYNC /etc/myapp ./backup/config
 MODE two-way
 
-# Application data - one-way backup only  
+# Application data - one-way backup only
 SYNC /var/lib/myapp ./backup/data
 MODE one-way
 EXCLUDE cache/
 EXCLUDE *.tmp
 
 # Logs - selective backup of recent files
-SYNC /var/log/myapp ./backup/logs  
+SYNC /var/log/myapp ./backup/logs
 MODE one-way
 ONLY *.log
 ```
@@ -670,11 +670,11 @@ sync-tools syncfile BackupFile --plan backup-review.plan --exclude "*.log.*" \
 # Generate conflict-focused plan for critical configs
 sync-tools syncfile BackupFile --plan backup-conflicts.plan --include-changes conflicts
 
-# Generate cleanup plan for space management  
+# Generate cleanup plan for space management
 sync-tools syncfile BackupFile --plan backup-cleanup.plan --include-changes new-in-dest
 
 # Review backup-review.plan to:
-# - Skip logs older than 7 days  
+# - Skip logs older than 7 days
 # - Verify critical configs are included
 # - Skip cache directories larger than 1GB
 
@@ -686,7 +686,7 @@ vim backup-cleanup.plan
 
 # Execute in stages
 sync-tools sync --apply-plan backup-review.plan --verbose
-sync-tools sync --apply-plan backup-conflicts.plan --verbose  
+sync-tools sync --apply-plan backup-conflicts.plan --verbose
 sync-tools sync --apply-plan backup-cleanup.plan --verbose
 ```
 

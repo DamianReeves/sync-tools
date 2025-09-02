@@ -64,8 +64,8 @@ func (m *BubbleTeaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "?", "h":
-			// TODO: Show help screen
-			return m, nil
+			// Show context-specific help
+			return m.showContextHelp()
 
 		default:
 			return m.handleStateSpecificKeys(msg)
@@ -172,22 +172,44 @@ func (m *BubbleTeaModel) renderSourceSelectionState(state SourceSelectionState) 
 	content.WriteString(headerStyle.Render("Select source directory"))
 	content.WriteString("\n\n")
 
-	// Initialize directory browser if not exists
+	// Manual path entry mode
+	if state.ManualEntry {
+		content.WriteString("Enter path manually:\n")
+		pathDisplay := state.PathInput
+		if pathDisplay == "" {
+			pathDisplay = "(type path here)"
+		}
+		content.WriteString(fmt.Sprintf("Path: %s\n", pathDisplay))
+
+		if state.PathError != "" {
+			content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %s\n", state.PathError)))
+		}
+
+		content.WriteString("\n")
+		content.WriteString(helpStyle.Render("Type path, Enter: Confirm, Esc: Back to browser, t: Toggle mode"))
+		return content.String()
+	}
+
+	// Browser mode
 	if state.Browser == nil {
-		// This should be handled in the state initialization
 		content.WriteString("Initializing directory browser...\n")
 		return content.String()
 	}
 
 	content.WriteString(fmt.Sprintf("Current path: %s\n\n", state.Browser.GetCurrentPath()))
 
-	// Render directory entries
-	entries := state.Browser.GetEntries()
-	selectedIndex := state.Browser.GetSelectedIndex()
+	// Show scroll indicators
+	if state.Browser.HasMoreAbove() {
+		content.WriteString(helpStyle.Render("    ↑ More entries above...\n"))
+	}
 
-	for i, entry := range entries {
+	// Render visible directory entries only
+	visibleEntries := state.Browser.GetVisibleEntries()
+	visibleSelectedIndex := state.Browser.GetVisibleSelectedIndex()
+
+	for i, entry := range visibleEntries {
 		prefix := "  "
-		if i == selectedIndex {
+		if i == visibleSelectedIndex {
 			prefix = "▶ "
 		}
 
@@ -206,8 +228,13 @@ func (m *BubbleTeaModel) renderSourceSelectionState(state SourceSelectionState) 
 		content.WriteString(fmt.Sprintf("%s%s %s%s\n", prefix, icon, entry.Name, sizeInfo))
 	}
 
+	// Show scroll indicators
+	if state.Browser.HasMoreBelow() {
+		content.WriteString(helpStyle.Render("    ↓ More entries below...\n"))
+	}
+
 	content.WriteString("\n")
-	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter directory, ←: Go up, Enter: Select, Esc: Cancel"))
+	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter, ←: Up, Enter: Select, t: Type path, ?: Help, Esc: Cancel"))
 	return content.String()
 }
 
@@ -219,7 +246,25 @@ func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelect
 
 	content.WriteString(fmt.Sprintf("Source: %s\n", state.SourcePath))
 
-	// Initialize directory browser if not exists
+	// Manual path entry mode
+	if state.ManualEntry {
+		content.WriteString("\nEnter path manually:\n")
+		pathDisplay := state.PathInput
+		if pathDisplay == "" {
+			pathDisplay = "(type path here)"
+		}
+		content.WriteString(fmt.Sprintf("Path: %s\n", pathDisplay))
+
+		if state.PathError != "" {
+			content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %s\n", state.PathError)))
+		}
+
+		content.WriteString("\n")
+		content.WriteString(helpStyle.Render("Type path, Enter: Confirm, Esc: Back to browser, t: Toggle mode"))
+		return content.String()
+	}
+
+	// Browser mode
 	if state.Browser == nil {
 		content.WriteString("Initializing directory browser...\n")
 		return content.String()
@@ -227,13 +272,18 @@ func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelect
 
 	content.WriteString(fmt.Sprintf("Current path: %s\n\n", state.Browser.GetCurrentPath()))
 
-	// Render directory entries
-	entries := state.Browser.GetEntries()
-	selectedIndex := state.Browser.GetSelectedIndex()
+	// Show scroll indicators
+	if state.Browser.HasMoreAbove() {
+		content.WriteString(helpStyle.Render("    ↑ More entries above...\n"))
+	}
 
-	for i, entry := range entries {
+	// Render visible directory entries only
+	visibleEntries := state.Browser.GetVisibleEntries()
+	visibleSelectedIndex := state.Browser.GetVisibleSelectedIndex()
+
+	for i, entry := range visibleEntries {
 		prefix := "  "
-		if i == selectedIndex {
+		if i == visibleSelectedIndex {
 			prefix = "▶ "
 		}
 
@@ -252,8 +302,13 @@ func (m *BubbleTeaModel) renderDestinationSelectionState(state DestinationSelect
 		content.WriteString(fmt.Sprintf("%s%s %s%s\n", prefix, icon, entry.Name, sizeInfo))
 	}
 
+	// Show scroll indicators
+	if state.Browser.HasMoreBelow() {
+		content.WriteString(helpStyle.Render("    ↓ More entries below...\n"))
+	}
+
 	content.WriteString("\n")
-	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter directory, ←: Go up, Enter: Select, Esc: Back"))
+	content.WriteString(helpStyle.Render("↑↓: Navigate, →: Enter, ←: Up, Enter: Select, t: Type path, ?: Help, Esc: Back"))
 	return content.String()
 }
 
@@ -392,10 +447,25 @@ func (m *BubbleTeaModel) handleInitialStateKeys(msg tea.KeyMsg) (tea.Model, tea.
 }
 
 func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceSelectionState) (tea.Model, tea.Cmd) {
+	// Handle manual path entry mode
+	if state.ManualEntry {
+		return m.handleManualPathEntry(msg, &state.ManualEntry, &state.PathInput, &state.PathError, func(path string) error {
+			ops, err := m.StateMachine.GetSourceSelectionOperations()
+			if err != nil {
+				return err
+			}
+			return ops.SelectSource(path)
+		}, func() {
+			state.ManualEntry = false
+			state.PathInput = ""
+			state.PathError = ""
+			_ = m.StateMachine.TransitionTo(state)
+		})
+	}
+
 	if state.Browser == nil {
 		// Initialize browser if missing
 		state.Browser = NewDirectoryBrowser(state.CurrentPath)
-		// Update the state in the state machine
 		_ = m.StateMachine.TransitionTo(state)
 		return m, nil
 	}
@@ -420,6 +490,13 @@ func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceS
 		if state.Browser.GoUp() {
 			_ = m.StateMachine.TransitionTo(state)
 		}
+
+	case "t":
+		// Toggle to manual path entry mode
+		state.ManualEntry = true
+		state.PathInput = state.Browser.GetCurrentPath()
+		state.PathError = ""
+		_ = m.StateMachine.TransitionTo(state)
 
 	case "enter":
 		// Select current directory as source using type-safe operations
@@ -440,6 +517,22 @@ func (m *BubbleTeaModel) handleSourceSelectionKeys(msg tea.KeyMsg, state SourceS
 }
 
 func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state DestinationSelectionState) (tea.Model, tea.Cmd) {
+	// Handle manual path entry mode
+	if state.ManualEntry {
+		return m.handleManualPathEntry(msg, &state.ManualEntry, &state.PathInput, &state.PathError, func(path string) error {
+			ops, err := m.StateMachine.GetDestinationSelectionOperations()
+			if err != nil {
+				return err
+			}
+			return ops.SelectDestination(path)
+		}, func() {
+			state.ManualEntry = false
+			state.PathInput = ""
+			state.PathError = ""
+			_ = m.StateMachine.TransitionTo(state)
+		})
+	}
+
 	if state.Browser == nil {
 		// Initialize browser if missing
 		state.Browser = NewDirectoryBrowser(state.CurrentPath)
@@ -467,6 +560,13 @@ func (m *BubbleTeaModel) handleDestinationSelectionKeys(msg tea.KeyMsg, state De
 		if state.Browser.GoUp() {
 			_ = m.StateMachine.TransitionTo(state)
 		}
+
+	case "t":
+		// Toggle to manual path entry mode
+		state.ManualEntry = true
+		state.PathInput = state.Browser.GetCurrentPath()
+		state.PathError = ""
+		_ = m.StateMachine.TransitionTo(state)
 
 	case "enter":
 		// Select current directory as destination using type-safe operations
@@ -616,11 +716,99 @@ func (m *BubbleTeaModel) handleProgressKeys(msg tea.KeyMsg, state ProgressState)
 	return m, nil
 }
 
-func (m *BubbleTeaModel) handleCompleteKeys(msg tea.KeyMsg, state CompleteState) (tea.Model, tea.Cmd) {
+func (m *BubbleTeaModel) handleCompleteKeys(msg tea.KeyMsg, _ CompleteState) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.quitting = true
 		return m, tea.Quit
 	}
+	return m, nil
+}
+
+// handleManualPathEntry handles text input for manual path entry
+func (m *BubbleTeaModel) handleManualPathEntry(
+	msg tea.KeyMsg,
+	_ *bool,
+	pathInput *string,
+	pathError *string,
+	selectPath func(string) error,
+	exitManualEntry func(),
+) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		// Validate and select the path
+		if *pathInput == "" {
+			*pathError = "Path cannot be empty"
+			return m, nil
+		}
+
+		// Try to select the path
+		if err := selectPath(*pathInput); err != nil {
+			*pathError = err.Error()
+			return m, nil
+		}
+		// Success - path was selected and wizard moved to next state
+		return m, nil
+
+	case "escape", "t":
+		// Exit manual entry mode
+		exitManualEntry()
+		return m, nil
+
+	case "backspace":
+		// Remove last character
+		if len(*pathInput) > 0 {
+			*pathInput = (*pathInput)[:len(*pathInput)-1]
+			*pathError = "" // Clear error when editing
+		}
+		return m, nil
+
+	default:
+		// Add character to path input
+		if len(msg.String()) == 1 {
+			*pathInput += msg.String()
+			*pathError = "" // Clear error when editing
+		}
+	}
+	return m, nil
+}
+
+// showContextHelp shows help information based on current state
+func (m *BubbleTeaModel) showContextHelp() (tea.Model, tea.Cmd) {
+	// For now, just show a simple help message
+	// In a full implementation, this would show a proper help screen
+	currentState := m.StateMachine.CurrentState()
+
+	var helpText string
+	switch currentState.(type) {
+	case SourceSelectionState:
+		helpText = "Source Selection Help:\n" +
+			"↑↓/jk: Navigate directories\n" +
+			"→/l: Enter directory\n" +
+			"←/h: Go to parent directory\n" +
+			"Enter: Select current directory\n" +
+			"t: Toggle manual path entry\n" +
+			"Esc: Cancel selection\n" +
+			"q: Quit wizard"
+
+	case DestinationSelectionState:
+		helpText = "Destination Selection Help:\n" +
+			"↑↓/jk: Navigate directories\n" +
+			"→/l: Enter directory\n" +
+			"←/h: Go to parent directory\n" +
+			"Enter: Select current directory\n" +
+			"t: Toggle manual path entry\n" +
+			"Esc: Go back to source selection\n" +
+			"q: Quit wizard"
+
+	default:
+		helpText = "General Help:\n" +
+			"q: Quit wizard\n" +
+			"Esc: Go back to previous step\n" +
+			"?: Show this help"
+	}
+
+	// For now, set error to show help (in a real implementation, you'd show a modal or separate screen)
+	m.Error = helpText
 	return m, nil
 }

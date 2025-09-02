@@ -17,6 +17,9 @@ type SourceSelectionState struct {
 	CurrentPath string
 	Directories []DirectoryInfo
 	Browser     *DirectoryBrowser
+	ManualEntry bool   // True when in manual path entry mode
+	PathInput   string // Current path being typed
+	PathError   string // Error message if path is invalid
 }
 
 func (SourceSelectionState) wizardState() {}
@@ -27,6 +30,9 @@ type DestinationSelectionState struct {
 	CurrentPath string
 	Directories []DirectoryInfo
 	Browser     *DirectoryBrowser
+	ManualEntry bool   // True when in manual path entry mode
+	PathInput   string // Current path being typed
+	PathError   string // Error message if path is invalid
 }
 
 func (DestinationSelectionState) wizardState() {}

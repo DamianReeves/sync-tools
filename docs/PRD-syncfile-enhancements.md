@@ -27,7 +27,7 @@ Extend SyncFile with post-sync action instructions that execute after successful
 
 - **PATCH**: Apply git-style patches (inline or from files)
 - **SCRIPT**: Execute custom scripts with sync context
-- **TRANSFORM**: Apply file transformations using templates or rules  
+- **TRANSFORM**: Apply file transformations using templates or rules
 - **VALIDATE**: Run validation checks with rollback capabilities
 - **NOTIFY**: Send notifications about sync completion
 
@@ -91,7 +91,7 @@ LAST_LINE(filename)                    # Last line number in file
 LINE_COUNT(filename)                   # Total lines (same as LAST_LINE)
 FILE_SIZE(filename)                    # File size in bytes
 
-# Content search functions  
+# Content search functions
 FIND_LINE(filename, "pattern")         # Line number containing pattern
 FIND_LAST_LINE(filename, "pattern")    # Last line containing pattern
 AFTER_LINE(filename, "pattern")        # Line number after pattern match
@@ -137,7 +137,7 @@ END SCRIPT
 
 **Environment Variables Available to Scripts:**
 - `SYNC_SOURCE`: Source directory path
-- `SYNC_DEST`: Destination directory path  
+- `SYNC_DEST`: Destination directory path
 - `SYNC_MODE`: Sync mode (one-way, two-way)
 - `SYNC_FILES_CHANGED`: Number of files modified
 - `SYNC_FILES_CREATED`: Number of files created
@@ -158,7 +158,7 @@ PREPEND config/app.yml:
   # Configuration for ${ENVIRONMENT}
   # Generated: ${BUILD_TIMESTAMP}
   # Version: ${APP_VERSION}
-  
+
 END PREPEND
 ```
 
@@ -183,7 +183,7 @@ Add content to the end of files after synchronization.
 APPEND [OPTIONS] <target-file>
 APPEND --file footer.txt README.md
 APPEND config/app.yml:
-  
+
   # Production overrides
   production:
     debug: false
@@ -193,7 +193,7 @@ END APPEND
 ```
 
 **Options:**
-- `--file <path>`: Append content from external file  
+- `--file <path>`: Append content from external file
 - `:` (colon): Start inline content definition (ends with `END APPEND`)
 - `--backup`: Create backup before appending content
 - `--target <directory>`: Apply to files in specific directory (default: sync destination)
@@ -335,7 +335,7 @@ GROUP database-update
   VALIDATE --command "test-database-connection.sh"
 END GROUP
 
-GROUP web-server  
+GROUP web-server
   DEPENDS-ON database-update
   TRANSFORM --sed 's/old-version/new-version/g' version.txt
   SCRIPT restart-web-server.sh
@@ -400,12 +400,12 @@ PREPEND config/app.yml:
   # Deployed: ${BUILD_TIMESTAMP}
   # Version: ${APP_VERSION}
   # Environment: ${DEPLOY_ENV}
-  
+
 END PREPEND
 
 # Add environment-specific configuration
 APPEND config/app.yml:
-  
+
   # Production overrides
   production:
     database_url: ${DB_HOST}:${DB_PORT}
@@ -478,7 +478,7 @@ GITIGNORE true
 # Apply server-specific patches
 IF HOSTNAME == "web-01"
   PATCH --file patches/web-01.patch
-ELIF HOSTNAME == "web-02"  
+ELIF HOSTNAME == "web-02"
   PATCH --file patches/web-02.patch
 END IF
 
@@ -519,15 +519,15 @@ const (
     InstTransform   InstructionType = "TRANSFORM"   // TRANSFORM --template config/*.tmpl
     InstValidate    InstructionType = "VALIDATE"    // VALIDATE --command "test.sh"
     InstNotify      InstructionType = "NOTIFY"      // NOTIFY --slack "#ops" "Done"
-    
+
     // Control flow instructions
     InstIf          InstructionType = "IF"          // IF condition
-    InstElif        InstructionType = "ELIF"        // ELIF condition  
+    InstElif        InstructionType = "ELIF"        // ELIF condition
     InstElse        InstructionType = "ELSE"        // ELSE
     InstEndif       InstructionType = "ENDIF"       // ENDIF
     InstGroup       InstructionType = "GROUP"       // GROUP name
     InstDependsOn   InstructionType = "DEPENDS-ON"  // DEPENDS-ON group
-    
+
     // Configuration instructions
     InstRollbackOnFailure InstructionType = "ROLLBACK-ON-FAILURE" // ROLLBACK-ON-FAILURE true
     InstBackupStrategy    InstructionType = "BACKUP-STRATEGY"     // BACKUP-STRATEGY incremental
@@ -594,7 +594,7 @@ type SyncResult struct {
 
 ### Must-Have Features (MVP)
 - [ ] PATCH instruction with file and inline support, function-style variables
-- [ ] PREPEND instruction for adding content to file beginnings  
+- [ ] PREPEND instruction for adding content to file beginnings
 - [ ] APPEND instruction for adding content to file ends
 - [ ] Basic error handling (abort, continue modes)
 - [ ] Environment variable access to sync results
@@ -624,7 +624,7 @@ type SyncResult struct {
 - **Performance**: Large patches and scripts may slow deployment
   - *Mitigation*: Timeout controls, async execution options
 
-### User Experience Risks  
+### User Experience Risks
 - **Learning Curve**: New syntax may overwhelm existing users
   - *Mitigation*: Comprehensive documentation, examples, gradual rollout
 - **Debugging**: Complex action chains difficult to troubleshoot
@@ -634,14 +634,14 @@ type SyncResult struct {
 
 ### Phase 1: Core Actions (4 weeks)
 - Week 1-2: PATCH instruction implementation
-- Week 3-4: SCRIPT instruction implementation  
+- Week 3-4: SCRIPT instruction implementation
 - Testing and documentation
 
 ### Phase 2: Enhanced Features (3 weeks)
 - Week 5-6: TRANSFORM and VALIDATE instructions
 - Week 7: Error handling and backup strategies
 
-### Phase 3: Advanced Features (3 weeks) 
+### Phase 3: Advanced Features (3 weeks)
 - Week 8-9: Conditional execution and control flow
 - Week 10: Notification system and polish
 

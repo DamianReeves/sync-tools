@@ -15,7 +15,7 @@ This guide covers the advanced development patterns introduced in sync-tools v0.
 sync-tools v0.4.0 introduces several sophisticated patterns that provide compile-time safety, enhanced testability, and domain-driven design:
 
 - **Type State Pattern**: Compile-time guarantees for state transitions
-- **Enhanced Test Driver**: Fluent API for complex test scenarios  
+- **Enhanced Test Driver**: Fluent API for complex test scenarios
 - **Object Mother Patterns**: Domain-specific builders for different user personas
 - **Multi-Persona Design**: Tailored interfaces for DevOps, Developers, and Compliance teams
 
@@ -27,12 +27,12 @@ The Type State Pattern ensures that state transitions in the interactive wizard 
 
 ```go
 // Define valid transition types as concrete structs
-type InitialToSourceSelection struct{ 
-    StateTransition[InitialState, SourceSelectionState] 
+type InitialToSourceSelection struct{
+    StateTransition[InitialState, SourceSelectionState]
 }
 
-type SourceToDestination struct{ 
-    StateTransition[SourceSelectionState, DestinationSelectionState] 
+type SourceToDestination struct{
+    StateTransition[SourceSelectionState, DestinationSelectionState]
 }
 
 // Type-safe state transition helpers
@@ -96,12 +96,12 @@ type WizardScenarioBuilder interface {
     WithSource(path string) WizardScenarioBuilder
     WithDestination(path string) WizardScenarioBuilder
     WithMode(mode string) WizardScenarioBuilder
-    
+
     // Expectation methods for test validation
     ExpectSuccess() WizardScenarioBuilder
     ExpectFailure(expectedError string) WizardScenarioBuilder
     ExpectSyncFileContaining(content string) WizardScenarioBuilder
-    
+
     // Execution methods
     Execute() *WizardResult
     ExecuteInTestMode() *WizardResult
@@ -143,7 +143,7 @@ config := DevOps.DeploymentSync("./app", "./prod")
 // - Exclusions: *.tmp, *.log, .git/, node_modules/, target/
 // - GitIgnore enabled
 
-// DevOps backup scenario  
+// DevOps backup scenario
 config := DevOps.BackupSync("./data", "./backup")
 // Pre-configured with:
 // - Two-way sync mode
@@ -157,7 +157,7 @@ config := DevOps.BackupSync("./data", "./backup")
 // Developer project sync
 config := Developer.ProjectSync("./src", "./staging")
 // Pre-configured with:
-// - One-way sync mode  
+// - One-way sync mode
 // - Exclusions: node_modules/, target/, build/, dist/, *.o, *.class
 // - GitIgnore enabled
 
@@ -172,7 +172,7 @@ config := Developer.AssetSync("./assets", "./cdn")
 
 ```go
 // Compliance audit sync
-config := Compliance.AuditSync("./records", "./archive") 
+config := Compliance.AuditSync("./records", "./archive")
 // Pre-configured with:
 // - One-way sync mode
 // - Dry-run enabled (compliance requires review)
@@ -192,7 +192,7 @@ config := pmWizard.FeatureDeployment("./feature", "./staging")
 // - Dry-run enabled (PM always wants to review first)
 
 // Emergency hotfix (faster deployment)
-config := pmWizard.HotfixDeployment("./hotfix", "./production")  
+config := pmWizard.HotfixDeployment("./hotfix", "./production")
 // Pre-configured with:
 // - Dry-run disabled (hotfixes need to be fast)
 // - Minimal exclusions
@@ -209,7 +209,7 @@ stages := NewMultiStageWizard().
         WithMode("one-way").
         Build().
     Stage2(stage1Result).
-        WithSourceDir("./build").  
+        WithSourceDir("./build").
         WithDestinationDir("./staging").
         WithMode("one-way").
         Build().
@@ -242,13 +242,13 @@ func TestWizardGeneratesTwoWaySyncFile(t *testing.T) {
     // Given a wizard scenario
     scenario := driver.NewScenario().
         WithSource("./test_src").
-        WithDestination("./test_dst").  
+        WithDestination("./test_dst").
         WithMode("two-way").
         ExpectSyncFileContaining("MODE two-way")
-    
+
     // When executed in test mode
     result := scenario.ExecuteInTestMode()
-    
+
     // Then it should succeed
     assert.True(t, result.Success)
 }
@@ -269,10 +269,10 @@ Object Mothers serve as executable specifications:
 func TestDevOpsDeploymentWorkflow(t *testing.T) {
     // This test documents how DevOps teams actually use sync-tools
     config := DevOps.DeploymentSync("./app", "./production")
-    
+
     driver := testdriver.NewWizardDriver()
     result := driver.GenerateSyncFile(config)
-    
+
     // Expectations based on real DevOps requirements
     assert.Contains(t, result.SyncFileContent, "EXCLUDE node_modules/")
     assert.Contains(t, result.SyncFileContent, "GITIGNORE true")
@@ -290,14 +290,14 @@ func TestComplexSyncScenario(t *testing.T) {
     // Builder prevents invalid combinations at compile time
     scenario := mother.WizardConfigFor("./src", "./dst").
         WithMode("two-way").
-        WithExclusionPatterns("*.tmp", "*.log"). 
+        WithExclusionPatterns("*.tmp", "*.log").
         WithGitIgnore(true).
         WithDryRun(false).
         Build()
-    
+
     // Type-safe execution
     result := driver.GenerateSyncFile(scenario)
-    
+
     // Fluent assertions
     assert.True(t, result.Success)
     assert.Contains(t, result.SyncFileContent, "MODE two-way")
@@ -317,7 +317,7 @@ func TestDevOpsPersonaWorkflows(t *testing.T) {
         {"backup", DevOps.BackupSync("./data", "./backup")},
         {"configuration", DevOps.ConfigurationSync("./config", "./remote")},
     }
-    
+
     for _, tc := range testCases {
         t.Run(tc.name, func(t *testing.T) {
             result := driver.GenerateSyncFile(tc.config)
@@ -385,8 +385,8 @@ func (d DataValidationState) GetStateName() string {
 
 2. **Add Type-Safe Transitions**:
 ```go
-type ProgressToDataValidation struct{ 
-    StateTransition[ProgressState, DataValidationState] 
+type ProgressToDataValidation struct{
+    StateTransition[ProgressState, DataValidationState]
 }
 
 func (sm *StateMachine) FromProgressToDataValidation(newState DataValidationState) error {

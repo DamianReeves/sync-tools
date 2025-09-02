@@ -3,7 +3,7 @@ sync-tools
 /build/
 /dist/
 
-# Go test artifacts  
+# Go test artifacts
 *.test
 *.prof
 coverage.out
