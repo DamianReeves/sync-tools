@@ -399,8 +399,8 @@ func (h *HelpModal) Render(baseContent string) string {
 }
 
 func (h *HelpModal) HandleInput(msg tea.KeyMsg) (Modal, tea.Cmd, bool) {
-	// Any key closes help
-	return h, nil, true
+	// Any key closes help - return nil to indicate modal should be closed
+	return nil, nil, true
 }
 
 func (h *HelpModal) IsComplete() (bool, WizardState) {

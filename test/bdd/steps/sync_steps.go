@@ -290,6 +290,23 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I can toggle selection with Space$`, tc.iCanToggleSelectionWithSpace)
 	ctx.Step(`^I can see totals: "([^"]*)"$`, tc.iCanSeeTotals)
 
+	// Help Modal steps
+	ctx.Step(`^I am in the sync wizard$`, tc.iAmInTheSyncWizard)
+	ctx.Step(`^I am on the source selection screen$`, tc.iAmOnTheSourceSelectionScreen)
+	ctx.Step(`^I press "([^"]*)" to open help$`, tc.iPressToOpenHelp)
+	ctx.Step(`^I should see the help modal displayed$`, tc.iShouldSeeTheHelpModalDisplayed)
+	ctx.Step(`^I should see "([^"]*)" in the help text$`, tc.iShouldSeeInTheHelpText)
+	ctx.Step(`^I should see navigation instructions in the help text$`, tc.iShouldSeeNavigationInstructionsInTheHelpText)
+	ctx.Step(`^I press any key to close help$`, tc.iPressAnyKeyToCloseHelp)
+	ctx.Step(`^I press "([^"]*)" to close help$`, tc.iPressToCloseHelp)
+	ctx.Step(`^the help modal should be closed$`, tc.theHelpModalShouldBeClosed)
+	ctx.Step(`^I should return to the source selection screen$`, tc.iShouldReturnToTheSourceSelectionScreen)
+	ctx.Step(`^I should still be able to navigate directories$`, tc.iShouldStillBeAbleToNavigateDirectories)
+	ctx.Step(`^I should be able to press "([^"]*)" to navigate down$`, tc.iShouldBeAbleToPressToNavigateDown)
+	ctx.Step(`^I should be able to press "([^"]*)" to navigate up$`, tc.iShouldBeAbleToPressToNavigateUp)
+	ctx.Step(`^I should be able to press "([^"]*)" to open manual path entry$`, tc.iShouldBeAbleToPressToOpenManualPathEntry)
+	ctx.Step(`^I press "([^"]*)" to open help again$`, tc.iPressToOpenHelpAgain)
+
 	// Setup and cleanup hooks
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return tc.beforeScenario(ctx, sc)
