@@ -442,6 +442,9 @@ func (m *BubbleTeaModel) handleInitialStateKeys(msg tea.KeyMsg) (tea.Model, tea.
 		if ops, err := m.StateMachine.GetInitialOperations(); err == nil {
 			if err := ops.StartSourceSelection(); err != nil {
 				m.Error = fmt.Sprintf("Failed to start source selection: %v", err)
+			} else {
+				// Sync the state machine's current state to the UI state
+				m.UIState.DomainState = m.StateMachine.CurrentState()
 			}
 		}
 	}

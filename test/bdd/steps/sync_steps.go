@@ -307,6 +307,11 @@ func (tc *TestContext) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I should be able to press "([^"]*)" to open manual path entry$`, tc.iShouldBeAbleToPressToOpenManualPathEntry)
 	ctx.Step(`^I press "([^"]*)" to open help again$`, tc.iPressToOpenHelpAgain)
 
+	// Welcome Screen steps
+	ctx.Step(`^I am on the welcome screen$`, tc.iAmOnTheWelcomeScreen)
+	ctx.Step(`^I press "([^"]*)" to start$`, tc.iPressToStart)
+	ctx.Step(`^I should be on the source selection screen$`, tc.iShouldBeOnTheSourceSelectionScreen)
+
 	// Setup and cleanup hooks
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return tc.beforeScenario(ctx, sc)
